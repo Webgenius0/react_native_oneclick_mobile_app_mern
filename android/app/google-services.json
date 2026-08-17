@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "225394019783",
+    "project_id": "click-df913",
+    "storage_bucket": "click-df913.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:225394019783:android:67e307090137b82936dde2",
+        "android_client_info": {
+          "package_name": "com.oneclick.shop"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD1rGJc-PL_DB-01go76_uUxfzpF13lf-U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
