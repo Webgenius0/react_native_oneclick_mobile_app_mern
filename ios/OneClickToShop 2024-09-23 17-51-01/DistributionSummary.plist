@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>OneClickToShop.ipa</key>
+	<array>
+		<dict>
+			<key>architectures</key>
+			<array>
+				<string>arm64</string>
+			</array>
+			<key>buildNumber</key>
+			<string>7</string>
+			<key>certificate</key>
+			<dict>
+				<key>SHA1</key>
+				<string>6F5B116F852E2D6AB35B375B56DCFEEC5837DF27</string>
+				<key>dateExpires</key>
+				<string>1.01.2025</string>
+				<key>type</key>
+				<string>Cloud Managed Apple Distribution</string>
+			</dict>
+			<key>embeddedBinaries</key>
+			<array>
+				<dict>
+					<key>architectures</key>
+					<array>
+						<string>arm64</string>
+					</array>
+					<key>buildNumber</key>
+					<string>0.12.0</string>
+					<key>certificate</key>
+					<dict>
+						<key>SHA1</key>
+						<string>6F5B116F852E2D6AB35B375B56DCFEEC5837DF27</string>
+						<key>dateExpires</key>
+						<string>1.01.2025</string>
+						<key>type</key>
+						<string>Cloud Managed Apple Distribution</string>
+					</dict>
+					<key>name</key>
+					<string>hermes.framework</string>
+					<key>team</key>
+					<dict>
+						<key>id</key>
+						<string>FPH96QND43</string>
+						<key>name</key>
+						<string>REVEA TEKNOLOJI TICARET LIMITED SIRKETI</string>
+					</dict>
+					<key>versionNumber</key>
+					<string>0.12.0</string>
+				</dict>
+			</array>
+			<key>entitlements</key>
+			<dict>
+				<key>application-identifier</key>
+				<string>FPH96QND43.com.revea.oneclicktoshop</string>
+				<key>aps-environment</key>
+				<string>production</string>
+				<key>com.apple.developer.team-identifier</key>
+				<string>FPH96QND43</string>
+				<key>get-task-allow</key>
+				<false/>
+			</dict>
+			<key>name</key>
+			<string>OneClickToShop.app</string>
+			<key>profile</key>
+			<dict>
+				<key>UUID</key>
+				<string>7930c86d-7a5c-4227-b796-1a3c1800e834</string>
+				<key>dateExpires</key>
+				<string>1.01.2025</string>
+				<key>name</key>
+				<string>iOS Team Ad Hoc Provisioning Profile: com.revea.oneclicktoshop</string>
+			</dict>
+			<key>team</key>
+			<dict>
+				<key>id</key>
+				<string>FPH96QND43</string>
+				<key>name</key>
+				<string>REVEA TEKNOLOJI TICARET LIMITED SIRKETI</string>
+			</dict>
+			<key>versionNumber</key>
+			<string>1.2.8</string>
+		</dict>
+	</array>
+</dict>
+</plist>

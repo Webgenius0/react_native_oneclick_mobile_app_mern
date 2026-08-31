@@ -1,0 +1,26 @@
+diff --git a/node_modules/react-native-webview/apple/RNCWebViewImpl.m b/node_modules/react-native-webview/apple/RNCWebViewImpl.m
+index 0a9d7f0..7b5f88d 100644
+--- a/node_modules/react-native-webview/apple/RNCWebViewImpl.m
++++ b/node_modules/react-native-webview/apple/RNCWebViewImpl.m
+@@ -875,12 +875,19 @@ - (void)visitSource
+     }
+     if (request.URL.host) {
+       [webView loadRequest:request];
+     }
+-    else {
++    else if (request.URL.fileURL) {
+       NSURL* readAccessUrl = allowingReadAccessToURL ? [RCTConvert NSURL:allowingReadAccessToURL] : request.URL;
+-      [webView loadFileURL:request.URL allowingReadAccessToURL:readAccessUrl];
++      @try {
++        [webView loadFileURL:request.URL allowingReadAccessToURL:readAccessUrl];
++      } @catch (NSException *exception) {
++        [webView loadRequest:request];
++      }
+     }
++    else {
++      [webView loadRequest:request];
++    }
+   }];
+ }
+ 
+ #if !TARGET_OS_OSX
