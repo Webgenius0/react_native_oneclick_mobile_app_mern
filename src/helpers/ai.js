@@ -1,10 +1,7 @@
 import axios from 'axios';
-
 import {API_URL} from '../../config';
 import asyncStorage from '@react-native-async-storage/async-storage/src/AsyncStorage';
 import {getToken} from './auth';
-// import navigator from "../services/navigator";
-// any js module
 import * as RootNavigation from './../services/RootNavigation';
 
 const ai = axios.create();
@@ -12,7 +9,7 @@ const aiLog = false;
 const aiErrorLog = true;
 ai.defaults.baseURL = API_URL;
 
-// console.log('API_URL', API_URL);
+console.log('API_URL', API_URL);
 
 ai.interceptors.request.use(
   async config => {
@@ -76,16 +73,21 @@ ai.interceptors.response.use(
       if (aiErrorLog) {
         console.log('403 Err');
       }
-      // console.log("removeItem user");
       await asyncStorage.removeItem('user');
-      RootNavigation.reset('Login');
-      // return false;
-      // navigator.reset("Login");
 
-      // localStorage.removeItem('token');
-
-      // window.location = '/'
+      try {
+        if (RootNavigation.navigationRef && RootNavigation.navigationRef.isReady()) {
+          const currentRoute = RootNavigation.navigationRef.getCurrentRoute();
+          if (currentRoute && currentRoute.name !== 'Login' && currentRoute.name !== 'Splash') {
+            RootNavigation.reset('Login');
+          }
+        }
+      } catch (navErr) {
+        console.log('Navigation reset error:', navErr);
+      }
     }
+
+    return Promise.reject(error);
   },
 );
 

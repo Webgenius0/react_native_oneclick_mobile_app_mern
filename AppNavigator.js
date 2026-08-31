@@ -4,7 +4,6 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { navigationRef } from './src/services/RootNavigation.js';
 
 import { useContext, useEffect, useState } from 'react';
-import { getToken } from './src/helpers/auth';
 import { i18n, t, tr } from './src/translate/i18n';
 import { storageGet } from './src/helpers/storage';
 import { EmContext } from './src/contexts/EmContext';
@@ -12,7 +11,6 @@ import Colors from './src/assets/Colors';
 import ReceiveSharingIntent from 'react-native-receive-sharing-intent';
 import { useCartStore } from './src/store/useCartStore';
 
-import NavigatorService from './src/services/navigator';
 import * as RNLocalize from 'react-native-localize';
 import ReactNative from 'react-native';
 
@@ -22,11 +20,9 @@ import DotsIcon from './src/assets/svg/dots.svg';
 import CreditIcon from './src/assets/svg/credit.svg';
 import CartIcon from './src/assets/svg/cart.svg';
 import BagIcon from './src/assets/svg/bag.svg';
-import BoxDown from './src/assets/svg/box-down.svg';
 import TruckIcon from './src/assets/svg/truck.svg';
 import SupportIcon from './src/assets/svg/support.svg';
 import ExpressIcon from './src/assets/svg/1click.svg';
-import TurkeyIcon from './src/assets/svg/turkey.svg';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -38,12 +34,10 @@ import Login from './src/pages/Login';
 import CategoryList from './src/pages/CategoryList';
 import CategoryDetail from './src/pages/CategoryDetail';
 import Orders from './src/pages/Orders';
-import Arrivals from './src/pages/Arrivals';
 import Cart from './src/pages/Cart';
 import Webview from './src/pages/Webview';
 import WebviewLite from './src/pages/WebviewLite';
 import WebsiteSuggest from './src/pages/WebsiteSuggest';
-import Balance from './src/pages/Balance';
 import OrderDetail from './src/pages/OrderDetail';
 import OrderForm from './src/pages/OrderForm';
 import Splash from './src/pages/Splash';
@@ -54,7 +48,6 @@ import PaymentStart from './src/pages/PaymentStart';
 import PaymentResponse from './src/pages/PaymentResponse';
 import WaafiPay from './src/pages/WaafiPay';
 import Support from './src/pages/Support';
-import { IS_DEV } from './src/helpers/common';
 import CartForm from './src/pages/CartForm';
 import EDahab from './src/pages/EDahab';
 import HomeNew from './src/pages/HomeNew.js';
@@ -62,7 +55,7 @@ import { EXPRESS } from './config.js';
 import BannerList from './src/pages/BannerList.js';
 
 export default function AppNavigator() {
-  const { ctx, ctxDil, setCtxDil } = useContext(EmContext);
+  const { ctx, setCtxDil } = useContext(EmContext);
   const { addItem } = useCartStore();
 
   const [state, setState] = useState({
@@ -89,45 +82,34 @@ export default function AppNavigator() {
   }
 
   const loadLanguage = async () => {
-    const lang = await storageGet('language');
-    if (lang) {
-      i18n.locale = lang;
-      setCtxDil(lang);
-      // i18n.changeLanguage(lang);
-    } else {
-      const locales = RNLocalize.getLocales();
-      const deviceLanguageCodes = locales.map(locale => locale.languageCode);
-      // console.log('device locales', deviceLanguageCodes);
-      const availableLanguages = ['en', 'tr', 'som'];
+    try {
+      const lang = await storageGet('language');
+      if (lang) {
+        i18n.locale = lang;
+        setCtxDil(lang);
+      } else {
+        const locales = RNLocalize.getLocales();
+        const deviceLanguageCodes = locales && locales.length ? locales.map(locale => locale.languageCode) : [];
+        const availableLanguages = ['en', 'tr', 'som'];
 
-      let findedLang = false;
-      deviceLanguageCodes.forEach(lang => {
-        if (findedLang === false && availableLanguages.includes(lang)) {
-          findedLang = lang;
-          i18n.locale = lang;
-          setCtxDil(lang);
-          // console.log('findend Lang', findedLang);
-          // i18n.changeLanguage(lang);
-        }
-      });
-
-      /*
-      if(availableLanguages.includes('tr')) {
-        i18n.locale = 'tr';
-        setCtxDil('tr');
+        let findedLang = false;
+        deviceLanguageCodes.forEach(lang => {
+          if (findedLang === false && availableLanguages.includes(lang)) {
+            findedLang = lang;
+            i18n.locale = lang;
+            setCtxDil(lang);
+          }
+        });
       }
-      */
+
+      const isRTL = i18n.locale === 'ar' || i18n.locale === 'ckb';
+      ReactNative.I18nManager.allowRTL(isRTL);
+      ReactNative.I18nManager.forceRTL(false);
+    } catch (err) {
+      console.log('loadLanguage error:', err);
+    } finally {
+      setState(prev => ({ ...prev, loading: false }));
     }
-
-    const isRTL = i18n.locale === 'ar' || i18n.locale === 'ckb';
-
-    // console.log('isRTL', isRTL);
-
-    ReactNative.I18nManager.allowRTL(isRTL);
-    ReactNative.I18nManager.forceRTL(false);
-    // ReactNative.I18nManager.forceRTL(isRTL);
-
-    setState({ ...state, loading: false });
   };
 
   useEffect(() => {
@@ -151,6 +133,7 @@ export default function AppNavigator() {
             image: productImage,
           });
 
+          ReceiveSharingIntent.clearReceivedFiles();
           // Navigate to cart
           setTimeout(() => {
             navigationRef.current?.navigate('Cart');

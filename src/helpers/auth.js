@@ -8,9 +8,9 @@ export const getToken = async () => {
     token = user?.token;
   } catch (error) {
     console.log('Something went wrong - getToken', error);
-    return 'catch err';
+    return null;
   }
-  return token;
+  return token || null;
 };
 
 export const getUser = async () => {

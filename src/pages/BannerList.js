@@ -77,39 +77,35 @@ export default function({ route, navigation }) {
   useFocusEffect(
     useCallback(() => {
       const fetchData = async () => {
-        // console.log("fetchData", +new Date());
-        setSubLoading(true);
-        console.log("BannerList fetchData:home ulkeID", ulkeID);
-        const c = await ai.post("home", {
-          ulkeID: ulkeID
-        });
-        let ns = { ...state };
-        // console.log("home", JSON.stringify(c.data));
-        if (c?.data?.error === false) {
-          ns = {
-            ...ns,
-            banners: c.data.banners,
-            sliders: c.data.sliders,
-            banners_orta: c.data.banners_orta,
-            stories: c.data.stories,
-            ulkes: c.data.ulkes,
-            kur: c.data?.kur ?? "",
-          };
-        } else {
-          alert("Hata Oluştu ");
-          ns = { ...ns, banners: [], sliders: [], stories: [] };
+        try {
+          setSubLoading(true);
+          console.log("BannerList fetchData:home ulkeID", ulkeID);
+          const c = await ai.post("home", {
+            ulkeID: ulkeID
+          });
+          let ns = { ...state };
+          if (c?.data?.error === false) {
+            ns = {
+              ...ns,
+              banners: c.data.banners || [],
+              sliders: c.data.sliders || [],
+              banners_orta: c.data.banners_orta || [],
+              stories: c.data.stories || [],
+              ulkes: c.data.ulkes || [],
+              kur: c.data?.kur ?? "",
+            };
+          } else {
+            ns = { ...ns, banners: [], sliders: [], stories: [] };
+          }
+
+          ns.loading = false;
+          setState(ns);
+        } catch (error) {
+          console.log("BannerList fetchData error:", error?.message);
+          setState(prev => ({ ...prev, loading: false }));
+        } finally {
+          setSubLoading(false);
         }
-
-        console.log("BannerList", JSON.stringify(ns));
-        ns.loading = false;
-        setState(ns);
-        setSubLoading(false);
-
-        /* if (ulkeID === 0 && ns.ulkes.length > 0) {
-          setUlkeID(ns.ulkes[0].id);
-        } */
-
-        // setCtx({ ...ctx, ulkes: ns.ulkes });
       };
 
       fetchData();

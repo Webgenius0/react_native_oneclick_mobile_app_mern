@@ -109,13 +109,15 @@ export default function ({ navigation }) {
   };
 
   const fetchSettings = async () => {
-    const res = await ai.get('settings');
-    // console.log(res);
-    if (res?.data?.error === false) {
-      setSettings({ ...settings, ...res.data.settings });
+    try {
+      const res = await ai.get('settings');
+      if (res?.data?.error === false) {
+        setSettings(prev => ({ ...prev, ...res.data.settings }));
+      }
+    } catch (e) {
+      console.log('fetchSettings error:', e?.message);
+    } finally {
       setSettingLoading(false);
-    } else {
-      alert(tr(res.data?.msg) || tr('Hata Oluştu'));
     }
   };
 

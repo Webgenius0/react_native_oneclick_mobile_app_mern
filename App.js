@@ -58,27 +58,31 @@ const App = () => {
   };
 
   const checkVersion = async () => {
-    var s = await appVersionCheck();
+    try {
+      var s = await appVersionCheck();
 
-    if (!s.valid && s.redirect && (!__DEV__ || DEV_REDIRECT_STORE)) {
-      var url = Platform.select({ ios: s.ios, android: s.android });
+      if (s && !s.valid && s.redirect && (!__DEV__ || DEV_REDIRECT_STORE)) {
+        var url = Platform.select({ ios: s.ios, android: s.android });
 
-      Alert.alert(
-        tr('Güncelleme Gerekli'),
-        tr('Yeni bir versiyon mevcut Lütfen uygulamayı güncelleyiniz'),
-        [
-          {
-            text: tr('Güncelle'),
-            onPress: () => {
-              BackHandler.exitApp();
-              Linking.openURL(url);
+        Alert.alert(
+          tr('Güncelleme Gerekli'),
+          tr('Yeni bir versiyon mevcut Lütfen uygulamayı güncelleyiniz'),
+          [
+            {
+              text: tr('Güncelle'),
+              onPress: () => {
+                BackHandler.exitApp();
+                Linking.openURL(url);
+              },
             },
-          },
-        ],
-        { cancelable: false },
-      );
+          ],
+          { cancelable: false },
+        );
 
-      return false;
+        return false;
+      }
+    } catch (e) {
+      console.log('checkVersion error:', e?.message);
     }
   };
 
@@ -112,9 +116,8 @@ const App = () => {
       if (files && files.length > 0) {
         const sharedText = files[0].text;
         if (sharedText && (sharedText.includes('trendyol.com') || sharedText.includes('hepsiburada.com') || sharedText.includes('amazon.com.tr'))) {
-          // Navigate to WebView with shared link
-          // This will be handled by AppNavigator
           console.log('Shared link received:', sharedText);
+          ReceiveSharingIntent.clearReceivedFiles();
         }
       }
     },

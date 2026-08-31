@@ -74,33 +74,33 @@ export default function({ route, navigation }) {
   useFocusEffect(
     useCallback(() => {
       const fetchData = async () => {
-        // console.log("fetchData", +new Date());
-        setSubLoading(true);
-        const c = await ai.post("home", {
-          ulkeID: ulkeID
-        });
-        let ns = { ...state };
-        // console.log("home", JSON.stringify(c.data));
-        if (c?.data?.error === false) {
-          ns = {
-            ...ns,
-            banners: c.data.banners,
-            sliders: c.data.sliders,
-            banners_orta: c.data.banners_orta,
-            ulkes: c.data.ulkes,
-            kur: c.data?.kur ?? "",
-          };
-        } else {
-          alert("Hata Oluştu ");
-          ns = { ...ns, banners: [], sliders: [] };
+        try {
+          setSubLoading(true);
+          const c = await ai.post("home", {
+            ulkeID: ulkeID
+          });
+          let ns = { ...state };
+          if (c?.data?.error === false) {
+            ns = {
+              ...ns,
+              banners: c.data.banners || [],
+              sliders: c.data.sliders || [],
+              banners_orta: c.data.banners_orta || [],
+              ulkes: c.data.ulkes || [],
+              kur: c.data?.kur ?? "",
+            };
+          } else {
+            ns = { ...ns, banners: [], sliders: [] };
+          }
+
+          ns.loading = false;
+          setState(ns);
+        } catch (error) {
+          console.log("Home fetchData error:", error?.message);
+          setState(prev => ({ ...prev, loading: false }));
+        } finally {
+          setSubLoading(false);
         }
-
-        console.log("home", JSON.stringify(ns));
-        ns.loading = false;
-        setState(ns);
-        setSubLoading(false);
-
-        // setCtx({ ...ctx, ulkes: ns.ulkes });
       };
 
       fetchData();

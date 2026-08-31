@@ -1,20 +1,11 @@
-import React, {useEffect, useRef, useState} from 'react';
-import {
-  View,
-  StyleSheet,
-  Animated,
-  Dimensions,
-  Text,
-  Image,
-} from 'react-native';
-import {getUser} from '../helpers/auth';
-import {CommonActions} from '@react-navigation/native';
-import {BASE_URL} from '../../config';
-import Logo from '../components/Logo';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, StyleSheet, Animated, Dimensions, Text, Image } from 'react-native';
+import { getUser } from '../helpers/auth';
+import { CommonActions } from '@react-navigation/native';
+import { BASE_URL, FIREBASE_ENABLED } from '../../config';
 import messaging from '@react-native-firebase/messaging';
-import * as RootNavigation from '../services/RootNavigation';
 
-export default function ({route, navigation}) {
+export default function ({ navigation }) {
   const [state, setState] = useState({
     logged: null,
     target: 'Login',
@@ -22,21 +13,26 @@ export default function ({route, navigation}) {
 
   const [animationCompleted, setAnimationCompleted] = useState(false);
   const [tokenChecked, setTokenChecked] = useState(false);
-  const {width} = Dimensions.get('window');
+  const { width } = Dimensions.get('window');
 
   useEffect(() => {
     const checkToken = async () => {
-      let user = await getUser();
-      let token = user ? user.token : null;
-      let ns = {};
-      if (user && token) {
-        ns = {...state, logged: true, target: 'Home'};
-      } else {
-        ns = {...state, logged: false, target: 'Login'};
+      try {
+        let user = await getUser();
+        let token = user ? user.token : null;
+        let ns = {};
+        if (user && token) {
+          ns = { ...state, logged: true, target: 'Home' };
+        } else {
+          ns = { ...state, logged: false, target: 'Login' };
+        }
+        setState(ns);
+      } catch (err) {
+        console.log('checkToken error:', err);
+        setState({ ...state, logged: false, target: 'Login' });
+      } finally {
+        setTokenChecked(true);
       }
-
-      setState(ns);
-      setTokenChecked(true);
     };
 
     checkToken();
@@ -45,93 +41,79 @@ export default function ({route, navigation}) {
   useEffect(() => {
     if (animationCompleted && tokenChecked) {
       let routes;
-      let routeIndex = 0;
       let defaultLoggedPage = 'AuthAfter';
       let defaultParams = {};
-      if (__DEV__) {
-        // defaultLoggedPage = 'Webview';
-        // defaultLoggedPage = 'AuthAfter';
-        // defaultLoggedPage = 'Orderss';
-        //defaultParams = {screen: 'Orders'};
-        // defaultParams = {screen: 'Support'};
-      }
 
       if (state.target === 'Home') {
-        routes = [{name: defaultLoggedPage}];
+        routes = [{ name: defaultLoggedPage }];
       } else {
-        routes = [{name: 'Login'}];
+        routes = [{ name: 'Login' }];
       }
 
       var tip = null;
       var orderId = null;
       var grupID = null;
 
-      messaging()
-        .getInitialNotification()
-        .then(remoteMessage => {
-          if (remoteMessage) {
-            //console.log("==== Notification caused app to open from quit state: ===", remoteMessage);
-
-            tip = remoteMessage.data?.type;
-            //console.log('===== tip =====', tip);
-            if (tip === 'order') {
-              orderId = remoteMessage.data?.id;
-              grupID = remoteMessage.data?.grupID;
-            }
-
-            console.log(' ===== grupID splash area  =====', grupID);
-
-            routeIndex = routes.length - 1;
-          } else {
-            //console.log("No initial notification found");
-          }
-        })
-        .catch(error => {
-          //console.error("Error getting initial notification: ", error);
-        })
-        .finally(() => {
-          //console.log('===== routes (final) =====', routes);
-          //console.log('===== routeIndex (final) =====', routeIndex);
-
-          if (state.logged) {
-            if (tip === 'order') {
-              // Orders
-              navigation.dispatch(
-                CommonActions.reset({
-                  index: 0,
-                  routes: [
-                    {
-                      name: 'AuthAfter',
+      const navigateToTarget = (curTip, curGrupId) => {
+        if (state.logged) {
+          if (curTip === 'order') {
+            navigation.dispatch(
+              CommonActions.reset({
+                index: 0,
+                routes: [
+                  {
+                    name: 'AuthAfter',
+                    params: {
+                      screen: 'Orders',
                       params: {
-                        screen: 'Orders',
-                        params: {
-                          // id: orderId || 0,
-                          grupID: grupID,
-                          refetch: +new Date(),
-                        },
+                        grupID: curGrupId,
+                        refetch: +new Date(),
                       },
                     },
-                  ],
-                }),
-              );
-            } else {
-              navigation.dispatch(
-                CommonActions.reset({
-                  index: 0,
-                  routes: routes,
-                  params: defaultParams,
-                }),
-              );
-            }
+                  },
+                ],
+              }),
+            );
           } else {
             navigation.dispatch(
               CommonActions.reset({
                 index: 0,
                 routes: routes,
+                params: defaultParams,
               }),
             );
           }
-        });
+        } else {
+          navigation.dispatch(
+            CommonActions.reset({
+              index: 0,
+              routes: routes,
+            }),
+          );
+        }
+      };
+
+      if (FIREBASE_ENABLED) {
+        messaging()
+          .getInitialNotification()
+          .then(remoteMessage => {
+            if (remoteMessage) {
+              tip = remoteMessage.data?.type;
+              if (tip === 'order') {
+                orderId = remoteMessage.data?.id;
+                grupID = remoteMessage.data?.grupID;
+              }
+            }
+          })
+          .catch(error => {
+            console.log('Error getting initial notification: ', error);
+          })
+          .finally(() => {
+            navigateToTarget(tip, grupID);
+          });
+      } else {
+        navigateToTarget(tip, grupID);
+      }
     }
   }, [animationCompleted, tokenChecked, navigation, state]);
 
@@ -146,14 +128,8 @@ export default function ({route, navigation}) {
   const opacity3 = useRef(new Animated.Value(0)).current;
 
   let fadeInDuration = 400;
-  let displayDuration = 500;
+  let displayDuration = 600;
   let fadeOutDuration = 400;
-
-  if (__DEV__) {
-    fadeInDuration = 25;
-    displayDuration = 25;
-    fadeOutDuration = 25;
-  }
 
   useEffect(() => {
     Animated.sequence([
@@ -206,7 +182,7 @@ export default function ({route, navigation}) {
   }, [opacity1, opacity2, opacity3]);
 
   const BASE_TEXT = __DEV__ ? (
-    <Text style={{color: '#000'}}>{BASE_URL}</Text>
+    <Text style={{ color: '#000' }}>{BASE_URL}</Text>
   ) : null;
 
   const logoMaxWidth = width / 1.5 > 300 ? 300 : width / 1.5;
@@ -216,7 +192,7 @@ export default function ({route, navigation}) {
 
   return (
     <View style={styles.container}>
-      <View style={{flex: 1, width: '100%', paddingTop: 100}}>
+      <View style={{ flex: 1, width: '100%', paddingTop: 100 }}>
         <View
           style={{
             // height: whiteLogoHeight + 20,
@@ -250,11 +226,11 @@ export default function ({route, navigation}) {
       />*/}
         <Animated.Image
           source={images.img2}
-          style={[styles.image, {opacity: opacity2}]}
+          style={[styles.image, { opacity: opacity2 }]}
         />
         <Animated.Image
           source={images.img3}
-          style={[styles.image, {opacity: opacity3}]}
+          style={[styles.image, { opacity: opacity3 }]}
         />
       </View>
     </View>

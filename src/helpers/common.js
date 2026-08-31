@@ -15,7 +15,6 @@ export const formatDate = (str) => {
   return `${day < 10 ? "0" + day : day}.${month < 10 ? "0" + month : month}.${year}`;
 };
 
-
 export const time = () => {
   //  discuss at: https://locutus.io/php/time/
   // original by: GeekFG (https://geekfg.blogspot.com)
@@ -26,7 +25,7 @@ export const time = () => {
   //   example 1: var $result = $timeStamp > 1000000000 && $timeStamp < 2000000000
   //   returns 1: true
   // return Math.floor(new Date().getTime() / 1000)
-  
+
   return +new Date();
 };
 
@@ -77,10 +76,14 @@ export const throttle = (func, delay) => {
 
 
 export const appVersionCheck = async () => {
-  const url = API_URL + "app-version";
-  var s = await axios.post(url, { version: APP_VERSION });
-
-  return s.data;
+  try {
+    const url = API_URL + "app-version";
+    var s = await axios.post(url, { version: APP_VERSION });
+    return s.data || { valid: true };
+  } catch (error) {
+    console.log("appVersionCheck error:", error?.message);
+    return { valid: true };
+  }
 };
 
 export const shorten = (str, limit = 10) => {
