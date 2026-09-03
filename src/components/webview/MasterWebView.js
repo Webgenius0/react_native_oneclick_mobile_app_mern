@@ -97,9 +97,10 @@ export default function MasterWebView({
     }
   }, [onNavigationStateChange, resolvedWebViewRef]);
 
-  // WhatsApp linklerini dış uygulamada açmak için
+  // WhatsApp ve Intent linklerini ele almak için
   const onShouldStartLoadWithRequest = useCallback(request => {
     const {url} = request;
+    if (!url) return true;
 
     if (url.includes('whatsapp.com') || url.includes('wa.me') || url.startsWith('whatsapp://')) {
       Linking.openURL(url).catch(err => {
@@ -108,7 +109,44 @@ export default function MasterWebView({
       return false;
     }
 
+    // Handle intent://, ty://, and non-http/https custom schemes
+    if (
+      url.startsWith('intent://') ||
+      url.startsWith('intent:') ||
+      (!url.startsWith('http://') &&
+        !url.startsWith('https://') &&
+        !url.startsWith('about:') &&
+        !url.startsWith('data:'))
+    ) {
+      if (url.includes('S.browser_fallback_url=')) {
+        try {
+          const match = url.match(/S\.browser_fallback_url=([^;]+)/);
+          if (match && match[1]) {
+            const fallbackUrl = decodeURIComponent(match[1]);
+            if (
+              fallbackUrl &&
+              (fallbackUrl.startsWith('http://') || fallbackUrl.startsWith('https://'))
+            ) {
+              resolvedWebViewRef.current?.injectJavaScript(
+                `window.location.href = "${fallbackUrl}"; true;`,
+              );
+            }
+          }
+        } catch (e) {
+          console.log('Intent fallback URL parse error:', e?.message || e);
+        }
+      }
+      return false;
+    }
+
     return true;
+  }, [resolvedWebViewRef]);
+
+  const onError = useCallback((syntheticEvent) => {
+    const { nativeEvent } = syntheticEvent;
+    if (nativeEvent && nativeEvent.description && nativeEvent.description.includes('ERR_UNKNOWN_URL_SCHEME')) {
+      return;
+    }
   }, []);
 
   const source = initialUrl && initialUrl !== BLANK_SOURCE_URL
@@ -139,6 +177,7 @@ export default function MasterWebView({
       // injectedJavaScript={INJECTED_JAVASCRIPT}
       onLoadStart={onLoadStart}
       onLoadEnd={onLoadEnd}
+      onError={onError}
       onMessage={onMessage}
       onNavigationStateChange={handleNavigationStateChange}
       onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}

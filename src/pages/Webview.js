@@ -939,6 +939,7 @@ export default function Webview({route, navigation}) {
 
   const onShouldStartLoadWithRequest = useCallback(request => {
     const nextUrl = request?.url || '';
+    if (!nextUrl) return true;
 
     if (
       nextUrl.includes('whatsapp.com') ||
@@ -951,7 +952,47 @@ export default function Webview({route, navigation}) {
       return false;
     }
 
+    if (
+      nextUrl.startsWith('intent://') ||
+      nextUrl.startsWith('intent:') ||
+      (!nextUrl.startsWith('http://') &&
+        !nextUrl.startsWith('https://') &&
+        !nextUrl.startsWith('about:') &&
+        !nextUrl.startsWith('data:'))
+    ) {
+      if (nextUrl.includes('S.browser_fallback_url=')) {
+        try {
+          const match = nextUrl.match(/S\.browser_fallback_url=([^;]+)/);
+          if (match && match[1]) {
+            const fallbackUrl = decodeURIComponent(match[1]);
+            if (
+              fallbackUrl &&
+              (fallbackUrl.startsWith('http://') || fallbackUrl.startsWith('https://'))
+            ) {
+              webViewRef.current?.injectJavaScript(
+                `window.location.href = "${fallbackUrl}"; true;`,
+              );
+            }
+          }
+        } catch (e) {
+          console.log('Intent fallback URL parse error:', e?.message || e);
+        }
+      }
+      return false;
+    }
+
     return true;
+  }, []);
+
+  const onError = useCallback(syntheticEvent => {
+    const {nativeEvent} = syntheticEvent;
+    if (
+      nativeEvent &&
+      nativeEvent.description &&
+      nativeEvent.description.includes('ERR_UNKNOWN_URL_SCHEME')
+    ) {
+      return;
+    }
   }, []);
 
   useLayoutEffect(() => {
@@ -1047,6 +1088,7 @@ export default function Webview({route, navigation}) {
           onMessage={onMessage}
           onLoadStart={onLoadStart}
           onLoadEnd={onLoadEnd}
+          onError={onError}
           onNavigationStateChange={onNavigationStateChange}
           onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}
         />

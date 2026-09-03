@@ -177,7 +177,6 @@ export default function ({ navigation }) {
   };
 
   const handleGuestLogin = async () => {
-    setState(prev => ({ ...prev, kod: 'HG1000', sifre: '123' }));
     await handleSubmit({
       kod: 'HG1000',
       sifre: '123',
@@ -290,9 +289,6 @@ export default function ({ navigation }) {
               <TouchableOpacity onPress={async () => handleGuestLogin()}>
                 <Text style={{ color: 'green', fontWeight: 'bold' }}>{tr('Misafir Girişi')}</Text>
               </TouchableOpacity>
-              <Text style={{ color: '#777', fontSize: 12, marginTop: 4 }}>
-                (Code: HG1000 | Password: 123)
-              </Text>
             </View>
           </View>
 

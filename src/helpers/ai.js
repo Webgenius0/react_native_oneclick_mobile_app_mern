@@ -1,7 +1,7 @@
 import axios from 'axios';
-import {API_URL} from '../../config';
+import { API_URL } from '../../config';
 import asyncStorage from '@react-native-async-storage/async-storage/src/AsyncStorage';
-import {getToken} from './auth';
+import { getToken } from './auth';
 import * as RootNavigation from './../services/RootNavigation';
 
 const ai = axios.create();
@@ -10,8 +10,6 @@ const aiErrorLog = true;
 ai.defaults.baseURL = API_URL;
 ai.defaults.headers.common['Accept'] = 'application/json, text/plain, */*';
 ai.defaults.headers.post['Content-Type'] = 'application/json';
-
-console.log('API_URL', API_URL);
 
 ai.interceptors.request.use(
   async config => {
