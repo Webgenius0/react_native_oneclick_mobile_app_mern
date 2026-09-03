@@ -8,6 +8,8 @@ const ai = axios.create();
 const aiLog = false;
 const aiErrorLog = true;
 ai.defaults.baseURL = API_URL;
+ai.defaults.headers.common['Accept'] = 'application/json, text/plain, */*';
+ai.defaults.headers.post['Content-Type'] = 'application/json';
 
 console.log('API_URL', API_URL);
 
@@ -25,6 +27,19 @@ ai.interceptors.request.use(
 
     if (token) {
       config.headers.Authorization = token;
+
+      const method = (config.method || 'get').toLowerCase();
+      if (method === 'post' || method === 'put' || method === 'patch' || method === 'delete') {
+        if (!config.data) {
+          config.data = { token };
+        } else if (typeof config.data === 'object' && !(config.data instanceof FormData)) {
+          if (!config.data.token) {
+            config.data = { token, ...config.data };
+          }
+        }
+      } else {
+        config.params = { token, ...config.params };
+      }
     }
     return config;
   },
@@ -60,7 +75,7 @@ ai.interceptors.response.use(
     if (!error?.response) {
       // print node error
       if (aiErrorLog) {
-        console.error('error', error, error.message, ai.defaults.baseURL);
+        console.warn('API network error:', error?.message || error, ai.defaults.baseURL);
       }
     }
 

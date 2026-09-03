@@ -7,12 +7,12 @@ export const DEV_REDIRECT_STORE = false;
 export const PROD_LOCAL = false;
 
 export const LOCAL_BASE_URL = `http://${LOCAL_HOST}/my/oneclicktoshop`;
-export const REMOTE_BASE_URL = "https://1click.thesyndicates.team";
-// export const REMOTE_BASE_URL = "https://1click.thesyndicates.team/api";
+// export const REMOTE_BASE_URL = "https://1click.thesyndicates.team";
+export const REMOTE_BASE_URL = "https://1click.thesyndicates.team/api";
 
 export const BASE_URL = (__DEV__ && DEV_LOCAL) || (!__DEV__ && PROD_LOCAL) ? LOCAL_BASE_URL : REMOTE_BASE_URL;
-export const API_URL = BASE_URL + "/api/";
-export const DATA_URL = BASE_URL + "/data/";
+export const API_URL = BASE_URL.endsWith('/api') ? BASE_URL + '/' : BASE_URL + '/api/';
+export const DATA_URL = BASE_URL.replace(/\/api\/?$/, '') + '/data/';
 
 export const IS_LOCAL = API_URL.includes("localhost") || API_URL.includes("172.20") || API_URL.includes("192.168");
 

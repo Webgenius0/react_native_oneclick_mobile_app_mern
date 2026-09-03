@@ -1,9 +1,13 @@
 import 'react-native-gesture-handler';
-import {AppRegistry} from 'react-native';
+import {AppRegistry, LogBox} from 'react-native';
 import App from './App';
 import {name as appName} from './app.json';
-import messaging from '@react-native-firebase/messaging';
+import {getMessaging, setBackgroundMessageHandler} from '@react-native-firebase/messaging';
 
+LogBox.ignoreLogs([
+  'This method is deprecated (as well as all React Native Firebase namespaced API)',
+  'Package react-native-ionicons contains invalid configuration',
+]);
 
 function HeadlessCheck({isHeadless}) {
   if (isHeadless) {
@@ -19,18 +23,17 @@ function firebaseBackgroundMessage(message) {
   return Promise.resolve();
 }
 
-
 AppRegistry.registerHeadlessTask('RNFirebaseBackgroundMessage', () => firebaseBackgroundMessage);
-
 
 AppRegistry.registerComponent(appName, () => HeadlessCheck);
 
-
-messaging().setBackgroundMessageHandler(async (remoteMessage) => {
-  console.log('Message handled in the background! index.js =============', remoteMessage);
-
-  // Burada gelen mesajı işleyebilirsiniz (örneğin, local notification gösterimi)
-});
+try {
+  setBackgroundMessageHandler(getMessaging(), async (remoteMessage) => {
+    console.log('Message handled in the background! index.js =============', remoteMessage);
+  });
+} catch (e) {
+  console.log('setBackgroundMessageHandler error:', e?.message || e);
+}
 
 
 /*

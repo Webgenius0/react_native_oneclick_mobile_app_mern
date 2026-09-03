@@ -101,10 +101,12 @@ const App = () => {
       try {
         console.log('====== fetchInjectScript ====== ', MOBIL_SCRIPT);
         const response = await fetch(MOBIL_SCRIPT, { cache: 'no-cache' });
-        const script = await response.text();
-        setInjectScript(script);
+        if (response && response.ok) {
+          const script = await response.text();
+          setInjectScript(script);
+        }
       } catch (error) {
-        console.error('fetchInjectScript error', error);
+        console.warn('fetchInjectScript network error:', error?.message || error);
       }
     })();
 
@@ -112,18 +114,24 @@ const App = () => {
     fetchAllNotifications(ctx, setCtx);
 
     // Handle shared links
-    ReceiveSharingIntent.getReceivedFiles(files => {
-      if (files && files.length > 0) {
-        const sharedText = files[0].text;
-        if (sharedText && (sharedText.includes('trendyol.com') || sharedText.includes('hepsiburada.com') || sharedText.includes('amazon.com.tr'))) {
-          console.log('Shared link received:', sharedText);
-          ReceiveSharingIntent.clearReceivedFiles();
-        }
-      }
-    },
-      (error) => {
-        console.log('Error receiving shared content:', error);
-      });
+    try {
+      ReceiveSharingIntent.getReceivedFiles(
+        files => {
+          if (files && files.length > 0) {
+            const sharedText = files[0].text;
+            if (sharedText && (sharedText.includes('trendyol.com') || sharedText.includes('hepsiburada.com') || sharedText.includes('amazon.com.tr'))) {
+              console.log('Shared link received:', sharedText);
+              ReceiveSharingIntent.clearReceivedFiles();
+            }
+          }
+        },
+        error => {
+          // Normal on cold launch when no shared content is present
+        },
+      );
+    } catch (e) {
+      // Ignored
+    }
 
     if (notifInerval && FIREBASE_ENABLED) {
       let timeout = IS_DEV ? 1000 * 60 * 3 : 1000 * 60 * 3;

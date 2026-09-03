@@ -188,13 +188,7 @@ export default function({ route, navigation }) {
             */
           }
 
-          {
-            (
-              <View style={{ flex: 1 }}>
-                <Dump data={state} ctx={ctx} />
-              </View>
-            )
-          }
+
         </ScrollView>
 
         {

@@ -1,4 +1,13 @@
-import messaging, {firebase} from '@react-native-firebase/messaging';
+import messaging, {
+  getMessaging,
+  requestPermission,
+  getToken,
+  onMessage,
+  onNotificationOpenedApp,
+  setBackgroundMessageHandler as setBgMsgHandler,
+  AuthorizationStatus,
+  registerDeviceForRemoteMessages,
+} from '@react-native-firebase/messaging';
 import {Alert, Platform} from 'react-native';
 import {storageGet, storageSet} from './storage';
 import {EmContext} from '../contexts/EmContext';
@@ -16,15 +25,12 @@ export async function requestUserPermission() {
   if (FIREBASE_ENABLED) {
     let authStatus, enabled;
     try {
-      authStatus = await messaging().requestPermission();
+      authStatus = await requestPermission(getMessaging());
       console.log('authStatus', authStatus);
 
-      // {"AUTHORIZED": 1, "DENIED": 0, "EPHEMERAL": 3, "NOT_DETERMINED": -1, "PROVISIONAL": 2}
-      // console.log('authVars', messaging.AuthorizationStatus);
-
       enabled =
-        authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-        authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+        authStatus === AuthorizationStatus.AUTHORIZED ||
+        authStatus === AuthorizationStatus.PROVISIONAL;
     } catch (e) {
       console.log('req error ==============> ', e);
     }
@@ -39,12 +45,10 @@ export const getFcmToken = async () => {
   if (!FIREBASE_ENABLED) {
     return null;
   }
-  // console.log("getFcmToken");
   let fcmToken;
   try {
-    fcmToken = await messaging().getToken();
+    fcmToken = await getToken(getMessaging());
   } catch (e) {
-    // console.log("fcmToken", fcmToken);
     // console.log("getFcmToken error ==========>", e);
   }
   if (fcmToken) {
@@ -61,7 +65,6 @@ export const getFcmToken = async () => {
   } else {
     // console.log("Failed", "No token received");
   }
-  // console.log("after getFcmToken");
   return fcmToken;
 };
 
@@ -83,131 +86,100 @@ export const fcmUpdate = async (fcmToken, force) => {
       dil: dil,
     };
 
-    // console.log("fcmData", fcmData);
-    /*
     try {
-
-      ai.post("fcm", fcmData).then((response) => {
-        console.log("fcmUpdate response", response);
-      }).then((response) => {
-        console.log("fcmUpdate response 2", response);
-
-      }).catch((error) => {
-        console.log("fcmUpdate error 3 ", error);
-      });
-    }catch (e) {
-      console.log("fcmUpdate error 4 ", e);
-    }
-    */
-
-    const {data} = await ai.post('fcm', fcmData);
-    if (data) {
-      await storageSet('tokenSend', true);
+      const {data} = await ai.post('fcm', fcmData);
+      if (data) {
+        await storageSet('tokenSend', true);
+      }
+    } catch (e) {
+      // safe fallback on offline server
     }
   }
 };
 
-export const notificationListener = async () =>
-  messaging().onNotificationOpenedApp(remoteMessage => {
-    console.log(
-      '=================== Notification notificationListener ===================',
-    );
-    console.log(remoteMessage.notification);
+export const notificationListener = async () => {
+  try {
+    return onNotificationOpenedApp(getMessaging(), remoteMessage => {
+      console.log(
+        '=================== Notification notificationListener ===================',
+      );
+      console.log(remoteMessage.notification);
 
-    var type = remoteMessage.data?.type;
-    if (type === 'order') {
-      // open fisDetay
-      console.log('===== before navigate onNotificationOpenedApp ====');
-      navigation.navigate('Orders', {
-        // id: remoteMessage.data.id,
-        id: 0,
-        grupID: remoteMessage.data.grupID,
-        refetch: (+new Date()),
-      });
-    }
-
-    // navigation.navigate(remoteMessage.data.type);
-  });
-
-// export {requestUserPermission, getFcmToken};
+      var type = remoteMessage.data?.type;
+      if (type === 'order') {
+        console.log('===== before navigate onNotificationOpenedApp ====');
+        navigation.navigate('Orders', {
+          id: 0,
+          grupID: remoteMessage.data.grupID,
+          refetch: +new Date(),
+        });
+      }
+    });
+  } catch (e) {
+    console.log('notificationListener error:', e?.message || e);
+  }
+};
 
 export const setBackgroundMessageHandler = async (ctx, setCtx) => {
-  // console.log("ctx", ctx, "setCtx", setCtx);
+  try {
+    onMessage(getMessaging(), async remoteMessage => {
+      console.log(
+        '=================== Notification setBackgroundMessageHandler ===================',
+      );
 
-  messaging().onMessage(async remoteMessage => {
-    console.log(
-      '=================== Notification setBackgroundMessageHandler ===================',
-    );
+      console.log(JSON.stringify(remoteMessage));
+      console.log('\n\n');
+      const {title, body} = remoteMessage.notification || {};
 
-    console.log(JSON.stringify(remoteMessage));
-    console.log('\n\n');
-    const {title, body} = remoteMessage.notification;
-    // Alert.alert(title, body);
-    //await saveNotification(ctx, setCtx, { title, body, time: +new Date(), from: "fcm" });
-
-    // show toast
-    Toast.show({
-      type: 'success',
-      position: 'top',
-      text1: title,
-      text2: body,
-      visibilityTime: 4000,
-      autoHide: true,
-      topOffset: 30,
-      bottomOffset: 40,
-      onPress: () => {
-        if (remoteMessage.data?.type === 'order') {
-          console.log('order click', remoteMessage.data.id, remoteMessage.data.grupID);
-
-          // if current screen is Orders, then refresh
+      Toast.show({
+        type: 'success',
+        position: 'top',
+        text1: title,
+        text2: body,
+        visibilityTime: 4000,
+        autoHide: true,
+        topOffset: 30,
+        bottomOffset: 40,
+        onPress: () => {
           if (remoteMessage.data?.type === 'order') {
+            console.log('order click', remoteMessage.data.id, remoteMessage.data.grupID);
+
             navigation.reset('Orders', {
-              id: 0, //remoteMessage.data.id,
+              id: 0,
               grupID: remoteMessage.data.grupID,
               refetch: +new Date(),
             });
-          } else {
-         /*   navigation.navigate('Orders', {
-              id: remoteMessage.data.id,
-              refetch: +new Date(),
-            });*/
           }
-
-          /*navigation.navigate("OrderDetail", {
-            id: remoteMessage.data.id,
-            load: true
-          });*/
-        }
-      },
+        },
+      });
     });
-  });
 
-  messaging().setBackgroundMessageHandler(async remoteMessage => {
-    console.log(
-      '=================== Notification messaging().setBackgroundMessageHandler ===================',
-    );
-    console.log(remoteMessage);
-    console.log('\n\n');
-
-    const {title, body} = remoteMessage.notification;
-    //await saveNotification(ctx, setCtx, { title, body, time: +new Date(), from: "background" });
-  });
+    setBgMsgHandler(getMessaging(), async remoteMessage => {
+      console.log(
+        '=================== Notification messaging().setBackgroundMessageHandler ===================',
+      );
+      console.log(remoteMessage);
+      console.log('\n\n');
+    });
+  } catch (e) {
+    console.log('setBackgroundMessageHandler helper error:', e?.message || e);
+  }
 };
 
 export const requestNotificationPermissionV2 = async () => {
-  const authStatus = await messaging().requestPermission();
-  const enabled =
-    authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-    authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+  try {
+    const authStatus = await requestPermission(getMessaging());
+    const enabled =
+      authStatus === AuthorizationStatus.AUTHORIZED ||
+      authStatus === AuthorizationStatus.PROVISIONAL;
 
-  if (enabled) {
-    // console.log("Authorization status:", authStatus);
-  }
-
-  await messaging().registerDeviceForRemoteMessages();
-  const token = await messaging().getToken();
-  if (FIREBASE_LOG) {
-    console.log('token', token);
+    await registerDeviceForRemoteMessages(getMessaging());
+    const token = await getToken(getMessaging());
+    if (FIREBASE_LOG) {
+      console.log('token', token);
+    }
+  } catch (e) {
+    console.log('requestNotificationPermissionV2 error:', e?.message || e);
   }
 };
 

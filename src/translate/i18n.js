@@ -24,11 +24,13 @@ i18n.exists = (key) => {
   return s;
 };
 
-const t = (key) => {
-  return i18n.t(key);
+const t = (key, options = {}) => {
+  if (!key) return '';
+  return i18n.t(key, { defaultValue: key, ...options });
 };
-const tr = (key) => {
-  return i18n.t(key);
+const tr = (key, options = {}) => {
+  if (!key) return '';
+  return i18n.t(key, { defaultValue: key, ...options });
 };
 
 const availableLanguages = [

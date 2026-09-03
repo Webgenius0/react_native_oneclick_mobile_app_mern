@@ -3,7 +3,7 @@ import { View, StyleSheet, Animated, Dimensions, Text, Image } from 'react-nativ
 import { getUser } from '../helpers/auth';
 import { CommonActions } from '@react-navigation/native';
 import { BASE_URL, FIREBASE_ENABLED } from '../../config';
-import messaging from '@react-native-firebase/messaging';
+import { getInitialNotification, getMessaging } from '@react-native-firebase/messaging';
 
 export default function ({ navigation }) {
   const [state, setState] = useState({
@@ -94,8 +94,7 @@ export default function ({ navigation }) {
       };
 
       if (FIREBASE_ENABLED) {
-        messaging()
-          .getInitialNotification()
+        getInitialNotification(getMessaging())
           .then(remoteMessage => {
             if (remoteMessage) {
               tip = remoteMessage.data?.type;

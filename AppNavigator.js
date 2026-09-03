@@ -116,34 +116,39 @@ export default function AppNavigator() {
     loadLanguage();
 
     // Handle shared links
-    ReceiveSharingIntent.getReceivedFiles(files => {
-      if (files && files.length > 0) {
-        const sharedText = files[0].text;
-        // (sharedText.includes('trendyol.com') || sharedText.includes('hepsiburada.com') || sharedText.includes('amazon.com.tr'))
-        if (sharedText) {
-          // Extract product info and add to cart
-          const productTitle = 'Product';
-          const productImage = '';
+    try {
+      ReceiveSharingIntent.getReceivedFiles(
+        files => {
+          if (files && files.length > 0) {
+            const sharedText = files[0].text;
+            if (sharedText) {
+              // Extract product info and add to cart
+              const productTitle = 'Product';
+              const productImage = '';
 
-          addItem({
-            title: productTitle,
-            url: sharedText,
-            count: 1,
-            checked: true,
-            image: productImage,
-          });
+              addItem({
+                title: productTitle,
+                url: sharedText,
+                count: 1,
+                checked: true,
+                image: productImage,
+              });
 
-          ReceiveSharingIntent.clearReceivedFiles();
-          // Navigate to cart
-          setTimeout(() => {
-            navigationRef.current?.navigate('Cart');
-          }, 1000);
-        }
-      }
-    },
-      (error) => {
-        console.log('Error receiving shared content:', error);
-      });
+              ReceiveSharingIntent.clearReceivedFiles();
+              // Navigate to cart
+              setTimeout(() => {
+                navigationRef.current?.navigate('Cart');
+              }, 1000);
+            }
+          }
+        },
+        error => {
+          // Normal on cold launch when no shared content is present
+        },
+      );
+    } catch (e) {
+      // Ignored
+    }
   }, []);
 
   if (state.loading) {

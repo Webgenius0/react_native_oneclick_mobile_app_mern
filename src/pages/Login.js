@@ -25,6 +25,7 @@ import { storageAllKeys, storageGet, storageSet } from '../helpers/storage';
 import Dump from '../components/Dump';
 import { fcmUpdate, getFcmToken } from '../helpers/notification';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CommonActions } from '@react-navigation/native';
 
 export default function ({ navigation }) {
   const { ctx, setCtx, ctxDil, setCtxDil } = useContext(EmContext);
@@ -59,28 +60,55 @@ export default function ({ navigation }) {
   };
 
   const handleSubmit = async ({ kod, sifre }) => {
+    if (!kod || !sifre) {
+      alert(tr('Lütfen müşteri kodu ve parolanızı giriniz'));
+      return;
+    }
+
     setLoading(true);
-    // ai
-    const res = await ai.post('login', {
-      kod: kod,
-      sifre: sifre,
-    });
+    try {
+      const cleanKod = typeof kod === 'string' ? kod.trim() : kod;
+      const cleanSifre = typeof sifre === 'string' ? sifre.trim() : sifre;
 
-    // alert(JSON.stringify(res));
+      const res = await ai.post('login', {
+        kod: cleanKod,
+        sifre: cleanSifre,
+      });
 
-    if (res.data.error === false) {
-      console.log(res.data.s);
-      await setUser(res.data.s);
-      setCtx({ ...ctx, user: res.data.s, token: res.data.s.token });
-      alert(tr('Giriş Yapıldı'));
+      if (res && res.data && res.data.error === false) {
+        console.log('Login Success Response:', res.data.s);
+        await setUser(res.data.s);
+        setCtx({ ...ctx, user: res.data.s, token: res.data.s.token });
 
-      const fcmToken = await getFcmToken();
-      console.log('fcmToken update --- ', fcmToken);
-      setLoading(false);
-      navigation.navigate('AuthAfter');
-    } else {
-      console.log('res', res);
-      alert(tr(res.data?.msg));
+        try {
+          const fcmToken = await getFcmToken();
+          console.log('fcmToken update --- ', fcmToken);
+        } catch (fcmErr) {
+          console.log('fcm update error:', fcmErr?.message || fcmErr);
+        }
+
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'AuthAfter' }],
+          }),
+        );
+      } else {
+        console.log('Login Response Error:', JSON.stringify(res?.data));
+        const errorMsg = res?.data?.msg || 'Hatalı Müşteri Kodu veya Parola';
+        console.log('Login error message:', errorMsg);
+        alert(tr(errorMsg));
+      }
+    } catch (error) {
+      console.log('Login Request Exception:', error?.message || error);
+      if (error?.response) {
+        console.log('Login Response Status:', error.response.status);
+        console.log('Login Response Data:', JSON.stringify(error.response.data));
+      }
+      const errorMsg = error?.response?.data?.msg || error?.message || 'Giriş yapılamadı';
+      console.log('Login Error Displayed:', errorMsg);
+      alert(tr(errorMsg));
+    } finally {
       setLoading(false);
     }
   };
@@ -149,8 +177,9 @@ export default function ({ navigation }) {
   };
 
   const handleGuestLogin = async () => {
+    setState(prev => ({ ...prev, kod: 'HG1000', sifre: '123' }));
     await handleSubmit({
-      kod: 'GUEST',
+      kod: 'HG1000',
       sifre: '123',
     });
   };
@@ -257,10 +286,13 @@ export default function ({ navigation }) {
           )}
 
           <View style={[styles.centeredInputRow]}>
-            <View>
+            <View style={{ alignItems: 'center' }}>
               <TouchableOpacity onPress={async () => handleGuestLogin()}>
-                <Text style={{ color: 'green' }}>{tr('Misafir Girişi')}</Text>
+                <Text style={{ color: 'green', fontWeight: 'bold' }}>{tr('Misafir Girişi')}</Text>
               </TouchableOpacity>
+              <Text style={{ color: '#777', fontSize: 12, marginTop: 4 }}>
+                (Code: HG1000 | Password: 123)
+              </Text>
             </View>
           </View>
 

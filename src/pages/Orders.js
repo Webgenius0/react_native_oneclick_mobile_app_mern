@@ -19,7 +19,7 @@ import ai from '../helpers/ai';
 import Dump from '../components/Dump';
 import {delay, lb, trDate} from '../helpers/common';
 import {CommonActions, useFocusEffect, useIsFocused} from '@react-navigation/native';
-import messaging from '@react-native-firebase/messaging';
+import {getMessaging, onMessage} from '@react-native-firebase/messaging';
 import OrderStatus from '../components/OrderStatus';
 import {tr} from '../translate/i18n';
 import NoImage from '../assets/svg/no-image.svg';
@@ -94,9 +94,14 @@ export default function ({route, navigation}) {
       return;
     }
 
-    const unsubscribe = messaging().onMessage(() => {
-      setRefetch(+new Date());
-    });
+    let unsubscribe;
+    try {
+      unsubscribe = onMessage(getMessaging(), () => {
+        setRefetch(+new Date());
+      });
+    } catch (e) {
+      console.log('Orders onMessage error:', e?.message || e);
+    }
 
     return unsubscribe;
   }, [isFocused]);
