@@ -1,33 +1,18 @@
-import React, {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
-import {
-  BackHandler,
-  Linking,
-  Platform,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import {HeaderBackButton} from '@react-navigation/elements';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { BackHandler, Linking, Platform, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { HeaderBackButton } from '@react-navigation/elements';
 import Clipboard from '@react-native-clipboard/clipboard';
-import {WebView} from 'react-native-webview';
+import { WebView } from 'react-native-webview';
 import Toast from 'react-native-toast-message';
 import GlobalStyle from '../assets/GlobalStyle';
 import Colors from '../assets/Colors';
-import {useCartStore} from '../store/useCartStore';
-import {delay} from '../helpers/common';
+import { useCartStore } from '../store/useCartStore';
+import { delay } from '../helpers/common';
 import AddToCart from '../components/webview/AddToCart';
-import {useScriptServiceStore} from '../store/useScriptServiceStore';
-import {useWebviewStore} from '../store/useWebviewStore';
-import {userAgent} from '../helpers/webview';
+import { useScriptServiceStore } from '../store/useScriptServiceStore';
+import { useWebviewStore } from '../store/useWebviewStore';
+import { userAgent } from '../helpers/webview';
+import { injectedJavascript } from '../helpers/webview1';
 
 const styles = StyleSheet.create({
   container: {
@@ -108,11 +93,34 @@ const isSheinUrl = url => {
   return host === 'shein.com' || host.endsWith('.shein.com');
 };
 
+const isProductUrl = url => {
+  if (!url || url === BLANK_SOURCE_URL) {
+    return false;
+  }
+  const lowerUrl = String(url).toLowerCase();
+
+  const patterns = [
+    /-p-\d+/i,
+    /-pm-\d+/i,
+    /\/dp\/[a-z0-9]+/i,
+    /\/gp\/product\/[a-z0-9]+/i,
+    /\/product\/[a-z0-9_-]+/i,
+    /\/products\/[a-z0-9_-]+/i,
+    /\/item\/[a-z0-9_-]+/i,
+    /\/items\/[a-z0-9_-]+/i,
+    /\/itm\/[a-z0-9_-]+/i,
+    /\/goods\/[a-z0-9_-]+/i,
+    /\/pd\/[a-z0-9_-]+/i,
+    /[?&](product_id|goods_id|item_id|pid)=/i,
+  ];
+
+  return patterns.some(pattern => pattern.test(lowerUrl));
+};
+
 const shouldProbeBeforeInject = url =>
   Platform.OS === 'android' && isSheinUrl(url);
 
-const buildInjectKey = (url, script) =>
-  `${String(url || '')}\n${String(script || '').length}`;
+const buildInjectKey = (url, script) => `${String(url || '')}\n${String(script || '').length}`;
 
 const buildSheinReadinessProbe = (targetUrl, attempt, total) => {
   const readyMessage = JSON.stringify({
@@ -177,10 +185,7 @@ const getUrlQueryPairs = url => {
   }
 
   const hashStart = String(url).indexOf('#', queryStart);
-  const query = String(url).slice(
-    queryStart + 1,
-    hashStart === -1 ? undefined : hashStart,
-  );
+  const query = String(url).slice(queryStart + 1, hashStart === -1 ? undefined : hashStart);
 
   if (!query) {
     return [];
@@ -192,10 +197,8 @@ const getUrlQueryPairs = url => {
     }
 
     const separatorIndex = part.indexOf('=');
-    const rawName =
-      separatorIndex === -1 ? part : part.slice(0, separatorIndex);
-    const rawValue =
-      separatorIndex === -1 ? '' : part.slice(separatorIndex + 1);
+    const rawName = separatorIndex === -1 ? part : part.slice(0, separatorIndex);
+    const rawValue = separatorIndex === -1 ? '' : part.slice(separatorIndex + 1);
 
     pairs.push({
       name: decodeQueryValue(rawName),
@@ -211,12 +214,7 @@ const appendCookieEntry = (entries, name, value) => {
   const nextValue = String(value || '').trim();
   const normalizedName = nextName.toLowerCase();
 
-  if (
-    !nextName ||
-    !nextValue ||
-    COOKIE_ATTRIBUTE_NAMES.includes(normalizedName) ||
-    !SAFE_COOKIE_NAME_REGEX.test(nextName)
-  ) {
+  if (!nextName || !nextValue || COOKIE_ATTRIBUTE_NAMES.includes(normalizedName) || !SAFE_COOKIE_NAME_REGEX.test(nextName)) {
     return;
   }
 
@@ -244,7 +242,7 @@ const appendCookieParamValue = (entries, value) => {
         });
         return;
       }
-    } catch (error) {}
+    } catch (error) { }
   }
 
   nextValue.split(/[;,]/).forEach(cookiePart => {
@@ -269,7 +267,7 @@ const getTrendyolCookieEntries = url => {
 
   const entries = new Map();
 
-  getUrlQueryPairs(url).forEach(({name, value}) => {
+  getUrlQueryPairs(url).forEach(({ name, value }) => {
     const normalizedName = String(name || '').toLowerCase();
     const aliasName = TRENDYOL_COOKIE_PARAM_ALIASES[normalizedName];
 
@@ -288,10 +286,10 @@ const getTrendyolCookieEntries = url => {
     }
   });
 
-  return Array.from(entries, ([name, value]) => ({name, value}));
+  return Array.from(entries, ([name, value]) => ({ name, value }));
 };
 
-const buildCookieValue = ({name, value}) =>
+const buildCookieValue = ({ name, value }) =>
   `${name}=${encodeURIComponent(value)}`;
 
 const buildTrendyolCookieScript = url => {
@@ -505,8 +503,8 @@ const ROUTE_CHANGE_BRIDGE = `
   })();
 `;
 
-export default function Webview({route, navigation}) {
-  const {addItem} = useCartStore();
+export default function Webview({ route, navigation }) {
+  const { addItem } = useCartStore();
   const injectScript = useScriptServiceStore(state => state.injectScript);
   const setTranslateUrl = useWebviewStore(state => state.setTranslateUrl);
 
@@ -537,7 +535,7 @@ export default function Webview({route, navigation}) {
     const cookies = getTrendyolCookieEntries(sourceUrl);
 
     if (!cookies.length) {
-      return {uri: sourceUrl};
+      return { uri: sourceUrl };
     }
 
     return {
@@ -601,6 +599,21 @@ export default function Webview({route, navigation}) {
   const loadingRef = useRef(true);
   const titleRef = useRef('');
   const imageRef = useRef('');
+  const priceRef = useRef('');
+  const currencyRef = useRef('');
+
+  const [isProductPage, setIsProductPage] = useState(() =>
+    isProductUrl(sourceUrl),
+  );
+
+  const updateProductPageStatus = useCallback((targetUrl, explicitStatus) => {
+    if (typeof explicitStatus === 'boolean') {
+      setIsProductPage(explicitStatus);
+      return;
+    }
+    const isProd = isProductUrl(targetUrl || currentUrlRef.current);
+    setIsProductPage(isProd);
+  }, []);
 
   const setStatus = useCallback(nextStatus => {
     setInjectStatus(prevStatus =>
@@ -645,23 +658,31 @@ export default function Webview({route, navigation}) {
         },
       });
 
+      const localScript = injectedJavascript({
+        page_url: targetUrl,
+        getMetaTagImage: true,
+        getMetaTitle: true,
+        getMetaPrice: true,
+      });
+
       return `
         ;(function() {
           try {
             if (window.ReactNativeWebView && typeof window.ReactNativeWebView.postMessage === 'function') {
               window.ReactNativeWebView.postMessage(${JSON.stringify(
-                startMessage,
-              )});
+        startMessage,
+      )});
             }
           } catch (_error) {}
         })();
-        ;${injectScript};
+        ;${injectScript || ''};
+        ;${localScript || ''};
         ;(function() {
           try {
             if (window.ReactNativeWebView && typeof window.ReactNativeWebView.postMessage === 'function') {
               window.ReactNativeWebView.postMessage(${JSON.stringify(
-                doneMessage,
-              )});
+        doneMessage,
+      )});
             }
           } catch (_error) {}
           true;
@@ -673,7 +694,7 @@ export default function Webview({route, navigation}) {
 
   const injectNow = useCallback(
     (targetUrl, options = {}) => {
-      const {attempt = 1, total = 1, force = false} = options;
+      const { attempt = 1, total = 1, force = false } = options;
       const nextUrl = targetUrl || currentUrlRef.current;
 
       if (!nextUrl || nextUrl === BLANK_SOURCE_URL) {
@@ -819,6 +840,8 @@ export default function Webview({route, navigation}) {
       count: 1,
       checked: true,
       image: imageRef.current,
+      price: priceRef.current,
+      currency: currencyRef.current,
     });
 
     if (webViewRef.current) {
@@ -839,7 +862,7 @@ export default function Webview({route, navigation}) {
   }, [addItem, navigation]);
 
   const onMessage = useCallback(
-    ({nativeEvent}) => {
+    ({ nativeEvent }) => {
       try {
         const message = JSON.parse(nativeEvent.data);
 
@@ -850,8 +873,19 @@ export default function Webview({route, navigation}) {
               return;
             }
 
+            const wasProduct = isProductUrl(currentUrlRef.current);
+            const isNextProduct = isProductUrl(nextUrl);
             currentUrlRef.current = nextUrl;
-            scheduleInject(nextUrl, {delays: SPA_INJECT_DELAYS});
+
+            if (!isNextProduct) {
+              titleRef.current = '';
+              imageRef.current = '';
+              priceRef.current = '';
+              currencyRef.current = '';
+            }
+
+            updateProductPageStatus(nextUrl);
+            scheduleInject(nextUrl, { delays: SPA_INJECT_DELAYS });
             return;
           }
           case INJECT_STATUS_MESSAGE_TYPE: {
@@ -888,11 +922,28 @@ export default function Webview({route, navigation}) {
 
             return;
           }
+          case 'isProductPage':
+            updateProductPageStatus(currentUrlRef.current, !!message.data);
+            return;
           case 'image':
-            imageRef.current = message.data || '';
+            if (message.data && typeof message.data === 'string') {
+              imageRef.current = message.data.trim();
+            }
             return;
           case 'title':
-            titleRef.current = message.data || '';
+            if (message.data && typeof message.data === 'string') {
+              titleRef.current = message.data.trim();
+            }
+            return;
+          case 'price':
+            if (message.data && typeof message.data === 'string') {
+              priceRef.current = message.data.trim();
+            }
+            return;
+          case 'currency':
+            if (message.data && typeof message.data === 'string') {
+              currencyRef.current = message.data.trim();
+            }
             return;
           case 'redirect':
             if (webViewRef.current && message.data) {
@@ -908,7 +959,7 @@ export default function Webview({route, navigation}) {
         return;
       }
     },
-    [injectNow, injectScript, scheduleInject, setStatus],
+    [injectNow, injectScript, scheduleInject, setStatus, updateProductPageStatus],
   );
 
   const onLoadStart = useCallback(() => {
@@ -924,17 +975,29 @@ export default function Webview({route, navigation}) {
 
   const onNavigationStateChange = useCallback(
     navState => {
-      currentUrlRef.current = navState.url || currentUrlRef.current;
+      const nextUrl = navState.url || currentUrlRef.current;
+      if (nextUrl !== currentUrlRef.current) {
+        const isNextProduct = isProductUrl(nextUrl);
+        if (!isNextProduct) {
+          titleRef.current = '';
+          imageRef.current = '';
+          priceRef.current = '';
+          currencyRef.current = '';
+        }
+      }
+      currentUrlRef.current = nextUrl;
       canGoBackRef.current = !!navState.canGoBack;
       loadingRef.current = !!navState.loading;
       setTranslateUrl(currentUrlRef.current);
       injectTrendyolCookies(currentUrlRef.current);
 
+      updateProductPageStatus(currentUrlRef.current);
+
       if (!navState.loading) {
         scheduleInject(currentUrlRef.current);
       }
     },
-    [injectTrendyolCookies, scheduleInject, setTranslateUrl],
+    [injectTrendyolCookies, scheduleInject, setTranslateUrl, updateProductPageStatus],
   );
 
   const onShouldStartLoadWithRequest = useCallback(request => {
@@ -985,7 +1048,7 @@ export default function Webview({route, navigation}) {
   }, []);
 
   const onError = useCallback(syntheticEvent => {
-    const {nativeEvent} = syntheticEvent;
+    const { nativeEvent } = syntheticEvent;
     if (
       nativeEvent &&
       nativeEvent.description &&
@@ -1018,10 +1081,13 @@ export default function Webview({route, navigation}) {
     loadingRef.current = sourceUrl !== BLANK_SOURCE_URL;
     titleRef.current = '';
     imageRef.current = '';
+    priceRef.current = '';
+    currencyRef.current = '';
     clearInjectTimers();
     setTranslateUrl(sourceUrl);
+    updateProductPageStatus(sourceUrl, '', '');
     setStatus(sourceUrl === BLANK_SOURCE_URL ? 'idle' : 'pending');
-  }, [clearInjectTimers, setStatus, setTranslateUrl, sourceUrl]);
+  }, [clearInjectTimers, setStatus, setTranslateUrl, sourceUrl, updateProductPageStatus]);
 
   useEffect(() => {
     if (!injectScript) {
@@ -1067,7 +1133,7 @@ export default function Webview({route, navigation}) {
           originWhitelist={['*']}
           ref={webViewRef}
           source={source}
-          {...(webViewUserAgent ? {userAgent: webViewUserAgent} : {})}
+          {...(webViewUserAgent ? { userAgent: webViewUserAgent } : {})}
           javaScriptEnabled={true}
           domStorageEnabled={true}
           cacheEnabled={!useSheinCompatibilityMode}
@@ -1092,7 +1158,7 @@ export default function Webview({route, navigation}) {
           onNavigationStateChange={onNavigationStateChange}
           onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}
         />
-        <AddToCart addChart={addChart} />
+        {isProductPage && <AddToCart addChart={addChart} />}
       </View>
     </SafeAreaView>
   );

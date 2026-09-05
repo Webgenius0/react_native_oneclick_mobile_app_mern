@@ -46,6 +46,8 @@ export default function Webview({route, navigation}) {
   // Ürüne dair bilgiler
   const [image, setImage] = useState('');
   const [title, setTitle] = useState('');
+  const [price, setPrice] = useState('');
+  const [currency, setCurrency] = useState('');
 
   // Çeviri butonu göster/gizle (route parametresi, varsayılan: gizli)
   const showTranslateButton = route?.params?.showTranslateButton || false;
@@ -105,10 +107,12 @@ export default function Webview({route, navigation}) {
       count: 1,
       checked: true,
       image,
+      price,
+      currency,
     });
     await delay(500);
     navigation.navigate('Cart');
-  }, [addItem, title, url, image, navigation]);
+  }, [addItem, title, url, image, price, currency, navigation]);
 
   // WebView içerisinden gelen mesajları işleme
   const lastMessageRef = useRef('');
@@ -123,6 +127,14 @@ export default function Webview({route, navigation}) {
           break;
         case 'title':
           setTitle(message.data);
+          lastMessageRef.current = message.data;
+          break;
+        case 'price':
+          setPrice(message.data);
+          lastMessageRef.current = message.data;
+          break;
+        case 'currency':
+          setCurrency(message.data);
           lastMessageRef.current = message.data;
           break;
         case 'routeChange': {

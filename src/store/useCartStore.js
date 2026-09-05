@@ -24,6 +24,8 @@ const normalizeCartItem = item => ({
   size: item.size ?? '',
   desc: item.desc ?? item.description ?? '',
   description: item.description ?? item.desc ?? '',
+  price: item.price ?? '',
+  currency: item.currency ?? '',
 });
 
 const useCartStore = create(
@@ -42,7 +44,16 @@ const useCartStore = create(
           if (existingItem) {
             return {
               items: currentItems.map(i =>
-                i.url === normalizedItem.url ? {...i, count: i.count + 1} : i,
+                i.url === normalizedItem.url
+                  ? {
+                      ...i,
+                      count: i.count + 1,
+                      image: normalizedItem.image || i.image,
+                      price: normalizedItem.price || i.price,
+                      title: normalizedItem.title || i.title,
+                      currency: normalizedItem.currency || i.currency,
+                    }
+                  : i,
               ),
             };
           } else {

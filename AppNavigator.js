@@ -70,9 +70,11 @@ export default function AppNavigator() {
   // initialRouteName = "Profile";
   authAfterInitialRouteName = "Home";
   authAfterInitialRouteName = 'Categories';
+
   if (EXPRESS) {
     // authAfterInitialRouteName = 'Home';
   }
+  
   if (__DEV__) {
     // authAfterInitialRouteName = "Orders";
     // authAfterInitialRouteName = 'Cart';

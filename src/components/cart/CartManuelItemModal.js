@@ -21,6 +21,8 @@ export default function ({modalVisible, setModalVisible, addItem}) {
   const [count, setCount] = useState('1');
   const [description, setDescription] = useState('');
   const [image, setImage] = useState('');
+  const [price, setPrice] = useState('');
+  const [currency, setCurrency] = useState('');
 
   const styles = StyleSheet.create({
     container: {
@@ -139,6 +141,8 @@ export default function ({modalVisible, setModalVisible, addItem}) {
       image: newImage,
       description,
       desc: description,
+      price,
+      currency,
     };
 
     addItem(item);
@@ -154,6 +158,8 @@ export default function ({modalVisible, setModalVisible, addItem}) {
     setSize('');
     setCount('1');
     setDescription('');
+    setPrice('');
+    setCurrency('');
   };
 
   const handleCancel = () => {

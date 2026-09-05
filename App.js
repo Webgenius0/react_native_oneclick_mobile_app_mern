@@ -99,7 +99,7 @@ const App = () => {
     // Translate script'i uygulama açılışında fetch et
     (async () => {
       try {
-        console.log('====== fetchInjectScript ====== ', MOBIL_SCRIPT);
+        // console.log('====== fetchInjectScript ====== ', MOBIL_SCRIPT);
         const response = await fetch(MOBIL_SCRIPT, { cache: 'no-cache' });
         if (response && response.ok) {
           const script = await response.text();

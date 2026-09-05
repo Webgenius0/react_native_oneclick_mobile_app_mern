@@ -165,6 +165,8 @@ export default function CartPage({navigation, route}) {
       postData.append('cart[' + i + '][size]', item.size ? item.size : '');
       postData.append('cart[' + i + '][acik]', item.desc ? item.desc : '');
       postData.append('cart[' + i + '][img]', item.image);
+      postData.append('cart[' + i + '][fiyat]', item.price ? item.price : '');
+      postData.append('cart[' + i + '][parabirim]', item.currency ? item.currency : '');
       postData.append('file[' + i + ']', item?.imageData || '');
       i++;
       // add imageData file to postData

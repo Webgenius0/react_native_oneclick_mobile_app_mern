@@ -49,6 +49,12 @@ export const injectedJavascript = params => {
     str += getMetaTagTitle(page_url);
   }
 
+  if (params?.getMetaPrice || true) {
+    str += getMetaTagPriceAndCurrency(page_url);
+  }
+
+  str += checkProductPageBridge(page_url);
+
   if (isTrendyol(page_url)) {
     str += hideTrendyolBanners();
     // str += translatePage();
@@ -61,75 +67,316 @@ export const injectedJavascript = params => {
   return str;
 };
 export const getTrendyolImage = () => {
-  console.log('getTrendyolImage worked');
-
-  return `
-  (function() {
-    window.ReactNativeWebView.postMessage(
-      JSON.stringify({type: 'debug', data: 'Script başladı'})
-    );
-    
-    var attempts = 0;
-    var maxAttempts = 1000000;
-    
-    var interval = setInterval(function() {
-      attempts++;
-      
-      var img = document.querySelector('._carouselImage_abb7111');
-      
-      if (img && img.src) {
-        console.log('getTrendyolImage', img.src);
-        window.ReactNativeWebView.postMessage(
-          JSON.stringify({type: 'message', data: 'Resim Bulundu: ' + img.src})
-        );
-        window.ReactNativeWebView.postMessage(
-          JSON.stringify({type: 'image', data: img.src})
-        );
-        // clearInterval(interval);
-      } else if (attempts >= maxAttempts) {
-        window.ReactNativeWebView.postMessage(
-          JSON.stringify({type: 'error', data: 'Resim bulunamadı (Max deneme: ' + maxAttempts + ')'})
-        );
-        clearInterval(interval);
-      } else {
-        window.ReactNativeWebView.postMessage(
-          JSON.stringify({type: 'debug', data: 'Deneme ' + attempts + '/' + maxAttempts})
-        );
-      }
-    }, 500); // Her 500ms'de bir kontrol et
-    
-  })();`;
+  return getMetaTagImage();
 };
-
 export const getMetaTagImage = page_url => {
   return `
   (function() {
-    var metaTag = document.querySelector('meta[property="og:image"]');
-    if (metaTag) {
-      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'image', data: metaTag.content }));
-    } else {
-      // window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error', data: 'Meta tag bulunamadı' }));
-    }
+    var attempts = 0;
+    var maxAttempts = 30;
+
+    var isValidImg = function(url) {
+      if (!url || typeof url !== 'string') return false;
+      var str = url.trim().toLowerCase();
+      if (!str || str.length < 5) return false;
+      if (str.indexOf('data:image/gif') === 0 ||
+          str.indexOf('data:image/svg') === 0 ||
+          str.indexOf('blank.gif') > -1 ||
+          str.indexOf('transparent.png') > -1 ||
+          str.indexOf('logo') > -1 ||
+          str.indexOf('favicon') > -1) {
+        return false;
+      }
+      return true;
+    };
+
+    var checkImage = function() {
+      attempts++;
+      try {
+        var imgUrl = '';
+
+        // 1. Primary DOM Product Selectors (Mobile/Desktop galleries)
+        var imgEl = document.querySelector(
+          '.product-slide-item img, img[src*="cdn.dsmcdn.com/mnresize"], img[data-src*="cdn.dsmcdn.com/mnresize"], ' +
+          'img[src*="media/images"], img[data-src*="media/images"], .detail-section-img, .base-product-image img, ' +
+          '.gallery-container img, #landingImage, #imgBlkFront, #main-image, img.a-dynamic-image, ' +
+          'img.product-intro__head-main-img, .crop-image-container img, [data-test-id="product-image"] img, img.product-image'
+        );
+        if (imgEl) {
+          var candDom = imgEl.getAttribute('data-src') || imgEl.getAttribute('data-original') || imgEl.getAttribute('data-old-hires') || imgEl.getAttribute('data-a-dynamic-image') || imgEl.src || '';
+          if (isValidImg(candDom)) {
+            imgUrl = candDom;
+          }
+        }
+
+        // 2. Check JSON-LD schema if DOM selector didn't find item image
+        if (!imgUrl) {
+          var jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
+          for (var i = 0; i < jsonLdScripts.length; i++) {
+            try {
+              var data = JSON.parse(jsonLdScripts[i].textContent);
+              var items = Array.isArray(data) ? data : [data];
+              for (var j = 0; j < items.length; j++) {
+                var item = items[j];
+                var rawImg = item && (item.image || (item['@graph'] && Array.isArray(item['@graph']) && item['@graph'].find(function(g) { return g.image; }) ? item['@graph'].find(function(g) { return g.image; }).image : null));
+                if (rawImg) {
+                  var cand = Array.isArray(rawImg) ? rawImg[0] : rawImg;
+                  if (typeof cand === 'object' && cand.url) cand = cand.url;
+                  if (isValidImg(cand)) {
+                    imgUrl = cand;
+                    break;
+                  }
+                }
+              }
+            } catch(e) {}
+            if (imgUrl) break;
+          }
+        }
+
+        // 3. Fallback to Meta tags
+        if (!imgUrl) {
+          var metaImg = document.querySelector('meta[property="og:image"], meta[name="twitter:image"], meta[itemprop="image"], link[rel="image_src"]');
+          if (metaImg) {
+            var val = metaImg.content || metaImg.href || '';
+            if (isValidImg(val)) {
+              imgUrl = val;
+            }
+          }
+        }
+
+        if (imgUrl && typeof imgUrl === 'string') {
+          imgUrl = imgUrl.trim();
+          if (imgUrl.indexOf('//') === 0) {
+            imgUrl = 'https:' + imgUrl;
+          } else if (imgUrl.indexOf('/') === 0) {
+            imgUrl = window.location.origin + imgUrl;
+          }
+
+          if (window.ReactNativeWebView && typeof window.ReactNativeWebView.postMessage === 'function') {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'image', data: imgUrl }));
+          }
+          if (imgInterval) clearInterval(imgInterval);
+        } else if (attempts >= maxAttempts) {
+          if (imgInterval) clearInterval(imgInterval);
+        }
+      } catch(err) {}
+    };
+
+    var imgInterval = setInterval(checkImage, 500);
+    checkImage();
   })();
-`;
+  `;
 };
 
 export const getMetaTagTitle = page_url => {
   return `
   (function() {
-    var metaTag = document.querySelector('meta[property="og:title"]');
-  
-    if (metaTag) {
-      var title = metaTag.content;
-      title = title.replace(' Fiyatı, Yorumları - Trendyol', '');
-      title = title.trim();
-      
-      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'title', data: title }));
-    } else {
-      // window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error', data: 'Meta tag bulunamadı' }));
-    }
+    try {
+      var title = '';
+      var metaTag = document.querySelector('meta[property="og:title"], meta[name="twitter:title"], meta[itemprop="name"]');
+      if (metaTag && metaTag.content) {
+        title = metaTag.content;
+      } else {
+        var h1 = document.querySelector('h1.pr-new-br span, h1, title');
+        if (h1 && h1.textContent) {
+          title = h1.textContent;
+        }
+      }
+      if (title) {
+        title = title.replace(' Fiyatı, Yorumları - Trendyol', '').trim();
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'title', data: title }));
+      }
+    } catch(e) {}
   })();
 `;
+};
+
+export const getMetaTagPriceAndCurrency = page_url => {
+  return `
+  (function() {
+    var attempts = 0;
+    var maxAttempts = 30;
+
+    var checkPrice = function() {
+      attempts++;
+      try {
+        var price = '';
+        var currency = '';
+
+        // 1. Meta tags
+        var metaPrice = document.querySelector('meta[property="og:price:amount"], meta[property="product:price:amount"], meta[itemprop="price"], meta[name="twitter:data1"]');
+        var metaCurrency = document.querySelector('meta[property="og:price:currency"], meta[property="product:price:currency"], meta[itemprop="priceCurrency"], meta[name="twitter:label1"]');
+
+        if (metaPrice && metaPrice.content) {
+          price = metaPrice.content.trim();
+        }
+        if (metaCurrency && metaCurrency.content) {
+          currency = metaCurrency.content.trim();
+        }
+
+        // 2. JSON-LD schema if price not found
+        if (!price) {
+          var jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
+          for (var i = 0; i < jsonLdScripts.length; i++) {
+            try {
+              var data = JSON.parse(jsonLdScripts[i].textContent);
+              var items = Array.isArray(data) ? data : [data];
+              for (var j = 0; j < items.length; j++) {
+                var item = items[j];
+                var offer = item && (item.offers || (item['@graph'] && Array.isArray(item['@graph']) && item['@graph'].find(function(g) { return g.offers; }) ? item['@graph'].find(function(g) { return g.offers; }).offers : null));
+                if (offer) {
+                  var targetOffer = Array.isArray(offer) ? offer[0] : offer;
+                  if (targetOffer && targetOffer.price) {
+                    price = String(targetOffer.price).trim();
+                    if (targetOffer.priceCurrency) {
+                      currency = String(targetOffer.priceCurrency).trim();
+                    }
+                    break;
+                  }
+                }
+              }
+            } catch(e) {}
+            if (price) break;
+          }
+        }
+
+        // 3. Fallback DOM selectors
+        var priceEl = null;
+        if (!price) {
+          priceEl = document.querySelector('.prc-dsc, .prc-box-dsc, span.prc-dsc, div.product-price-container, .a-price .a-offscreen, #priceblock_ourprice, #priceblock_dealprice, #corePrice_feature_div .a-offscreen, .product-intro__head-price, .price-item, [data-test-id="price-current-price"], #offering-price, .product-price, .pdp-price');
+          if (priceEl && priceEl.textContent) {
+            var text = priceEl.textContent.trim();
+            var match = text.match(/([0-9\\.,\\s]+)\\s*([A-Za-z₺$€£AED]+)?/);
+            if (match) {
+              price = match[1].trim();
+              if (match[2]) currency = match[2].trim();
+            } else {
+              price = text;
+            }
+          }
+        }
+
+        // 4. Extract or infer currency if missing
+        if (!currency) {
+          var targetText = (priceEl ? priceEl.textContent : '') || document.body.innerText || '';
+          var currMatch = targetText.match(/(TL|TRY|₺|AED|SAR|USD|EUR|GBP|\\$|€|£)/i);
+          if (currMatch) {
+            currency = currMatch[1].toUpperCase();
+          } else {
+            var href = window.location.href || '';
+            if (href.indexOf('trendyol.com') > -1 || href.indexOf('hepsiburada.com') > -1 || href.indexOf('.tr') > -1) {
+              currency = 'TL';
+            } else if (href.indexOf('amazon.ae') > -1) {
+              currency = 'AED';
+            } else if (href.indexOf('amazon.sa') > -1) {
+              currency = 'SAR';
+            } else if (href.indexOf('amazon.de') > -1) {
+              currency = 'EUR';
+            } else if (href.indexOf('amazon.co.uk') > -1) {
+              currency = 'GBP';
+            } else if (href.indexOf('amazon.com') > -1 || href.indexOf('shein.com') > -1) {
+              currency = 'USD';
+            }
+          }
+        }
+
+        if (currency === '₺') currency = 'TL';
+        if (currency === '$') currency = 'USD';
+        if (currency === '€') currency = 'EUR';
+        if (currency === '£') currency = 'GBP';
+
+        if (price) {
+          if (window.ReactNativeWebView && typeof window.ReactNativeWebView.postMessage === 'function') {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'price', data: price }));
+            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'currency', data: currency || 'TL' }));
+          }
+          if (priceInterval) clearInterval(priceInterval);
+        } else if (attempts >= maxAttempts) {
+          if (priceInterval) clearInterval(priceInterval);
+        }
+      } catch(err) {}
+    };
+
+    var priceInterval = setInterval(checkPrice, 500);
+    checkPrice();
+  })();
+`;
+};
+
+export const checkProductPageBridge = page_url => {
+  return `
+  (function() {
+    var attempts = 0;
+    var maxAttempts = 20;
+
+    var check = function() {
+      attempts++;
+      try {
+        var href = (window.location.href || '').toLowerCase();
+
+        // 1. Strict URL pattern check
+        var isProductUrl = (
+          /-p-\d+/i.test(href) ||
+          /-pm-\d+/i.test(href) ||
+          /\/dp\/[a-z0-9]+/i.test(href) ||
+          /\/gp\/product\/[a-z0-9]+/i.test(href) ||
+          /\/product\/[a-z0-9_-]+/i.test(href) ||
+          /\/products\/[a-z0-9_-]+/i.test(href) ||
+          /\/item\/[a-z0-9_-]+/i.test(href) ||
+          /\/items\/[a-z0-9_-]+/i.test(href) ||
+          /\/itm\/[a-z0-9_-]+/i.test(href) ||
+          /\/goods\/[a-z0-9_-]+/i.test(href) ||
+          /\/pd\/[a-z0-9_-]+/i.test(href) ||
+          /[?&](product_id|goods_id|item_id|pid)=/i.test(href)
+        );
+
+        // 2. Meta tags check for single product
+        var ogType = document.querySelector('meta[property="og:type"]');
+        var isProductMeta = (
+          (ogType && ogType.content && ogType.content.toLowerCase().indexOf('product') > -1) ||
+          !!document.querySelector('meta[property="product:price:amount"], meta[property="og:price:amount"], meta[itemprop="price"]')
+        );
+
+        // 3. JSON-LD Schema check
+        var isProductSchema = false;
+        var jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
+        for (var i = 0; i < jsonLdScripts.length; i++) {
+          try {
+            var text = jsonLdScripts[i].textContent || '';
+            if (text.indexOf('"Product"') > -1 || text.indexOf('"@type":"Product"') > -1 || text.indexOf('"IndividualProduct"') > -1) {
+              isProductSchema = true;
+              break;
+            }
+          } catch(e) {}
+        }
+
+        // 4. Single Product DOM Elements
+        var isProductDom = !!document.querySelector(
+          '#add-to-cart-button, #buy-now-button, .add-to-basket, .button_add_to_basket, #addToCart, ' +
+          'button[class*="add-to-cart"], a[class*="add-to-cart"], [data-test-id*="add-to-cart"], ' +
+          'button[class*="addToCart"], button[class*="buy-now"], ' +
+          '.product-detail-container, .product-intro, [data-goods-id], [data-product-id]'
+        );
+
+        var isProduct = isProductUrl || isProductMeta || isProductSchema || isProductDom;
+
+        if (window.ReactNativeWebView && typeof window.ReactNativeWebView.postMessage === 'function') {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'isProductPage',
+            data: isProduct
+          }));
+        }
+
+        if (isProduct || attempts >= maxAttempts) {
+          if (checkInterval) clearInterval(checkInterval);
+        }
+      } catch(err) {}
+    };
+
+    var checkInterval = setInterval(check, 500);
+    check();
+  })();
+  `;
 };
 
 export const hideTrendyolBanners = () => {

@@ -62,6 +62,13 @@ const CartItem = ({
                   <TouchableOpacity onPress={() => openUrl(item.url)}>
                     <Text style={styles.url}>{item.title || item.url}</Text>
                   </TouchableOpacity>
+                  {Boolean(item?.price) && (
+                    <Text style={styles.priceText}>
+                      {String(item.price).toLowerCase().includes(String(item.currency || '').toLowerCase())
+                        ? item.price
+                        : `${item.price} ${item.currency || 'TL'}`}
+                    </Text>
+                  )}
                 </View>
                 <View style={styles.trashIconWrapper}>
                   <TouchableOpacity
@@ -189,8 +196,14 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   url: {
-    marginBottom: 10,
+    marginBottom: 5,
     color: '#000',
+  },
+  priceText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#F15927',
+    marginBottom: 5,
   },
   cb: {
     marginBottom: 10,
