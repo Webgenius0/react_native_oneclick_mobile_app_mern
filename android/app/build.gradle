@@ -122,6 +122,10 @@ android {
             useLegacyPackaging true
         }
     }
+    adbOptions {
+        timeOutInMs 10 * 60 * 1000
+        installOptions '-r', '-d', '-t'
+    }
     experimentalProperties["android.experimental.art.profileBasedDexOptimization.forceEnable16KB"] = true
 }
 

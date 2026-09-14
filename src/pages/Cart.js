@@ -124,8 +124,10 @@ export default function CartPage({navigation, route}) {
     }
 
 
-    // Check if any checked item has both size and desc empty
-    const hasEmptyDetails = items.some(item => item.checked === true && !item.size && !item.desc);
+    // Check if any checked item has both size (if size is applicable) and desc empty
+    const hasEmptyDetails = items.some(
+      item => item.checked === true && item.hasSize && !item.size && !item.desc,
+    );
     
     if (hasEmptyDetails) {
       const confirmed = await new Promise((resolve) => {
@@ -163,7 +165,22 @@ export default function CartPage({navigation, route}) {
       postData.append('cart[' + i + '][link]', item.url);
       postData.append('cart[' + i + '][sayi]', item.count);
       postData.append('cart[' + i + '][size]', item.size ? item.size : '');
-      postData.append('cart[' + i + '][acik]', item.desc ? item.desc : '');
+      postData.append('cart[' + i + '][color]', item.color ? item.color : '');
+      postData.append('cart[' + i + '][renk]', item.color ? item.color : '');
+      postData.append('cart[' + i + '][store]', item.store ? item.store : '');
+      postData.append('cart[' + i + '][store_name]', item.store ? item.store : '');
+      postData.append('cart[' + i + '][magaza]', item.store ? item.store : '');
+
+      let optionsStr = '';
+      if (Array.isArray(item.options) && item.options.length > 0) {
+        optionsStr = item.options
+          .map(o => `${o.name}: ${o.selected || (o.values && o.values[0]) || ''}`)
+          .join(', ');
+        postData.append('cart[' + i + '][options]', optionsStr);
+      }
+
+      const combinedDesc = [item.desc, optionsStr].filter(Boolean).join(' | ');
+      postData.append('cart[' + i + '][acik]', combinedDesc);
       postData.append('cart[' + i + '][img]', item.image);
       postData.append('cart[' + i + '][fiyat]', item.price ? item.price : '');
       postData.append('cart[' + i + '][parabirim]', item.currency ? item.currency : '');

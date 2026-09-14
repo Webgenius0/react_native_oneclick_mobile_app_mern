@@ -22,6 +22,13 @@ const normalizeCartItem = item => ({
     ? item.checked
     : true,
   size: item.size ?? '',
+  hasSize: item.hasSize ?? (Array.isArray(item.sizes) && item.sizes.length > 0),
+  sizes: Array.isArray(item.sizes) ? item.sizes : [],
+  color: item.color ?? '',
+  hasColor: item.hasColor ?? (Array.isArray(item.colors) && item.colors.length > 0),
+  colors: Array.isArray(item.colors) ? item.colors : [],
+  options: Array.isArray(item.options) ? item.options : [],
+  store: item.store ?? item.storeName ?? '',
   desc: item.desc ?? item.description ?? '',
   description: item.description ?? item.desc ?? '',
   price: item.price ?? '',
@@ -52,6 +59,14 @@ const useCartStore = create(
                       price: normalizedItem.price || i.price,
                       title: normalizedItem.title || i.title,
                       currency: normalizedItem.currency || i.currency,
+                      store: normalizedItem.store || i.store,
+                      size: normalizedItem.size || i.size,
+                      hasSize: normalizedItem.hasSize ?? i.hasSize,
+                      sizes: normalizedItem.sizes?.length ? normalizedItem.sizes : i.sizes,
+                      color: normalizedItem.color || i.color,
+                      hasColor: normalizedItem.hasColor ?? i.hasColor,
+                      colors: normalizedItem.colors?.length ? normalizedItem.colors : i.colors,
+                      options: normalizedItem.options?.length ? normalizedItem.options : i.options,
                     }
                   : i,
               ),
@@ -86,6 +101,30 @@ const useCartStore = create(
       updateItem: (url, item) =>
         set(state => ({
           items: state.items.map(i => (i.url === url ? {...i, ...item} : i)),
+        })),
+      updateOption: (url, optionName, selectedValue) =>
+        set(state => ({
+          items: state.items.map(i => {
+            if (i.url !== url) return i;
+            const currentOptions = Array.isArray(i.options) ? i.options : [];
+            const updatedOptions = currentOptions.map(opt =>
+              opt.name.toLowerCase() === optionName.toLowerCase()
+                ? { ...opt, selected: selectedValue }
+                : opt,
+            );
+            const isSize =
+              optionName.toLowerCase().includes('size') ||
+              optionName.toLowerCase().includes('beden');
+            const isColor =
+              optionName.toLowerCase().includes('color') ||
+              optionName.toLowerCase().includes('renk');
+            return {
+              ...i,
+              options: updatedOptions,
+              ...(isSize ? { size: selectedValue } : {}),
+              ...(isColor ? { color: selectedValue } : {}),
+            };
+          }),
         })),
       updateField: (url, field, value) =>
         set(state => ({

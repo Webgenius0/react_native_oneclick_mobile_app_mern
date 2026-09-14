@@ -20,6 +20,7 @@ import { getToken, getUser } from "../helpers/auth";
 import { ext, mimeType } from "../helpers/file";
 import { tr } from "../translate/i18n";
 import { EmContext } from "../contexts/EmContext";
+import { getStoreName } from "../helpers/storeHelper";
 
 export default function({ route, navigation }) {
 
@@ -112,6 +113,10 @@ export default function({ route, navigation }) {
     postData.append("size", state.size);
     postData.append("sayi", state.qty);
     postData.append("acik", state.desc);
+    const storeName = getStoreName(state.link);
+    postData.append("store", storeName);
+    postData.append("store_name", storeName);
+    postData.append("magaza", storeName);
 
     // console.log('mimeType(file.name)', mimeType(file.name));
     let ek = 1;

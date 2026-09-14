@@ -54,6 +54,7 @@ export const injectedJavascript = params => {
   }
 
   str += checkProductPageBridge(page_url);
+  str += getProductOptionsBridge(page_url);
 
   if (isTrendyol(page_url)) {
     str += hideTrendyolBanners();
@@ -316,10 +317,12 @@ export const checkProductPageBridge = page_url => {
 
         // 1. Strict URL pattern check
         var isProductUrl = (
-          /-p-\d+/i.test(href) ||
-          /-pm-\d+/i.test(href) ||
+          /-p-[a-z0-9_-]+/i.test(href) ||
+          /-pm-[a-z0-9_-]+/i.test(href) ||
           /\/dp\/[a-z0-9]+/i.test(href) ||
+          /\/gp\/aw\/d\/[a-z0-9]+/i.test(href) ||
           /\/gp\/product\/[a-z0-9]+/i.test(href) ||
+          /\/d\/[a-z0-9]+/i.test(href) ||
           /\/product\/[a-z0-9_-]+/i.test(href) ||
           /\/products\/[a-z0-9_-]+/i.test(href) ||
           /\/item\/[a-z0-9_-]+/i.test(href) ||
@@ -327,7 +330,7 @@ export const checkProductPageBridge = page_url => {
           /\/itm\/[a-z0-9_-]+/i.test(href) ||
           /\/goods\/[a-z0-9_-]+/i.test(href) ||
           /\/pd\/[a-z0-9_-]+/i.test(href) ||
-          /[?&](product_id|goods_id|item_id|pid)=/i.test(href)
+          /[?&](product_id|goods_id|item_id|pid|sku|asin)=/i.test(href)
         );
 
         // 2. Meta tags check for single product
@@ -375,6 +378,375 @@ export const checkProductPageBridge = page_url => {
 
     var checkInterval = setInterval(check, 500);
     check();
+  })();
+  `;
+};
+
+export const getProductOptionsBridge = page_url => {
+  return `
+  (function() {
+    var attempts = 0;
+    var maxFastAttempts = 20;
+    var lastSentKey = '';
+
+    var cleanText = function(text) {
+      if (!text || typeof text !== 'string') return '';
+      return text.replace(/\\s+/g, ' ').replace(/^[:\\-\\s]+|[:\\-\\s]+$/g, '').trim();
+    };
+
+    var cleanOptionValue = function(text) {
+      if (!text || typeof text !== 'string') return '';
+      var clean = text.replace(/\\s+/g, ' ').trim();
+      // Strip trailing price diffs, e.g. (+200 TL), (+15,00 TL), (-$5.00), (350 TL), +10 ₺
+      clean = clean.replace(/\\s*[\\(\\[]?[+\\-]?\\s*\\d+([.,]\\d+)?\\s*(tl|₺|\\$|€|usd|eur)[\\)\\]]?/gi, '');
+      clean = clean.replace(/^[:\\-\\s]+|[:\\-\\s]+$/g, '').trim();
+      if (clean.length === 0 || clean.length > 25) return '';
+
+      var lower = clean.toLowerCase();
+      var junkWords = [
+        'select', 'seçiniz', 'seç', 'choose', 'lütfen', 'beden tablosu', 'size guide',
+        'size chart', 'beden rehberi', 'out of stock', 'tükendi', 'stokta yok',
+        'gelince haber ver', 'sepete ekle', 'add to cart', 'buy now', 'hemen al',
+        'kargo bedava', 'free delivery', 'kupon', 'coupon', 'indirim', 'discount',
+        'taksit', 'installment', 'satıcı', 'seller', 'yorum', 'review', 'değerlendirme',
+        'kargo', 'teslimat', 'iade', 'return', 'share', 'paylaş', 'fiyat', 'price'
+      ];
+      for (var j = 0; j < junkWords.length; j++) {
+        if (lower === junkWords[j] || lower.indexOf(junkWords[j]) === 0) return '';
+      }
+
+      // Discard pure digits >= 7 chars (barcodes / skus)
+      if (/^\\d{7,}$/.test(clean)) return '';
+
+      return clean;
+    };
+
+    var normalizeDimName = function(rawName) {
+      if (!rawName || typeof rawName !== 'string') return null;
+      var n = cleanText(rawName);
+      var lower = n.toLowerCase();
+
+      // Junk dimensions to ignore
+      var ignoreDims = ['quantity', 'adet', 'miktar', 'qty', 'seller', 'satıcı', 'kargo', 'teslimat', 'garanti', 'warranty', 'sigorta', 'protection', 'fiyat', 'price', 'sepet', 'basket', 'cart', 'taksit', 'adres', 'address'];
+      for (var i = 0; i < ignoreDims.length; i++) {
+        if (lower.indexOf(ignoreDims[i]) > -1) return null;
+      }
+
+      // Valid e-commerce variant dimensions only
+      if (lower.indexOf('beden') > -1 || lower.indexOf('size') > -1 || lower.indexOf('numara') > -1 || lower.indexOf('ölçü') > -1 || lower.indexOf('boyut') > -1 || lower.indexOf('dimension') > -1) return 'Size';
+      if (lower.indexOf('renk') > -1 || lower.indexOf('color') > -1 || lower.indexOf('colour') > -1) return 'Color';
+      if (lower.indexOf('model') > -1 || lower.indexOf('tip') > -1 || lower === 'type') return 'Model';
+      if (lower.indexOf('ağırlık') > -1 || lower.indexOf('weight') > -1 || lower.indexOf('gram') > -1 || lower.indexOf('kg') > -1) return 'Weight';
+      if (lower.indexOf('kapasite') > -1 || lower.indexOf('capacity') > -1 || lower.indexOf('hafıza') > -1 || lower.indexOf('storage') > -1 || lower.indexOf('hacim') > -1) return 'Capacity';
+      if (lower.indexOf('stil') > -1 || lower.indexOf('style') > -1 || lower.indexOf('tarz') > -1) return 'Style';
+      if (lower.indexOf('desen') > -1 || lower.indexOf('pattern') > -1) return 'Pattern';
+
+      return null;
+    };
+
+    var extractOptions = function(forceSend) {
+      attempts++;
+      try {
+        var optionsMap = {};
+
+        var addOptionValue = function(dimName, val, isSelected) {
+          var normName = normalizeDimName(dimName);
+          if (!normName) return;
+          var cleanVal = cleanOptionValue(val);
+          if (!cleanVal) return;
+
+          if (!optionsMap[normName]) {
+            optionsMap[normName] = { name: normName, values: [], selected: '' };
+          }
+          if (optionsMap[normName].values.indexOf(cleanVal) === -1) {
+            optionsMap[normName].values.push(cleanVal);
+          }
+          if (isSelected && !optionsMap[normName].selected) {
+            optionsMap[normName].selected = cleanVal;
+          }
+        };
+
+        var setOptionSelected = function(dimName, selVal) {
+          var normName = normalizeDimName(dimName);
+          if (!normName) return;
+          var cleanVal = cleanOptionValue(selVal);
+          if (!cleanVal) return;
+
+          if (!optionsMap[normName]) {
+            optionsMap[normName] = { name: normName, values: [cleanVal], selected: cleanVal };
+          } else {
+            optionsMap[normName].selected = cleanVal;
+            if (optionsMap[normName].values.indexOf(cleanVal) === -1) {
+              optionsMap[normName].values.unshift(cleanVal);
+            }
+          }
+        };
+
+        // 1. WINDOW APPLICATION STATE (Trendyol, Shein, Hepsiburada)
+        // Trendyol Product State
+        try {
+          if (window.__PRODUCT_DETAIL_APP_INITIAL_STATE__ && window.__PRODUCT_DETAIL_APP_INITIAL_STATE__.product) {
+            var tp = window.__PRODUCT_DETAIL_APP_INITIAL_STATE__.product;
+            if (Array.isArray(tp.variants)) {
+              for (var vi = 0; vi < tp.variants.length; vi++) {
+                var vItem = tp.variants[vi];
+                if (vItem && vItem.attributeValue) {
+                  addOptionValue('Size', vItem.attributeValue, !!vItem.selected);
+                }
+              }
+            }
+            if (Array.isArray(tp.slicingAttributes)) {
+              for (var si = 0; si < tp.slicingAttributes.length; si++) {
+                var sAttr = tp.slicingAttributes[si];
+                var sDim = normalizeDimName(sAttr.name || sAttr.type || 'Color');
+                if (sDim && Array.isArray(sAttr.attributes)) {
+                  for (var ai = 0; ai < sAttr.attributes.length; ai++) {
+                    var aItem = sAttr.attributes[ai];
+                    var aVal = aItem.name || aItem.value;
+                    if (aVal) addOptionValue(sDim, aVal, !!aItem.selected);
+                  }
+                }
+              }
+            }
+          }
+        } catch(_e) {}
+
+        // Shein Global Data
+        try {
+          var shData = window.productIntroData || window.gbProductIntroData;
+          if (shData && shData.detail) {
+            var dt = shData.detail;
+            if (Array.isArray(dt.mainSaleAttribute)) {
+              for (var m = 0; m < dt.mainSaleAttribute.length; m++) {
+                var mItem = dt.mainSaleAttribute[m];
+                var mDim = normalizeDimName(mItem.attr_name || 'Color');
+                if (mDim && Array.isArray(mItem.attr_value_list)) {
+                  for (var mv = 0; mv < mItem.attr_value_list.length; mv++) {
+                    addOptionValue(mDim, mItem.attr_value_list[mv].attr_value_name, !!mItem.attr_value_list[mv].is_default);
+                  }
+                }
+              }
+            }
+            if (Array.isArray(dt.saleAttribute)) {
+              for (var sa = 0; sa < dt.saleAttribute.length; sa++) {
+                var saItem = dt.saleAttribute[sa];
+                var saDim = normalizeDimName(saItem.attr_name || 'Size');
+                if (saDim && Array.isArray(saItem.attr_value_list)) {
+                  for (var sav = 0; sav < saItem.attr_value_list.length; sav++) {
+                    addOptionValue(saDim, saItem.attr_value_list[sav].attr_value_name, !!saItem.attr_value_list[sav].is_default);
+                  }
+                }
+              }
+            }
+          }
+        } catch(_e) {}
+
+        // 2. AMAZON VARIATION DIMENSIONS (Mobile & Desktop)
+        var amzRows = document.querySelectorAll('div[id^="inline-twister-row-"], div[id^="variation_"], .inline-twister-row');
+        for (var r = 0; r < amzRows.length; r++) {
+          var row = amzRows[r];
+          var rawId = row.id || '';
+          var rawFromId = rawId.replace('inline-twister-row-', '').replace('variation_', '').replace('_name', '');
+          var labelEl = row.querySelector('.inline-twister-dim-title-label, label, .a-form-label, h4');
+          var dimName = normalizeDimName(labelEl ? labelEl.textContent : rawFromId);
+          if (!dimName) continue;
+
+          var selEl = row.querySelector('.inline-twister-dim-title-value, .selection, span[id^="inline-twister-dim-title-value-"]');
+          if (selEl) {
+            setOptionSelected(dimName, selEl.textContent);
+          }
+
+          var rowSelect = row.querySelector('select');
+          if (rowSelect) {
+            var rOpts = rowSelect.querySelectorAll('option');
+            for (var ro = 0; ro < rOpts.length; ro++) {
+              if (rOpts[ro].value && rOpts[ro].value !== '-1') {
+                addOptionValue(dimName, rOpts[ro].textContent, rOpts[ro].selected);
+              }
+            }
+          } else {
+            var items = row.querySelectorAll('li, div[data-csa-c-content-id], div[data-asin], .a-button-text, button');
+            for (var it = 0; it < items.length; it++) {
+              var itemEl = items[it];
+              var img = itemEl.querySelector('img');
+              var val = img ? (img.getAttribute('alt') || img.getAttribute('title') || '') : '';
+              if (!val) {
+                var btn = itemEl.querySelector('.a-button-text, button, span') || itemEl;
+                val = btn.textContent;
+              }
+              var isSel = itemEl.classList.contains('swatchSelect') || itemEl.classList.contains('a-button-selected') || itemEl.getAttribute('aria-checked') === 'true';
+              addOptionValue(dimName, val, isSel);
+            }
+          }
+        }
+
+        // Amazon Global / Mobile Dropdowns
+        var amzDropdowns = document.querySelectorAll('select[name^="dropdown_selected_"], select[id^="dropdown_selected_"], select[id^="native_dropdown_selected_"]');
+        for (var ad = 0; ad < amzDropdowns.length; ad++) {
+          var adSel = amzDropdowns[ad];
+          var adName = normalizeDimName(adSel.name || adSel.id || '');
+          if (adName) {
+            var adOpts = adSel.querySelectorAll('option');
+            for (var ao = 0; ao < adOpts.length; ao++) {
+              if (adOpts[ao].value && adOpts[ao].value !== '-1') {
+                addOptionValue(adName, adOpts[ao].textContent, adOpts[ao].selected);
+              }
+            }
+          }
+        }
+
+        // 3. TRENDYOL ATTRIBUTES & VARIANTS (Mobile .sp-itm & Desktop)
+        var spItems = document.querySelectorAll('.sp-itm, .size-options .sp-itm, .sp-v .sp-itm, .size-item');
+        for (var sp = 0; sp < spItems.length; sp++) {
+          var spEl = spItems[sp];
+          var isSpSel = spEl.classList.contains('selected') || spEl.classList.contains('active') || spEl.getAttribute('aria-checked') === 'true';
+          addOptionValue('Size', spEl.textContent, isSpSel);
+        }
+
+        var tyContainers = document.querySelectorAll('.attribute-v2-container, .variants-container, div[class*="size-variant"], div[class*="color-variant"], .slicing-attributes');
+        for (var t = 0; t < tyContainers.length; t++) {
+          var tCont = tyContainers[t];
+          var tLabel = tCont.querySelector('.attribute-v2-label, .title, .sp-itm-title, span[class*="label"]');
+          var rawTName = tLabel ? tLabel.textContent : (tCont.className.indexOf('color') > -1 ? 'Color' : 'Size');
+          var tDim = normalizeDimName(rawTName);
+          if (!tDim) continue;
+
+          var tSubItems = tCont.querySelectorAll('.attribute-v2-item, .sp-itm, .sl-itm, .color-item, button, a');
+          for (var tsi = 0; tsi < tSubItems.length; tsi++) {
+            var tsiEl = tSubItems[tsi];
+            var tsiImg = tsiEl.querySelector('img');
+            var tsiVal = tsiEl.getAttribute('title') || (tsiImg ? tsiImg.getAttribute('alt') : '') || tsiEl.textContent;
+            var isTsiSel = tsiEl.classList.contains('selected') || tsiEl.classList.contains('active') || tsiEl.getAttribute('aria-checked') === 'true';
+            addOptionValue(tDim, tsiVal, isTsiSel);
+          }
+        }
+
+        // 4. HEPSIBURADA ATTRIBUTES & VARIANTS
+        var hbContainers = document.querySelectorAll('div[data-test-id="variant-property"], div[class*="variantProperty"], div[class*="VariantProperty"], div[class*="variant-property"]');
+        for (var h = 0; h < hbContainers.length; h++) {
+          var hCont = hbContainers[h];
+          var hTitle = hCont.querySelector('span[class*="variantTitle"], div[data-test-id="variant-name"], label[class*="variant"]');
+          var hDim = normalizeDimName(hTitle ? hTitle.textContent : '');
+          if (!hDim) continue;
+
+          var hItems = hCont.querySelectorAll('a[data-test-id="variant-item"], div[class*="variantItem"], div[class*="variant-item"], button');
+          for (var hi = 0; hi < hItems.length; hi++) {
+            var hEl = hItems[hi];
+            var hImg = hEl.querySelector('img');
+            var hVal = hEl.getAttribute('title') || (hImg ? hImg.getAttribute('alt') : '') || hEl.textContent;
+            var isHSel = hEl.classList.contains('selected') || hEl.getAttribute('aria-selected') === 'true';
+            addOptionValue(hDim, hVal, isHSel);
+          }
+        }
+
+        // 5. SHEIN DOM ATTRIBUTES & VARIANTS
+        var shContainers = document.querySelectorAll('div[class*="product-intro__attr-item"], div[class*="goods-size"], div[class*="goods-color"], div[data-attr-type]');
+        for (var s = 0; s < shContainers.length; s++) {
+          var sCont = shContainers[s];
+          var sTitle = sCont.querySelector('[class*="attr-title"], [class*="attr-name"], .val-title');
+          var sDim = normalizeDimName(sTitle ? sTitle.textContent : (sCont.getAttribute('data-attr-type') || ''));
+          if (!sDim) continue;
+
+          var shEls = sCont.querySelectorAll('.goods-size__radio, .goods-color__radio, [data-attr-type] button, .val-item');
+          for (var shi = 0; shi < shEls.length; shi++) {
+            var shEl = shEls[shi];
+            var shVal = shEl.getAttribute('title') || shEl.getAttribute('aria-label') || shEl.textContent;
+            var isShSel = shEl.classList.contains('active') || shEl.classList.contains('selected') || shEl.getAttribute('aria-checked') === 'true';
+            addOptionValue(sDim, shVal, isShSel);
+          }
+        }
+
+        // 6. GENERIC E-COMMERCE SELECTS
+        var allSelects = document.querySelectorAll('select');
+        for (var sc = 0; sc < allSelects.length; sc++) {
+          var selBox = allSelects[sc];
+          var selName = normalizeDimName(selBox.name || selBox.id || (selBox.previousElementSibling ? selBox.previousElementSibling.textContent : ''));
+          if (!selName) continue;
+
+          var sOpts = selBox.querySelectorAll('option');
+          for (var so = 0; so < sOpts.length; so++) {
+            if (sOpts[so].value && sOpts[so].value !== '-1') {
+              addOptionValue(selName, sOpts[so].textContent, sOpts[so].selected);
+            }
+          }
+        }
+
+        // 7. FORMAT AND COMPILE RESULT
+        var finalOptions = [];
+        var sizeObj = null;
+        var colorObj = null;
+
+        var dimKeys = Object.keys(optionsMap);
+        for (var k = 0; k < dimKeys.length; k++) {
+          var opt = optionsMap[dimKeys[k]];
+          if (opt && opt.values.length > 0 && opt.values.length <= 35) {
+            if (!opt.selected) opt.selected = opt.values[0];
+            finalOptions.push(opt);
+            if (opt.name === 'Size') sizeObj = opt;
+            if (opt.name === 'Color') colorObj = opt;
+          }
+        }
+
+        var hasSize = Boolean(sizeObj && sizeObj.values.length > 0);
+        var hasColor = Boolean(colorObj && colorObj.values.length > 0);
+
+        var resultData = {
+          hasOptions: finalOptions.length > 0,
+          options: finalOptions,
+          hasSize: hasSize,
+          sizes: hasSize ? sizeObj.values : [],
+          selectedSize: hasSize ? sizeObj.selected : '',
+          hasColor: hasColor,
+          colors: hasColor ? colorObj.values : [],
+          selectedColor: hasColor ? colorObj.selected : '',
+        };
+
+        var key = JSON.stringify(resultData);
+        if (forceSend || key !== lastSentKey) {
+          lastSentKey = key;
+          if (window.ReactNativeWebView && typeof window.ReactNativeWebView.postMessage === 'function') {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'productOptions',
+              data: resultData
+            }));
+          }
+        }
+
+        if (attempts >= maxFastAttempts && optInterval) {
+          clearInterval(optInterval);
+          optInterval = setInterval(function() { extractOptions(false); }, 2000);
+        }
+      } catch(e) {}
+    };
+
+    window.__extractAndSendProductOptions = function(force) {
+      extractOptions(Boolean(force));
+    };
+
+    var optInterval = setInterval(function() { extractOptions(false); }, 600);
+    extractOptions(false);
+
+    try {
+      document.addEventListener('click', function() {
+        setTimeout(function() { extractOptions(false); }, 200);
+      }, true);
+      document.addEventListener('change', function() {
+        setTimeout(function() { extractOptions(false); }, 150);
+      }, true);
+      document.addEventListener('touchend', function() {
+        setTimeout(function() { extractOptions(false); }, 250);
+      }, true);
+    } catch(e) {}
+
+    try {
+      if (window.MutationObserver) {
+        var optObserver = new MutationObserver(function() {
+          clearTimeout(window.__optDebounceTimer);
+          window.__optDebounceTimer = setTimeout(function() { extractOptions(false); }, 300);
+        });
+        optObserver.observe(document.body || document.documentElement, { childList: true, subtree: true });
+      }
+    } catch(e) {}
   })();
   `;
 };

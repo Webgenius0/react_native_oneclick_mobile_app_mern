@@ -7,6 +7,7 @@ import {
   View,
   StyleSheet,
   Touchable,
+  ScrollView,
 } from 'react-native';
 import FastImage from 'react-native-fast-image';
 import CartItemCountArea from './CartItemCountArea';
@@ -29,6 +30,24 @@ const CartItem = ({
 }) => {
   const changeItem = (field, value) => {
     onChange(item.url, field, value);
+  };
+
+  const changeOption = (optionName, selectedValue) => {
+    const currentOptions = Array.isArray(item.options) ? item.options : [];
+    const updatedOptions = currentOptions.map(opt =>
+      opt.name.toLowerCase() === optionName.toLowerCase()
+        ? { ...opt, selected: selectedValue }
+        : opt,
+    );
+    onChange(item.url, 'options', updatedOptions);
+
+    const lowerName = optionName.toLowerCase();
+    if (lowerName.includes('size') || lowerName.includes('beden')) {
+      onChange(item.url, 'size', selectedValue);
+    }
+    if (lowerName.includes('color') || lowerName.includes('renk')) {
+      onChange(item.url, 'color', selectedValue);
+    }
   };
 
   const openUrl = url => {
@@ -59,6 +78,11 @@ const CartItem = ({
             <View style={styles.flexColumn}>
               <View style={styles.itemHeader}>
                 <View style={styles.flex1}>
+                  {Boolean(item?.store) && (
+                    <View style={styles.storeBadge}>
+                      <Text style={styles.storeBadgeText}>{item.store}</Text>
+                    </View>
+                  )}
                   <TouchableOpacity onPress={() => openUrl(item.url)}>
                     <Text style={styles.url}>{item.title || item.url}</Text>
                   </TouchableOpacity>
@@ -79,16 +103,153 @@ const CartItem = ({
                   </TouchableOpacity>
                 </View>
               </View>
-              <View style={styles.row}>
-                <View style={styles.sizeInputWrapper}>
-                  <TextInput
-                    style={styles.input}
-                    value={item?.size ?? ''}
-                    placeholder={t('Beden')}
-                    placeholderTextColor={'#8f8f8f'}
-                    onChangeText={text => changeItem('size', text)}
-                  />
-                </View>
+
+              {/* Dynamic Product Options (Model, Weight, Size, Color, etc.) */}
+              {Array.isArray(item?.options) && item.options.length > 0 ? (
+                item.options.map((opt, optIdx) => {
+                  if (
+                    !opt ||
+                    !opt.name ||
+                    !Array.isArray(opt.values) ||
+                    opt.values.length === 0
+                  ) {
+                    return null;
+                  }
+                  return (
+                    <View key={optIdx} style={styles.optionContainer}>
+                      <View style={styles.optionHeaderRow}>
+                        <Text style={styles.optionLabel}>{opt.name}:</Text>
+                        {Boolean(opt.selected) && (
+                          <Text style={styles.optionSelectedValue}>
+                            {opt.selected}
+                          </Text>
+                        )}
+                      </View>
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.chipsScrollContent}>
+                        {opt.values.map((val, valIdx) => {
+                          const isSelected =
+                            String(opt.selected || '').trim().toLowerCase() ===
+                            String(val).trim().toLowerCase();
+                          return (
+                            <TouchableOpacity
+                              key={valIdx}
+                              onPress={() => changeOption(opt.name, val)}
+                              style={[
+                                styles.chip,
+                                isSelected && styles.chipSelected,
+                              ]}>
+                              <Text
+                                style={[
+                                  styles.chipText,
+                                  isSelected && styles.chipTextSelected,
+                                ]}>
+                                {val}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+                    </View>
+                  );
+                })
+              ) : (
+                <>
+                  {/* Conditional Size Option */}
+                  {Boolean(item?.hasSize) && (
+                    <View style={styles.optionContainer}>
+                      <Text style={styles.optionLabel}>{t('Beden')}:</Text>
+                      {Array.isArray(item.sizes) && item.sizes.length > 0 ? (
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          contentContainerStyle={styles.chipsScrollContent}>
+                          {item.sizes.map((s, idx) => {
+                            const isSelected =
+                              String(item.size || '').trim() ===
+                              String(s).trim();
+                            return (
+                              <TouchableOpacity
+                                key={idx}
+                                onPress={() => changeItem('size', s)}
+                                style={[
+                                  styles.chip,
+                                  isSelected && styles.chipSelected,
+                                ]}>
+                                <Text
+                                  style={[
+                                    styles.chipText,
+                                    isSelected && styles.chipTextSelected,
+                                  ]}>
+                                  {s}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </ScrollView>
+                      ) : (
+                        <TextInput
+                          style={styles.input}
+                          value={item?.size ?? ''}
+                          placeholder={t('Beden')}
+                          placeholderTextColor={'#8f8f8f'}
+                          onChangeText={text => changeItem('size', text)}
+                        />
+                      )}
+                    </View>
+                  )}
+
+                  {/* Conditional Color Option */}
+                  {Boolean(item?.hasColor) && (
+                    <View style={styles.optionContainer}>
+                      <Text style={styles.optionLabel}>
+                        {t('Renk') || 'Renk'}:
+                      </Text>
+                      {Array.isArray(item.colors) && item.colors.length > 0 ? (
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          contentContainerStyle={styles.chipsScrollContent}>
+                          {item.colors.map((c, idx) => {
+                            const isSelected =
+                              String(item.color || '').trim() ===
+                              String(c).trim();
+                            return (
+                              <TouchableOpacity
+                                key={idx}
+                                onPress={() => changeItem('color', c)}
+                                style={[
+                                  styles.chip,
+                                  isSelected && styles.chipSelected,
+                                ]}>
+                                <Text
+                                  style={[
+                                    styles.chipText,
+                                    isSelected && styles.chipTextSelected,
+                                  ]}>
+                                  {c}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </ScrollView>
+                      ) : (
+                        <TextInput
+                          style={styles.input}
+                          value={item?.color ?? ''}
+                          placeholder={t('Renk') || 'Renk'}
+                          placeholderTextColor={'#8f8f8f'}
+                          onChangeText={text => changeItem('color', text)}
+                        />
+                      )}
+                    </View>
+                  )}
+                </>
+              )}
+
+              <View style={styles.countRow}>
                 <CartItemCountArea
                   item={item}
                   onIncrease={onIncrease}
@@ -169,6 +330,73 @@ const styles = StyleSheet.create({
   trashButton: {
     padding: 5,
     borderRadius: 5,
+  },
+  storeBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#FFF1EC',
+    borderColor: '#F15927',
+    borderWidth: 1,
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginBottom: 4,
+  },
+  storeBadgeText: {
+    color: '#F15927',
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  optionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 3,
+  },
+  optionSelectedValue: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#F15927',
+    marginLeft: 5,
+  },
+  optionContainer: {
+    marginVertical: 4,
+  },
+  optionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#555',
+  },
+  chipsScrollContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  chip: {
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#D0D0D0',
+    backgroundColor: '#FAFAFA',
+    marginRight: 6,
+  },
+  chipSelected: {
+    borderColor: '#F15927',
+    backgroundColor: '#F15927',
+  },
+  chipText: {
+    fontSize: 12,
+    color: '#333',
+    fontWeight: '500',
+  },
+  chipTextSelected: {
+    color: '#FFF',
+    fontWeight: '700',
+  },
+  countRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 4,
   },
   sizeInputWrapper: {
     flexDirection: 'row',

@@ -1,5 +1,4 @@
 import {Platform} from 'react-native';
-import { AGGRESSIVE_TAP_FIX } from './aggressiveTapFix';
 
 export const isTrendyol = page_url => {
   return page_url.indexOf('trendyol.com') > -1;

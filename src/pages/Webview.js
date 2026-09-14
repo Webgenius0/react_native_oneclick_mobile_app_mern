@@ -13,6 +13,7 @@ import { useScriptServiceStore } from '../store/useScriptServiceStore';
 import { useWebviewStore } from '../store/useWebviewStore';
 import { userAgent } from '../helpers/webview';
 import { injectedJavascript } from '../helpers/webview1';
+import { getStoreName } from '../helpers/storeHelper';
 
 const styles = StyleSheet.create({
   container: {
@@ -100,10 +101,12 @@ const isProductUrl = url => {
   const lowerUrl = String(url).toLowerCase();
 
   const patterns = [
-    /-p-\d+/i,
-    /-pm-\d+/i,
+    /-p-[a-z0-9_-]+/i,
+    /-pm-[a-z0-9_-]+/i,
     /\/dp\/[a-z0-9]+/i,
+    /\/gp\/aw\/d\/[a-z0-9]+/i,
     /\/gp\/product\/[a-z0-9]+/i,
+    /\/d\/[a-z0-9]+/i,
     /\/product\/[a-z0-9_-]+/i,
     /\/products\/[a-z0-9_-]+/i,
     /\/item\/[a-z0-9_-]+/i,
@@ -111,7 +114,7 @@ const isProductUrl = url => {
     /\/itm\/[a-z0-9_-]+/i,
     /\/goods\/[a-z0-9_-]+/i,
     /\/pd\/[a-z0-9_-]+/i,
-    /[?&](product_id|goods_id|item_id|pid)=/i,
+    /[?&](product_id|goods_id|item_id|pid|sku|asin)=/i,
   ];
 
   return patterns.some(pattern => pattern.test(lowerUrl));
@@ -563,10 +566,19 @@ export default function Webview({ route, navigation }) {
         : `${TRENDYOL_COOKIE_SETUP_BRIDGE}\n${ROUTE_CHANGE_BRIDGE}`,
     [useSheinCompatibilityMode],
   );
+  const localInitialScript = useMemo(() => {
+    return injectedJavascript({
+      page_url: sourceUrl,
+      getMetaTagImage: true,
+      getMetaTitle: true,
+      getMetaPrice: true,
+    });
+  }, [sourceUrl]);
+
   const injectedJavaScript = useMemo(
     () =>
       useSheinCompatibilityMode
-        ? 'true;'
+        ? `${localInitialScript}\ntrue;`
         : `
           ${ROUTE_CHANGE_BRIDGE}
           ;(function() {
@@ -583,8 +595,9 @@ export default function Webview({ route, navigation }) {
             } catch (_error) {}
             true;
           })();
+          ${localInitialScript}
         `,
-    [useSheinCompatibilityMode],
+    [localInitialScript, useSheinCompatibilityMode],
   );
   const [injectStatus, setInjectStatus] = useState(
     injectScript ? 'pending' : 'waiting',
@@ -601,6 +614,29 @@ export default function Webview({ route, navigation }) {
   const imageRef = useRef('');
   const priceRef = useRef('');
   const currencyRef = useRef('');
+  const optionsRef = useRef({
+    hasOptions: false,
+    options: [],
+    hasSize: false,
+    sizes: [],
+    selectedSize: '',
+    hasColor: false,
+    colors: [],
+    selectedColor: '',
+  });
+
+  const resetOptionsRef = useCallback(() => {
+    optionsRef.current = {
+      hasOptions: false,
+      options: [],
+      hasSize: false,
+      sizes: [],
+      selectedSize: '',
+      hasColor: false,
+      colors: [],
+      selectedColor: '',
+    };
+  }, []);
 
   const [isProductPage, setIsProductPage] = useState(() =>
     isProductUrl(sourceUrl),
@@ -705,11 +741,6 @@ export default function Webview({ route, navigation }) {
       currentUrlRef.current = nextUrl;
       setTranslateUrl(nextUrl);
 
-      if (!injectScript) {
-        setStatus('waiting');
-        return;
-      }
-
       if (!webViewRef.current) {
         setStatus('pending');
         return;
@@ -717,7 +748,7 @@ export default function Webview({ route, navigation }) {
 
       const injectKey = buildInjectKey(nextUrl, injectScript);
 
-      if (lastInjectedKeyRef.current === injectKey) {
+      if (lastInjectedKeyRef.current === injectKey && attempt === 1 && !force) {
         setStatus('injected');
         return;
       }
@@ -735,6 +766,9 @@ export default function Webview({ route, navigation }) {
         webViewRef.current.injectJavaScript(
           buildInjectCommand(nextUrl, attempt, total),
         );
+        if (attempt >= total) {
+          lastInjectedKeyRef.current = injectKey;
+        }
       } catch (error) {
         setStatus('error');
       }
@@ -834,20 +868,13 @@ export default function Webview({ route, navigation }) {
   );
 
   const addChart = useCallback(async () => {
-    addItem({
-      title: titleRef.current,
-      url: currentUrlRef.current,
-      count: 1,
-      checked: true,
-      image: imageRef.current,
-      price: priceRef.current,
-      currency: currencyRef.current,
-    });
-
     if (webViewRef.current) {
       webViewRef.current.injectJavaScript(`
         (function() {
           try {
+            if (typeof window.__extractAndSendProductOptions === 'function') {
+              window.__extractAndSendProductOptions(true);
+            }
             if (typeof onUrlChange === 'function') {
               onUrlChange();
             }
@@ -857,9 +884,43 @@ export default function Webview({ route, navigation }) {
       `);
     }
 
-    await delay(500);
+    // Wait briefly (up to 400ms) for options to arrive if not already present
+    const startTime = Date.now();
+    while (Date.now() - startTime < 400) {
+      if (
+        optionsRef.current &&
+        Array.isArray(optionsRef.current.options) &&
+        optionsRef.current.options.length > 0
+      ) {
+        break;
+      }
+      await delay(50);
+    }
+
+    const storeName = getStoreName(currentUrlRef.current, route?.params?.ad);
+    const opts = optionsRef.current || {};
+
+    addItem({
+      title: titleRef.current,
+      url: currentUrlRef.current,
+      count: 1,
+      checked: true,
+      image: imageRef.current,
+      price: priceRef.current,
+      currency: currencyRef.current,
+      store: storeName,
+      options: Array.isArray(opts.options) ? opts.options : [],
+      hasSize: !!(opts.hasSize && opts.sizes && opts.sizes.length > 0),
+      sizes: opts.sizes || [],
+      size: opts.selectedSize || '',
+      hasColor: !!(opts.hasColor && opts.colors && opts.colors.length > 0),
+      colors: opts.colors || [],
+      color: opts.selectedColor || '',
+    });
+
+    await delay(150);
     navigation.navigate('Cart');
-  }, [addItem, navigation]);
+  }, [addItem, navigation, route?.params?.ad]);
 
   const onMessage = useCallback(
     ({ nativeEvent }) => {
@@ -882,6 +943,7 @@ export default function Webview({ route, navigation }) {
               imageRef.current = '';
               priceRef.current = '';
               currencyRef.current = '';
+              resetOptionsRef();
             }
 
             updateProductPageStatus(nextUrl);
@@ -945,6 +1007,24 @@ export default function Webview({ route, navigation }) {
               currencyRef.current = message.data.trim();
             }
             return;
+          case 'productOptions':
+            if (message.data && typeof message.data === 'object') {
+              const opts = Array.isArray(message.data.options) ? message.data.options : [];
+              optionsRef.current = {
+                hasOptions: opts.length > 0,
+                options: opts,
+                hasSize: !!message.data.hasSize,
+                sizes: Array.isArray(message.data.sizes) ? message.data.sizes : [],
+                selectedSize: message.data.selectedSize ? String(message.data.selectedSize).trim() : '',
+                hasColor: !!message.data.hasColor,
+                colors: Array.isArray(message.data.colors) ? message.data.colors : [],
+                selectedColor: message.data.selectedColor ? String(message.data.selectedColor).trim() : '',
+              };
+              if (opts.length > 0) {
+                setIsProductPage(true);
+              }
+            }
+            return;
           case 'redirect':
             if (webViewRef.current && message.data) {
               webViewRef.current.injectJavaScript(
@@ -983,6 +1063,7 @@ export default function Webview({ route, navigation }) {
           imageRef.current = '';
           priceRef.current = '';
           currencyRef.current = '';
+          resetOptionsRef();
         }
       }
       currentUrlRef.current = nextUrl;
@@ -1083,6 +1164,7 @@ export default function Webview({ route, navigation }) {
     imageRef.current = '';
     priceRef.current = '';
     currencyRef.current = '';
+    resetOptionsRef();
     clearInjectTimers();
     setTranslateUrl(sourceUrl);
     updateProductPageStatus(sourceUrl, '', '');
@@ -1090,11 +1172,6 @@ export default function Webview({ route, navigation }) {
   }, [clearInjectTimers, setStatus, setTranslateUrl, sourceUrl, updateProductPageStatus]);
 
   useEffect(() => {
-    if (!injectScript) {
-      setStatus('waiting');
-      return;
-    }
-
     if (!loadingRef.current) {
       scheduleInject(currentUrlRef.current, {
         delays: [60, 500, 1400],
@@ -1102,7 +1179,7 @@ export default function Webview({ route, navigation }) {
     } else {
       setStatus('pending');
     }
-  }, [injectScript, scheduleInject, setStatus]);
+  }, [scheduleInject, setStatus]);
 
   useEffect(() => {
     if (Platform.OS !== 'android') {
