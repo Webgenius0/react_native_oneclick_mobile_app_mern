@@ -21,6 +21,12 @@ import { ext, mimeType } from "../helpers/file";
 import { tr } from "../translate/i18n";
 import { EmContext } from "../contexts/EmContext";
 import { getStoreName } from "../helpers/storeHelper";
+import { useExchangeRateStore } from "../store/useExchangeRateStore";
+import {
+  calculateConvertedPrice,
+  parsePrice,
+  normalizeCurrency,
+} from "../helpers/currencyHelper";
 
 export default function({ route, navigation }) {
 
@@ -35,12 +41,21 @@ export default function({ route, navigation }) {
 
   const url = route.params?.url || "https://google.com";
 
+  const { rates, inverseRates, fetchRates } = useExchangeRateStore();
+
+  useEffect(() => {
+    fetchRates();
+  }, [fetchRates]);
+
   const [state, setState] = useState({
     link: url,
-    img: "",
-    size: "",
-    qty: 1,
-    desc: "",
+    img: route.params?.image || route.params?.img || "",
+    size: route.params?.size || "",
+    color: route.params?.color || "",
+    price: route.params?.price || "",
+    currency: route.params?.currency || "",
+    qty: route.params?.qty || route.params?.count || 1,
+    desc: route.params?.desc || "",
     showDump: false,
     loading: true,
     whatsapp_order: false,
@@ -108,15 +123,51 @@ export default function({ route, navigation }) {
     let token = await getToken();
     console.log("token", token);
 
+    const parsedPrice = parsePrice(state.price || route.params?.price);
+    const normalizedCurr = normalizeCurrency(
+      state.currency || route.params?.currency,
+      state.price || route.params?.price,
+    );
+    const convertedPrice = calculateConvertedPrice(
+      state.price || route.params?.price,
+      state.currency || route.params?.currency,
+      rates,
+      inverseRates,
+    );
+
     postData.append("link", state.link);
-    postData.append("img", state.img);
-    postData.append("size", state.size);
     postData.append("sayi", state.qty);
-    postData.append("acik", state.desc);
+    postData.append("img", state.img);
+    postData.append("size", state.size || "");
+    postData.append("color", state.color || route.params?.color || "");
+    postData.append("renk", state.color || route.params?.color || "");
+    postData.append("acik", state.desc || "");
+
     const storeName = getStoreName(state.link);
     postData.append("store", storeName);
     postData.append("store_name", storeName);
     postData.append("magaza", storeName);
+    postData.append("marketplace", storeName);
+    postData.append("pazaryeri", storeName);
+    postData.append("market", storeName);
+
+    if (parsedPrice !== null) {
+      postData.append("price", parsedPrice);
+      postData.append("original_price", parsedPrice);
+      postData.append("fiyat", parsedPrice);
+    }
+    if (normalizedCurr) {
+      postData.append("currency", normalizedCurr);
+      postData.append("original_currency", normalizedCurr);
+      postData.append("pb", normalizedCurr);
+    }
+    if (convertedPrice !== null) {
+      postData.append("converted_price", convertedPrice);
+      postData.append("price_usd", convertedPrice);
+      postData.append("fiyat_usd", convertedPrice);
+      postData.append("converted_currency", "USD");
+      postData.append("target_currency", "USD");
+    }
 
     // console.log('mimeType(file.name)', mimeType(file.name));
     let ek = 1;
@@ -143,11 +194,24 @@ export default function({ route, navigation }) {
 
     if (response.data.error === false) {
       console.log("Error false", response.data);
-      alert(tr("Sipariş Alındı"));
-      setTimeout(function() {
-        let d = +new Date();
-        navigation.navigate("Orders", { refetch: d });
-      }, 1000);
+      const orderId = response.data.order_id || (response.data.order_ids && response.data.order_ids[0]);
+      const orderIds = response.data.order_ids || (orderId ? [orderId] : []);
+      const totalUsd = response.data.total_usd;
+
+      if (totalUsd !== undefined && orderId) {
+        navigation.navigate("PaymentStart", {
+          quick: true,
+          tutar: totalUsd,
+          siparis_ids: orderIds,
+          siparis_id: orderId,
+        });
+      } else {
+        alert(tr("Sipariş Alındı"));
+        setTimeout(function() {
+          let d = +new Date();
+          navigation.navigate("Orders", { refetch: d });
+        }, 1000);
+      }
     } else {
       alert(tr("Hata Oluştu"));
       console.log("Hata Oluştu", response.data);

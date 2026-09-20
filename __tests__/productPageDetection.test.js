@@ -1,0 +1,429 @@
+/* eslint-disable no-new-func */
+/**
+ * Test suite for WebView single product and Add to Cart / Buy Now button detection.
+ */
+
+import { checkProductPageBridge } from '../src/helpers/webview1';
+
+describe('Product Page & Add to Cart Detection Bridge', () => {
+  let mockWindow;
+  let postedMessages;
+
+  beforeEach(() => {
+    postedMessages = [];
+
+    // Setup mock browser window & document
+    mockWindow = {
+      location: {
+        href: 'https://www.example.com/',
+        pathname: '/',
+      },
+      ReactNativeWebView: {
+        postMessage: (msg) => {
+          postedMessages.push(JSON.parse(msg));
+        },
+      },
+      getComputedStyle: (el) => ({
+        display: el.style?.display || 'block',
+        visibility: el.style?.visibility || 'visible',
+        opacity: el.style?.opacity || '1',
+      }),
+      setInterval: (fn, ms) => {
+        // Execute once immediately or store
+        return 123;
+      },
+      clearInterval: () => {},
+      MutationObserver: null,
+    };
+  });
+
+  const runBridgeInContext = (customWindow, customDocument) => {
+    const bridgeScript = checkProductPageBridge();
+    const fn = new Function('window', 'document', bridgeScript);
+    fn(customWindow, customDocument);
+  };
+
+  test('generates a non-empty bridge script', () => {
+    const script = checkProductPageBridge();
+    expect(typeof script).toBe('string');
+    expect(script.length).toBeGreaterThan(100);
+    expect(script).toContain('hasActiveCartOrBuyButton');
+    expect(script).toContain('isSingleProductPage');
+  });
+
+  test('Scenario 1: Home page -> button hidden (isProduct: false)', () => {
+    mockWindow.location.href = 'https://www.amazon.ae/';
+    mockWindow.location.pathname = '/';
+
+    const mockDocument = {
+      querySelectorAll: () => [],
+      querySelector: () => null,
+      body: {},
+    };
+
+    runBridgeInContext(mockWindow, mockDocument);
+
+    expect(postedMessages.length).toBeGreaterThan(0);
+    const lastMsg = postedMessages[postedMessages.length - 1];
+    expect(lastMsg.type).toBe('isProductPage');
+    expect(lastMsg.data.isProduct).toBe(false);
+  });
+
+  test('Scenario 2: Category / listing page -> button hidden (isProduct: false)', () => {
+    mockWindow.location.href = 'https://www.trendyol.com/en/men-shirts-x-g2-c75';
+    mockWindow.location.pathname = '/en/men-shirts-x-g2-c75';
+
+    // Multiple product cards on listing
+    const productCards = [{}, {}, {}, {}, {}];
+    const mockDocument = {
+      querySelectorAll: (selector) => {
+        if (selector.includes('.product-card') || selector.includes('.p-card-wrppr')) {
+          return productCards;
+        }
+        return [];
+      },
+      querySelector: () => null,
+      body: {},
+    };
+
+    runBridgeInContext(mockWindow, mockDocument);
+
+    expect(postedMessages.length).toBeGreaterThan(0);
+    const lastMsg = postedMessages[postedMessages.length - 1];
+    expect(lastMsg.type).toBe('isProductPage');
+    expect(lastMsg.data.isProduct).toBe(false);
+  });
+
+  test('Scenario 3: Single product page with Add to Cart button -> button visible (isProduct: true)', () => {
+    mockWindow.location.href = 'https://www.amazon.ae/dp/B0FQFHZF6L';
+    mockWindow.location.pathname = '/dp/B0FQFHZF6L';
+
+    const cartBtn = {
+      innerText: 'Add to Cart',
+      disabled: false,
+      getAttribute: () => null,
+      getBoundingClientRect: () => ({ width: 120, height: 40 }),
+      style: { display: 'block', visibility: 'visible', opacity: '1' },
+    };
+
+    const mockDocument = {
+      querySelectorAll: (selector) => {
+        if (selector.includes('#add-to-cart-button')) {
+          return [cartBtn];
+        }
+        if (selector.includes('.product-card')) {
+          return [];
+        }
+        return [];
+      },
+      querySelector: (selector) => {
+        if (selector.includes('#buybox') || selector.includes('#productTitle')) {
+          return {};
+        }
+        return null;
+      },
+      body: {},
+    };
+
+    runBridgeInContext(mockWindow, mockDocument);
+
+    expect(postedMessages.length).toBeGreaterThan(0);
+    const lastMsg = postedMessages[postedMessages.length - 1];
+    expect(lastMsg.type).toBe('isProductPage');
+    expect(lastMsg.data.isProduct).toBe(true);
+    expect(lastMsg.data.url).toBe('https://www.amazon.ae/dp/B0FQFHZF6L');
+  });
+
+  test('Scenario 4: Single product page with Buy Now button -> button visible (isProduct: true)', () => {
+    mockWindow.location.href = 'https://www.amazon.ae/dp/B0FQFHZF6L';
+    mockWindow.location.pathname = '/dp/B0FQFHZF6L';
+
+    const buyNowBtn = {
+      innerText: 'Buy Now',
+      disabled: false,
+      getAttribute: () => null,
+      getBoundingClientRect: () => ({ width: 120, height: 40 }),
+      style: { display: 'block', visibility: 'visible', opacity: '1' },
+    };
+
+    const mockDocument = {
+      querySelectorAll: (selector) => {
+        if (selector.includes('#buy-now-button')) {
+          return [buyNowBtn];
+        }
+        return [];
+      },
+      querySelector: (selector) => {
+        if (selector.includes('#productTitle')) {
+          return {};
+        }
+        return null;
+      },
+      body: {},
+    };
+
+    runBridgeInContext(mockWindow, mockDocument);
+
+    expect(postedMessages.length).toBeGreaterThan(0);
+    const lastMsg = postedMessages[postedMessages.length - 1];
+    expect(lastMsg.type).toBe('isProductPage');
+    expect(lastMsg.data.isProduct).toBe(true);
+  });
+
+  test('Scenario 5: Single product page with Turkish "Sepete Ekle" -> button visible (isProduct: true)', () => {
+    mockWindow.location.href = 'https://www.trendyol.com/brand/product-name-p-123456';
+    mockWindow.location.pathname = '/brand/product-name-p-123456';
+
+    const sepeteEkleBtn = {
+      innerText: 'Sepete Ekle',
+      disabled: false,
+      getAttribute: () => null,
+      getBoundingClientRect: () => ({ width: 150, height: 45 }),
+      style: { display: 'block', visibility: 'visible', opacity: '1' },
+    };
+
+    const mockDocument = {
+      querySelectorAll: (selector) => {
+        if (selector.includes('.add-to-basket')) {
+          return [sepeteEkleBtn];
+        }
+        return [];
+      },
+      querySelector: (selector) => {
+        if (selector.includes('.product-detail-container')) {
+          return {};
+        }
+        return null;
+      },
+      body: {},
+    };
+
+    runBridgeInContext(mockWindow, mockDocument);
+
+    expect(postedMessages.length).toBeGreaterThan(0);
+    const lastMsg = postedMessages[postedMessages.length - 1];
+    expect(lastMsg.type).toBe('isProductPage');
+    expect(lastMsg.data.isProduct).toBe(true);
+  });
+
+  test('Scenario 6: Single product page with out-of-stock / Tükendi button -> button hidden (isProduct: false)', () => {
+    mockWindow.location.href = 'https://www.trendyol.com/brand/product-name-p-123456';
+    mockWindow.location.pathname = '/brand/product-name-p-123456';
+
+    const outOfStockBtn = {
+      innerText: 'Tükendi - Gelince Haber Ver',
+      disabled: true,
+      getAttribute: () => 'true',
+      getBoundingClientRect: () => ({ width: 150, height: 45 }),
+      style: { display: 'block', visibility: 'visible', opacity: '1' },
+    };
+
+    const mockDocument = {
+      querySelectorAll: (selector) => {
+        if (selector.includes('.add-to-basket') || selector.includes('button')) {
+          return [outOfStockBtn];
+        }
+        return [];
+      },
+      querySelector: (selector) => {
+        if (selector.includes('.product-detail-container')) {
+          return {};
+        }
+        return null;
+      },
+      body: {},
+    };
+
+    runBridgeInContext(mockWindow, mockDocument);
+
+    expect(postedMessages.length).toBeGreaterThan(0);
+    const lastMsg = postedMessages[postedMessages.length - 1];
+    expect(lastMsg.type).toBe('isProductPage');
+    expect(lastMsg.data.isProduct).toBe(false);
+  });
+
+  test('Scenario 7: Product page where button is hidden (display: none) -> button hidden (isProduct: false)', () => {
+    mockWindow.location.href = 'https://www.amazon.ae/dp/B0FQFHZF6L';
+    mockWindow.location.pathname = '/dp/B0FQFHZF6L';
+
+    const hiddenBtn = {
+      innerText: 'Add to Cart',
+      disabled: false,
+      getAttribute: () => null,
+      getBoundingClientRect: () => ({ width: 0, height: 0 }),
+      style: { display: 'none', visibility: 'hidden', opacity: '0' },
+    };
+
+    const mockDocument = {
+      querySelectorAll: (selector) => {
+        if (selector.includes('#add-to-cart-button')) {
+          return [hiddenBtn];
+        }
+        return [];
+      },
+      querySelector: () => ({}),
+      body: {},
+    };
+
+    runBridgeInContext(mockWindow, mockDocument);
+
+    expect(postedMessages.length).toBeGreaterThan(0);
+    const lastMsg = postedMessages[postedMessages.length - 1];
+    expect(lastMsg.type).toBe('isProductPage');
+    expect(lastMsg.data.isProduct).toBe(false);
+  });
+
+  test('Scenario 8: Product page without either Add to Cart or Buy Now button -> button hidden (isProduct: false)', () => {
+    mockWindow.location.href = 'https://www.amazon.ae/dp/B0FQFHZF6L';
+    mockWindow.location.pathname = '/dp/B0FQFHZF6L';
+
+    const otherBtn = {
+      innerText: 'View Details',
+      disabled: false,
+      getAttribute: () => null,
+      getBoundingClientRect: () => ({ width: 100, height: 35 }),
+      style: { display: 'block', visibility: 'visible', opacity: '1' },
+    };
+
+    const mockDocument = {
+      querySelectorAll: (selector) => {
+        if (selector.startsWith('button, input[type="button"]')) {
+          return [otherBtn];
+        }
+        return [];
+      },
+      querySelector: () => ({}),
+      body: {},
+    };
+
+    runBridgeInContext(mockWindow, mockDocument);
+
+    expect(postedMessages.length).toBeGreaterThan(0);
+    const lastMsg = postedMessages[postedMessages.length - 1];
+    expect(lastMsg.type).toBe('isProductPage');
+    expect(lastMsg.data.isProduct).toBe(false);
+  });
+
+  test('Scenario 9: Listing page with multiple cards having quick-add buttons -> button hidden (isProduct: false)', () => {
+    mockWindow.location.href = 'https://www.amazon.ae/s?k=laptop';
+    mockWindow.location.pathname = '/s';
+
+    const quickAddBtn = {
+      innerText: 'Add to Cart',
+      disabled: false,
+      getAttribute: () => null,
+      getBoundingClientRect: () => ({ width: 80, height: 30 }),
+      style: { display: 'block', visibility: 'visible', opacity: '1' },
+    };
+
+    // 10 search result cards
+    const searchCards = Array(10).fill({});
+
+    const mockDocument = {
+      querySelectorAll: (selector) => {
+        if (selector.includes('s-search-result') || selector.includes('.product-card')) {
+          return searchCards;
+        }
+        if (selector.includes('button')) {
+          return [quickAddBtn];
+        }
+        return [];
+      },
+      querySelector: () => null,
+      body: {},
+    };
+
+    runBridgeInContext(mockWindow, mockDocument);
+
+    expect(postedMessages.length).toBeGreaterThan(0);
+    const lastMsg = postedMessages[postedMessages.length - 1];
+    expect(lastMsg.type).toBe('isProductPage');
+    expect(lastMsg.data.isProduct).toBe(false);
+  });
+
+  test('Scenario 10: Trendyol single product page with recommendation cards (.p-card-wrppr) -> button visible (isProduct: true)', () => {
+    mockWindow.location.href = 'https://www.trendyol.com/mavi/erkek-tisort-p-12345678?boutiqueId=61';
+    mockWindow.location.pathname = '/mavi/erkek-tisort-p-12345678';
+
+    const sepeteEkleBtn = {
+      innerText: 'Sepete Ekle',
+      disabled: false,
+      getAttribute: (attr) => (attr === 'class' ? 'add-to-basket-button' : null),
+      getBoundingClientRect: () => ({ width: 140, height: 44 }),
+      offsetWidth: 140,
+      offsetHeight: 44,
+      style: { display: 'block', visibility: 'visible', opacity: '1' },
+    };
+
+    // 15 recommendation cards in the bottom carousel
+    const recommendationCards = Array(15).fill({});
+
+    const mockDocument = {
+      querySelectorAll: (selector) => {
+        if (selector.includes('.p-card-wrppr')) {
+          return recommendationCards;
+        }
+        if (selector.includes('.add-to-basket') || selector.includes('add-to-basket-button') || selector.includes('button')) {
+          return [sepeteEkleBtn];
+        }
+        return [];
+      },
+      querySelector: (selector) => {
+        if (selector.includes('product-detail') || selector.includes('pr-in-w')) {
+          return {};
+        }
+        return null;
+      },
+      body: {},
+    };
+
+    runBridgeInContext(mockWindow, mockDocument);
+
+    expect(postedMessages.length).toBeGreaterThan(0);
+    const lastMsg = postedMessages[postedMessages.length - 1];
+    expect(lastMsg.type).toBe('isProductPage');
+    expect(lastMsg.data.isProduct).toBe(true);
+  });
+});
+
+describe('URL Comparison & Stale Message Prevention', () => {
+  const { isSamePageUrl, isProductUrl } = require('../src/helpers/webviewUtils');
+
+  test('isSamePageUrl returns true for identical URLs', () => {
+    expect(isSamePageUrl('https://amazon.ae/dp/B0FQFHZF6L', 'https://amazon.ae/dp/B0FQFHZF6L')).toBe(true);
+  });
+
+  test('isSamePageUrl returns true when only hash differs', () => {
+    expect(isSamePageUrl('https://amazon.ae/dp/B0FQFHZF6L#reviews', 'https://amazon.ae/dp/B0FQFHZF6L')).toBe(true);
+    expect(isSamePageUrl('https://amazon.ae/dp/B0FQFHZF6L', 'https://amazon.ae/dp/B0FQFHZF6L#details')).toBe(true);
+  });
+
+  test('isSamePageUrl returns true for same product with tracking parameters', () => {
+    const url1 = 'https://amazon.ae/dp/B0FQFHZF6L?ref=hp_1';
+    const url2 = 'https://amazon.ae/dp/B0FQFHZF6L?ref=hp_2';
+    expect(isSamePageUrl(url1, url2)).toBe(true);
+  });
+
+  test('isSamePageUrl returns false for different product pages', () => {
+    const url1 = 'https://trendyol.com/brand/item-p-1001';
+    const url2 = 'https://trendyol.com/brand/item-p-2002';
+    expect(isSamePageUrl(url1, url2)).toBe(false);
+  });
+
+  test('isSamePageUrl returns false when navigating from product to category', () => {
+    const productUrl = 'https://trendyol.com/brand/item-p-1001';
+    const categoryUrl = 'https://trendyol.com/en/men-shirts-x-g2-c75';
+    expect(isSamePageUrl(productUrl, categoryUrl)).toBe(false);
+  });
+
+  test('isProductUrl correctly identifies product vs non-product URLs', () => {
+    expect(isProductUrl('https://trendyol.com/brand/product-name-p-12345')).toBe(true);
+    expect(isProductUrl('https://amazon.ae/dp/B0FQFHZF6L')).toBe(true);
+    expect(isProductUrl('https://m.shein.com/ar-en/item-p-100188201.html')).toBe(true);
+    expect(isProductUrl('https://amazon.ae/')).toBe(false);
+    expect(isProductUrl('https://trendyol.com/en/')).toBe(false);
+    expect(isProductUrl('about:blank')).toBe(false);
+    expect(isProductUrl('')).toBe(false);
+  });
+});
+

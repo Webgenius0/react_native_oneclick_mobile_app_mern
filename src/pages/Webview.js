@@ -14,6 +14,7 @@ import { useWebviewStore } from '../store/useWebviewStore';
 import { userAgent } from '../helpers/webview';
 import { injectedJavascript } from '../helpers/webview1';
 import { getStoreName } from '../helpers/storeHelper';
+import { isProductUrl, isSamePageUrl } from '../helpers/webviewUtils';
 
 const styles = StyleSheet.create({
   container: {
@@ -92,32 +93,6 @@ const isTrendyolUrl = url => {
 const isSheinUrl = url => {
   const host = getUrlHost(url);
   return host === 'shein.com' || host.endsWith('.shein.com');
-};
-
-const isProductUrl = url => {
-  if (!url || url === BLANK_SOURCE_URL) {
-    return false;
-  }
-  const lowerUrl = String(url).toLowerCase();
-
-  const patterns = [
-    /-p-[a-z0-9_-]+/i,
-    /-pm-[a-z0-9_-]+/i,
-    /\/dp\/[a-z0-9]+/i,
-    /\/gp\/aw\/d\/[a-z0-9]+/i,
-    /\/gp\/product\/[a-z0-9]+/i,
-    /\/d\/[a-z0-9]+/i,
-    /\/product\/[a-z0-9_-]+/i,
-    /\/products\/[a-z0-9_-]+/i,
-    /\/item\/[a-z0-9_-]+/i,
-    /\/items\/[a-z0-9_-]+/i,
-    /\/itm\/[a-z0-9_-]+/i,
-    /\/goods\/[a-z0-9_-]+/i,
-    /\/pd\/[a-z0-9_-]+/i,
-    /[?&](product_id|goods_id|item_id|pid|sku|asin)=/i,
-  ];
-
-  return patterns.some(pattern => pattern.test(lowerUrl));
 };
 
 const shouldProbeBeforeInject = url =>
@@ -502,6 +477,10 @@ const ROUTE_CHANGE_BRIDGE = `
       postRouteChange('hashchange');
     });
 
+    window.addEventListener('beforeunload', function() {
+      postRouteChange('beforeunload');
+    });
+
     true;
   })();
 `;
@@ -522,8 +501,8 @@ export default function Webview({ route, navigation }) {
       // return 'https://m.shein.com/ar-en/DAZY-3-Pieces-Loose-Casual-Vacation-Style-Hollow-Out-Lace-Trim-Plaid-Camisole-Straight-Leg-Pants-And-Sheer-Cover-Up-T-Shirt-Outfit-For-Women-Fall-Clothes-Lounge-Sets-For-Women-p-100188201.html?attr_ids=&detailBusinessFrom=0-1_100188201%257C0-2&imgRatio=3-4&isAppointMall=&mallCode=1&pageListType=4&showFeedbackRec=1&src_identifier=on%253DCATEGORY_RECOMMEND_COMPONENT%2560cn%253Dsbc%2560hz%253D-%2560jc%253Dreal_2030%2560ps%253D3_1_1&src_module=all&src_tab_page_id=page_home1777062677652';
       // return 'https://www.trendyol.com/en/';
       return 'https://www.amazon.ae/dp/B0FQFHZF6L?_encoding=UTF8&ref_=cct_cg_atfwire_3a1&pf_rd_p=4daee1f2-9395-437b-8065-2dd6f83ab3ba&pf_rd_r=1XK14FMV7HW3Q96FK8SK';
-      return 'https://www.amazon.ae/SKY-TOUCH-Portable-Shattaf-Bidet-Bottle/dp/B0C4TNZLSY/ref=mp_s_a_1_1_sspa?_encoding=UTF8&dib=eyJ2IjoiMSJ9.p0ov1f7M3pnaG6oDRM0QzlZVQalfzoqmcPcod2tkpzvKNrpqoR8ROjaCK7YzYfVm_c-QQb_rhqpT2Co2d2I2n5Gfhk1k-gGcwG7Hr2UxqrV_S78Lw9T6iC7iR2p9X7eshlP9tTGm4lTbdPlwpo6O84Pv0LrMirri2rRbFdahwEAZU1CWD5EnaT-Yhj_xqKRmE6ZkG87HYCNTz9YX2a75MQ.xwjagqifuNTU-OV7DbIj7N2F-NVEGp8-wED5GzjxKq8&dib_tag=se&qid=1777591427&refinements=p_36%3A-6900%2Cp_n_prime_domestic%3A20642115031%2Cp_72%3A12407972031&rnid=12407971031&s=health&sr=1-1-spons&aref=9mUJ1O0z3K&sp_csd=d2lkZ2V0TmFtZT1zcF9waG9uZV9icm93c2VfYXRm&psc=1';
-      return 'https://www.amazon.ae/';
+      // return 'https://www.amazon.ae/SKY-TOUCH-Portable-Shattaf-Bidet-Bottle/dp/B0C4TNZLSY/ref=mp_s_a_1_1_sspa?_encoding=UTF8&dib=eyJ2IjoiMSJ9.p0ov1f7M3pnaG6oDRM0QzlZVQalfzoqmcPcod2tkpzvKNrpqoR8ROjaCK7YzYfVm_c-QQb_rhqpT2Co2d2I2n5Gfhk1k-gGcwG7Hr2UxqrV_S78Lw9T6iC7iR2p9X7eshlP9tTGm4lTbdPlwpo6O84Pv0LrMirri2rRbFdahwEAZU1CWD5EnaT-Yhj_xqKRmE6ZkG87HYCNTz9YX2a75MQ.xwjagqifuNTU-OV7DbIj7N2F-NVEGp8-wED5GzjxKq8&dib_tag=se&qid=1777591427&refinements=p_36%3A-6900%2Cp_n_prime_domestic%3A20642115031%2Cp_72%3A12407972031&rnid=12407971031&s=health&sr=1-1-spons&aref=9mUJ1O0z3K&sp_csd=d2lkZ2V0TmFtZT1zcF9waG9uZV9icm93c2VfYXRm&psc=1';
+      // return 'https://www.amazon.ae/';
       // return 'https://www.amazon.ae/DJI-Lossless-Transmitter-Official-Warranty/dp/B0FKT9K6CB?_encoding=UTF8&content-id=amzn1.sym.fc30acf5-d509-4cd5-a780-14e9eeb0536e&dib=eyJ2IjoiMSJ9.hXptKqxyQPkfqldB0z_WEMqG3EzcTnGjJZB19V2yrwGHN8coLynDsd615wIYcefT3rTZuX3QXErf2yY04Lkd6lhJnMWjngAT20YZGrIBaqsmOowyu8_n_o17QsJv7tHOOg9MS6MkQ5Hs1GLIF4QKWlGxAVizeDQqaCUErQ8d96dSPW960C5ChwLYyzCALPMmBNG7f_kYdBpokq9rNLIwx781l_hs5snoLVNUowqjJSxNhpxB9Wy5d-eavMHqDKekx7pDreFD2XfUeNCyqT3QaJwH4c3rCP1PVSjXPShJiDI.2rT-_t05CpyWerbOFTmlXiksTXVPmwlUXvAe_Fx-N8w&dib_tag=se&pd_rd_r=f69bb5de-b3df-45a4-ab02-0a08be479045&pd_rd_w=H81LQ&pd_rd_wg=id50a&qid=1777590917&s=electronics&sr=1-1&th=1';
     }
 
@@ -624,6 +603,7 @@ export default function Webview({ route, navigation }) {
     colors: [],
     selectedColor: '',
   });
+  const pendingOptionsResolveRef = useRef(null);
 
   const resetOptionsRef = useCallback(() => {
     optionsRef.current = {
@@ -636,20 +616,12 @@ export default function Webview({ route, navigation }) {
       colors: [],
       selectedColor: '',
     };
-  }, []);
-
-  const [isProductPage, setIsProductPage] = useState(() =>
-    isProductUrl(sourceUrl),
-  );
-
-  const updateProductPageStatus = useCallback((targetUrl, explicitStatus) => {
-    if (typeof explicitStatus === 'boolean') {
-      setIsProductPage(explicitStatus);
-      return;
+    if (pendingOptionsResolveRef.current) {
+      pendingOptionsResolveRef.current = null;
     }
-    const isProd = isProductUrl(targetUrl || currentUrlRef.current);
-    setIsProductPage(isProd);
   }, []);
+
+  const [isProductPage, setIsProductPage] = useState(false);
 
   const setStatus = useCallback(nextStatus => {
     setInjectStatus(prevStatus =>
@@ -868,7 +840,12 @@ export default function Webview({ route, navigation }) {
   );
 
   const addChart = useCallback(async () => {
+    let freshOpts = null;
     if (webViewRef.current) {
+      const optionPromise = new Promise(resolve => {
+        pendingOptionsResolveRef.current = resolve;
+      });
+
       webViewRef.current.injectJavaScript(`
         (function() {
           try {
@@ -882,23 +859,16 @@ export default function Webview({ route, navigation }) {
           true;
         })();
       `);
-    }
 
-    // Wait briefly (up to 400ms) for options to arrive if not already present
-    const startTime = Date.now();
-    while (Date.now() - startTime < 400) {
-      if (
-        optionsRef.current &&
-        Array.isArray(optionsRef.current.options) &&
-        optionsRef.current.options.length > 0
-      ) {
-        break;
-      }
-      await delay(50);
+      freshOpts = await Promise.race([
+        optionPromise,
+        new Promise(resolve => setTimeout(() => resolve(null), 350)),
+      ]);
+      pendingOptionsResolveRef.current = null;
     }
 
     const storeName = getStoreName(currentUrlRef.current, route?.params?.ad);
-    const opts = optionsRef.current || {};
+    const opts = freshOpts || optionsRef.current || {};
 
     addItem({
       title: titleRef.current,
@@ -929,12 +899,19 @@ export default function Webview({ route, navigation }) {
 
         switch (message?.type) {
           case ROUTE_CHANGE_MESSAGE_TYPE: {
+            const kind = message?.data?.kind;
+            if (kind === 'beforeunload') {
+              setIsProductPage(false);
+              return;
+            }
+
             const nextUrl = message?.data?.url;
             if (!nextUrl) {
               return;
             }
 
-            const wasProduct = isProductUrl(currentUrlRef.current);
+            setIsProductPage(false);
+
             const isNextProduct = isProductUrl(nextUrl);
             currentUrlRef.current = nextUrl;
 
@@ -946,7 +923,6 @@ export default function Webview({ route, navigation }) {
               resetOptionsRef();
             }
 
-            updateProductPageStatus(nextUrl);
             scheduleInject(nextUrl, { delays: SPA_INJECT_DELAYS });
             return;
           }
@@ -984,9 +960,23 @@ export default function Webview({ route, navigation }) {
 
             return;
           }
-          case 'isProductPage':
-            updateProductPageStatus(currentUrlRef.current, !!message.data);
+          case 'isProductPage': {
+            if (message.data && typeof message.data === 'object') {
+              const msgUrl = message.data.url;
+              const isProd = !!message.data.isProduct;
+              if (msgUrl && currentUrlRef.current && !isSamePageUrl(msgUrl, currentUrlRef.current)) {
+                if (isProd) {
+                  currentUrlRef.current = msgUrl;
+                } else {
+                  return;
+                }
+              }
+              setIsProductPage(isProd);
+            } else if (typeof message.data === 'boolean') {
+              setIsProductPage(message.data);
+            }
             return;
+          }
           case 'image':
             if (message.data && typeof message.data === 'string') {
               imageRef.current = message.data.trim();
@@ -1010,18 +1000,39 @@ export default function Webview({ route, navigation }) {
           case 'productOptions':
             if (message.data && typeof message.data === 'object') {
               const opts = Array.isArray(message.data.options) ? message.data.options : [];
-              optionsRef.current = {
+              let extractedSize = message.data.selectedSize ? String(message.data.selectedSize).trim() : '';
+              let extractedColor = message.data.selectedColor ? String(message.data.selectedColor).trim() : '';
+
+              // Ensure size/color are synced from options array if not directly populated
+              if (!extractedSize) {
+                const sizeOpt = opts.find(o => o.name && o.name.toLowerCase() === 'size');
+                if (sizeOpt && sizeOpt.selected) {
+                  extractedSize = String(sizeOpt.selected).trim();
+                }
+              }
+              if (!extractedColor) {
+                const colorOpt = opts.find(o => o.name && o.name.toLowerCase() === 'color');
+                if (colorOpt && colorOpt.selected) {
+                  extractedColor = String(colorOpt.selected).trim();
+                }
+              }
+
+              const nextOptions = {
                 hasOptions: opts.length > 0,
                 options: opts,
-                hasSize: !!message.data.hasSize,
+                hasSize: !!(message.data.hasSize || extractedSize),
                 sizes: Array.isArray(message.data.sizes) ? message.data.sizes : [],
-                selectedSize: message.data.selectedSize ? String(message.data.selectedSize).trim() : '',
-                hasColor: !!message.data.hasColor,
+                selectedSize: extractedSize,
+                hasColor: !!(message.data.hasColor || extractedColor),
                 colors: Array.isArray(message.data.colors) ? message.data.colors : [],
-                selectedColor: message.data.selectedColor ? String(message.data.selectedColor).trim() : '',
+                selectedColor: extractedColor,
               };
-              if (opts.length > 0) {
-                setIsProductPage(true);
+              optionsRef.current = nextOptions;
+
+              if (typeof pendingOptionsResolveRef.current === 'function') {
+                const resolver = pendingOptionsResolveRef.current;
+                pendingOptionsResolveRef.current = null;
+                resolver(nextOptions);
               }
             }
             return;
@@ -1039,11 +1050,12 @@ export default function Webview({ route, navigation }) {
         return;
       }
     },
-    [injectNow, injectScript, scheduleInject, setStatus, updateProductPageStatus],
+    [injectNow, injectScript, resetOptionsRef, scheduleInject, setStatus],
   );
 
   const onLoadStart = useCallback(() => {
     loadingRef.current = true;
+    setIsProductPage(false);
     setStatus(injectScript ? 'pending' : 'waiting');
   }, [injectScript, setStatus]);
 
@@ -1057,6 +1069,7 @@ export default function Webview({ route, navigation }) {
     navState => {
       const nextUrl = navState.url || currentUrlRef.current;
       if (nextUrl !== currentUrlRef.current) {
+        setIsProductPage(false);
         const isNextProduct = isProductUrl(nextUrl);
         if (!isNextProduct) {
           titleRef.current = '';
@@ -1072,18 +1085,20 @@ export default function Webview({ route, navigation }) {
       setTranslateUrl(currentUrlRef.current);
       injectTrendyolCookies(currentUrlRef.current);
 
-      updateProductPageStatus(currentUrlRef.current);
-
-      if (!navState.loading) {
+      if (navState.loading) {
+        setIsProductPage(false);
+      } else {
         scheduleInject(currentUrlRef.current);
       }
     },
-    [injectTrendyolCookies, scheduleInject, setTranslateUrl, updateProductPageStatus],
+    [injectTrendyolCookies, resetOptionsRef, scheduleInject, setTranslateUrl],
   );
 
   const onShouldStartLoadWithRequest = useCallback(request => {
     const nextUrl = request?.url || '';
-    if (!nextUrl) return true;
+    if (!nextUrl) {
+      return true;
+    }
 
     if (
       nextUrl.includes('whatsapp.com') ||
@@ -1123,6 +1138,10 @@ export default function Webview({ route, navigation }) {
         }
       }
       return false;
+    }
+
+    if (nextUrl !== currentUrlRef.current && !nextUrl.startsWith('about:')) {
+      setIsProductPage(false);
     }
 
     return true;
@@ -1167,9 +1186,9 @@ export default function Webview({ route, navigation }) {
     resetOptionsRef();
     clearInjectTimers();
     setTranslateUrl(sourceUrl);
-    updateProductPageStatus(sourceUrl, '', '');
+    setIsProductPage(false);
     setStatus(sourceUrl === BLANK_SOURCE_URL ? 'idle' : 'pending');
-  }, [clearInjectTimers, setStatus, setTranslateUrl, sourceUrl, updateProductPageStatus]);
+  }, [clearInjectTimers, resetOptionsRef, setStatus, setTranslateUrl, sourceUrl]);
 
   useEffect(() => {
     if (!loadingRef.current) {

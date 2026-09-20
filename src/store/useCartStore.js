@@ -14,98 +14,174 @@ const devCart = [
   },
 ];
 
-const devFill = false; // Set to false as per your preference
+import {generateItemKey} from '../helpers/variantUtils';
 
-const normalizeCartItem = item => ({
-  ...item,
-  checked: Object.prototype.hasOwnProperty.call(item, 'checked')
-    ? item.checked
-    : true,
-  size: item.size ?? '',
-  hasSize: item.hasSize ?? (Array.isArray(item.sizes) && item.sizes.length > 0),
-  sizes: Array.isArray(item.sizes) ? item.sizes : [],
-  color: item.color ?? '',
-  hasColor: item.hasColor ?? (Array.isArray(item.colors) && item.colors.length > 0),
-  colors: Array.isArray(item.colors) ? item.colors : [],
-  options: Array.isArray(item.options) ? item.options : [],
-  store: item.store ?? item.storeName ?? '',
-  desc: item.desc ?? item.description ?? '',
-  description: item.description ?? item.desc ?? '',
-  price: item.price ?? '',
-  currency: item.currency ?? '',
-});
+export const normalizeCartItem = item => {
+  if (!item) {
+    return null;
+  }
+
+  // Clean and preserve options array
+  let options = Array.isArray(item.options) ? [...item.options] : [];
+  options = options.filter(
+    opt => opt && opt.name && Array.isArray(opt.values) && opt.values.length > 0,
+  );
+
+  let size = item.size ? String(item.size).trim() : '';
+  let sizes = Array.isArray(item.sizes) ? item.sizes.map(s => String(s).trim()) : [];
+  let color = item.color ? String(item.color).trim() : '';
+  let colors = Array.isArray(item.colors) ? item.colors.map(c => String(c).trim()) : [];
+
+  // Bidirectional sync: if options has Size, sync size & sizes
+  const sizeOpt = options.find(
+    o => o.name && o.name.toLowerCase() === 'size',
+  );
+  if (sizeOpt) {
+    if (!size && sizeOpt.selected) {
+      size = String(sizeOpt.selected).trim();
+    } else if (size && !sizeOpt.selected) {
+      sizeOpt.selected = size;
+    }
+    if (sizes.length === 0 && Array.isArray(sizeOpt.values)) {
+      sizes = sizeOpt.values.map(s => String(s).trim());
+    }
+  } else if (size || sizes.length > 0) {
+    // If top level size is present but not in options, push into options
+    options.push({
+      name: 'Size',
+      values: sizes.length > 0 ? sizes : [size],
+      selected: size || (sizes.length > 0 ? sizes[0] : ''),
+    });
+  }
+
+  // Bidirectional sync: if options has Color, sync color & colors
+  const colorOpt = options.find(
+    o => o.name && o.name.toLowerCase() === 'color',
+  );
+  if (colorOpt) {
+    if (!color && colorOpt.selected) {
+      color = String(colorOpt.selected).trim();
+    } else if (color && !colorOpt.selected) {
+      colorOpt.selected = color;
+    }
+    if (colors.length === 0 && Array.isArray(colorOpt.values)) {
+      colors = colorOpt.values.map(c => String(c).trim());
+    }
+  } else if (color || colors.length > 0) {
+    options.push({
+      name: 'Color',
+      values: colors.length > 0 ? colors : [color],
+      selected: color || (colors.length > 0 ? colors[0] : ''),
+    });
+  }
+
+  // Ensure each option has a valid non-empty selected value if values exist
+  options = options.map(opt => ({
+    ...opt,
+    selected: opt.selected ? String(opt.selected).trim() : (opt.values[0] ? String(opt.values[0]).trim() : ''),
+  }));
+
+  const itemKey = item.id || generateItemKey({ ...item, size, color, options });
+
+  return {
+    ...item,
+    id: itemKey,
+    checked: Object.prototype.hasOwnProperty.call(item, 'checked')
+      ? item.checked
+      : true,
+    size: size,
+    hasSize: item.hasSize ?? (sizes.length > 0 || !!size),
+    sizes: sizes,
+    color: color,
+    hasColor: item.hasColor ?? (colors.length > 0 || !!color),
+    colors: colors,
+    options: options,
+    store: item.store ?? item.storeName ?? '',
+    desc: item.desc ?? item.description ?? '',
+    description: item.description ?? item.desc ?? '',
+    price: item.price ?? '',
+    currency: item.currency ?? '',
+  };
+};
+
+const matchesItem = (item, idOrUrl) => {
+  if (!item || !idOrUrl) {
+    return false;
+  }
+  return item.id === idOrUrl || item.url === idOrUrl;
+};
 
 const useCartStore = create(
   persist(
-    set => ({
-      //items: __DEV__ && devFill ? devCart : [],
+    (set, get) => ({
       items: [],
       addItem: item =>
         set(state => {
           const currentItems = state.items || [];
           const normalizedItem = normalizeCartItem(item);
-          console.log('Adding item:', normalizedItem);
-          const existingItem = currentItems.find(
-            i => i.url === normalizedItem.url,
-          );
-          if (existingItem) {
-            return {
-              items: currentItems.map(i =>
-                i.url === normalizedItem.url
-                  ? {
-                      ...i,
-                      count: i.count + 1,
-                      image: normalizedItem.image || i.image,
-                      price: normalizedItem.price || i.price,
-                      title: normalizedItem.title || i.title,
-                      currency: normalizedItem.currency || i.currency,
-                      store: normalizedItem.store || i.store,
-                      size: normalizedItem.size || i.size,
-                      hasSize: normalizedItem.hasSize ?? i.hasSize,
-                      sizes: normalizedItem.sizes?.length ? normalizedItem.sizes : i.sizes,
-                      color: normalizedItem.color || i.color,
-                      hasColor: normalizedItem.hasColor ?? i.hasColor,
-                      colors: normalizedItem.colors?.length ? normalizedItem.colors : i.colors,
-                      options: normalizedItem.options?.length ? normalizedItem.options : i.options,
-                    }
-                  : i,
-              ),
-            };
-          } else {
-            if (currentItems.length === 0) {
-              return {items: [{...normalizedItem, count: 1}]};
-            } else {
-              // add prepend
-              return {items: [{...normalizedItem, count: 1}, ...currentItems]};
-            }
+          if (!normalizedItem) {
+            return { items: currentItems };
           }
+
+          console.log('Adding item:', normalizedItem);
+          const existingIndex = currentItems.findIndex(
+            i => (i.id || generateItemKey(i)) === normalizedItem.id,
+          );
+
+          if (existingIndex > -1) {
+            const nextItems = [...currentItems];
+            const existingItem = nextItems[existingIndex];
+            nextItems[existingIndex] = {
+              ...existingItem,
+              count: (existingItem.count || 1) + 1,
+              image: normalizedItem.image || existingItem.image,
+              price: normalizedItem.price || existingItem.price,
+              title: normalizedItem.title || existingItem.title,
+              currency: normalizedItem.currency || existingItem.currency,
+              store: normalizedItem.store || existingItem.store,
+              size: normalizedItem.size || existingItem.size,
+              hasSize: normalizedItem.hasSize ?? existingItem.hasSize,
+              sizes: normalizedItem.sizes?.length ? normalizedItem.sizes : existingItem.sizes,
+              color: normalizedItem.color || existingItem.color,
+              hasColor: normalizedItem.hasColor ?? existingItem.hasColor,
+              colors: normalizedItem.colors?.length ? normalizedItem.colors : existingItem.colors,
+              options: normalizedItem.options?.length ? normalizedItem.options : existingItem.options,
+            };
+            return { items: nextItems };
+          }
+
+          return { items: [{ ...normalizedItem, count: 1 }, ...currentItems] };
         }),
-      removeItem: url =>
+      removeItem: idOrUrl =>
         set(state => ({
-          items: state.items.filter(i => i.url !== url),
+          items: state.items.filter(i => !matchesItem(i, idOrUrl)),
         })),
-      increaseCount: url =>
+      increaseCount: idOrUrl =>
         set(state => ({
           items: state.items.map(i =>
-            i.url === url ? {...i, count: i.count + 1} : i,
+            matchesItem(i, idOrUrl) ? { ...i, count: i.count + 1 } : i,
           ),
         })),
-      decreaseCount: url =>
+      decreaseCount: idOrUrl =>
         set(state => ({
           items: state.items
             .map(i =>
-              i.url === url && i.count > 1 ? {...i, count: i.count - 1} : i,
+              matchesItem(i, idOrUrl) && i.count > 1 ? { ...i, count: i.count - 1 } : i,
             )
             .filter(i => i.count > 0),
         })),
-      updateItem: (url, item) =>
+      updateItem: (idOrUrl, itemData) =>
         set(state => ({
-          items: state.items.map(i => (i.url === url ? {...i, ...item} : i)),
+          items: state.items.map(i =>
+            matchesItem(i, idOrUrl) ? normalizeCartItem({ ...i, ...itemData }) : i,
+          ),
         })),
-      updateOption: (url, optionName, selectedValue) =>
+      updateOption: (idOrUrl, optionName, selectedValue) =>
         set(state => ({
           items: state.items.map(i => {
-            if (i.url !== url) return i;
+            if (!matchesItem(i, idOrUrl)) {
+              return i;
+            }
             const currentOptions = Array.isArray(i.options) ? i.options : [];
             const updatedOptions = currentOptions.map(opt =>
               opt.name.toLowerCase() === optionName.toLowerCase()
@@ -118,37 +194,40 @@ const useCartStore = create(
             const isColor =
               optionName.toLowerCase().includes('color') ||
               optionName.toLowerCase().includes('renk');
-            return {
+            const updatedItem = {
               ...i,
               options: updatedOptions,
               ...(isSize ? { size: selectedValue } : {}),
               ...(isColor ? { color: selectedValue } : {}),
             };
+            // Regenerate ID with the new option choice
+            return normalizeCartItem(updatedItem);
           }),
         })),
-      updateField: (url, field, value) =>
+      updateField: (idOrUrl, field, value) =>
         set(state => ({
           items: state.items.map(i =>
-            i.url === url
+            matchesItem(i, idOrUrl)
               ? {
                   ...i,
                   [field]: value,
-                  ...(field === 'desc' ? {description: value} : {}),
+                  ...(field === 'desc' ? { description: value } : {}),
                 }
               : i,
           ),
         })),
       checkItem: item => {
-        console.log('Checking item:', item.url);
+        const targetId = item?.id || item?.url;
+        console.log('Checking item:', targetId);
         set(state => ({
           items: state.items.map(i =>
-            i.url === item.url ? {...i, checked: !i.checked} : i,
+            matchesItem(i, targetId) ? { ...i, checked: !i.checked } : i,
           ),
         }));
       },
       updateAll: items =>
         set(() => ({
-          items,
+          items: Array.isArray(items) ? items.map(normalizeCartItem) : [],
         })),
 
       clearCart: () => set({items: []}),

@@ -18,6 +18,8 @@ import Colors from '../../assets/Colors';
 import CheckBox from '@react-native-community/checkbox';
 import React from 'react';
 import Dump from '../Dump';
+import { useExchangeRateStore } from '../../store/useExchangeRateStore';
+import { normalizeCurrency } from '../../helpers/currencyHelper';
 
 const CartItem = ({
   item,
@@ -28,8 +30,13 @@ const CartItem = ({
   onChange,
   navigation,
 }) => {
+  const targetId = item.id || item.url;
+  const convertedUsd = useExchangeRateStore(state =>
+    state.convertPrice(item?.price, item?.currency),
+  );
+
   const changeItem = (field, value) => {
-    onChange(item.url, field, value);
+    onChange(targetId, field, value);
   };
 
   const changeOption = (optionName, selectedValue) => {
@@ -39,14 +46,14 @@ const CartItem = ({
         ? { ...opt, selected: selectedValue }
         : opt,
     );
-    onChange(item.url, 'options', updatedOptions);
+    onChange(targetId, 'options', updatedOptions);
 
     const lowerName = optionName.toLowerCase();
     if (lowerName.includes('size') || lowerName.includes('beden')) {
-      onChange(item.url, 'size', selectedValue);
+      onChange(targetId, 'size', selectedValue);
     }
     if (lowerName.includes('color') || lowerName.includes('renk')) {
-      onChange(item.url, 'color', selectedValue);
+      onChange(targetId, 'color', selectedValue);
     }
   };
 
@@ -87,17 +94,24 @@ const CartItem = ({
                     <Text style={styles.url}>{item.title || item.url}</Text>
                   </TouchableOpacity>
                   {Boolean(item?.price) && (
-                    <Text style={styles.priceText}>
-                      {String(item.price).toLowerCase().includes(String(item.currency || '').toLowerCase())
-                        ? item.price
-                        : `${item.price} ${item.currency || 'TL'}`}
-                    </Text>
+                    <View style={styles.priceContainer}>
+                      <Text style={styles.priceText}>
+                        {String(item.price).toLowerCase().includes(String(item.currency || '').toLowerCase())
+                          ? item.price
+                          : `${item.price} ${item.currency || 'TL'}`}
+                      </Text>
+                      {convertedUsd !== null && normalizeCurrency(item?.currency, item?.price) !== 'USD' && (
+                        <Text style={styles.convertedPriceText}>
+                          {` (~$${convertedUsd.toFixed(2)} USD)`}
+                        </Text>
+                      )}
+                    </View>
                   )}
                 </View>
                 <View style={styles.trashIconWrapper}>
                   <TouchableOpacity
                     title="Sil"
-                    onPress={() => onRemove(item.url)}
+                    onPress={() => onRemove(targetId)}
                     style={styles.trashButton}>
                     <TrashIcon width={20} height={20} fill={'red'} />
                   </TouchableOpacity>
@@ -427,11 +441,21 @@ const styles = StyleSheet.create({
     marginBottom: 5,
     color: '#000',
   },
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginBottom: 5,
+  },
   priceText: {
     fontSize: 14,
     fontWeight: 'bold',
     color: '#F15927',
-    marginBottom: 5,
+  },
+  convertedPriceText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2e7d32',
   },
   cb: {
     marginBottom: 10,

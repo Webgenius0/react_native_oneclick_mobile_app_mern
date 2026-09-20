@@ -34,6 +34,12 @@ import Loading from '../components/Loading';
 import RNPickerSelect from 'react-native-picker-select';
 import {useFocusEffect} from '@react-navigation/native';
 import TeslimatSehirPicker from '../components/TeslimatSehirPicker';
+import { useExchangeRateStore } from '../store/useExchangeRateStore';
+import {
+  calculateConvertedPrice,
+  parsePrice,
+  normalizeCurrency,
+} from '../helpers/currencyHelper';
 
 export default function CartPage({navigation, route}) {
   const insets = useSafeAreaInsets();
@@ -60,9 +66,26 @@ export default function CartPage({navigation, route}) {
   const [reRender, setReRender] = useState(0);
   const deliveryRef = createRef();
 
-  // usePersistedCart();
+  const { rates, inverseRates, fetchRates } = useExchangeRateStore();
 
+  useEffect(() => {
+    fetchRates();
+  }, [fetchRates]);
+
+  const checkedItems = items ? items.filter(item => item.checked === true) : [];
   const totalItems = items.reduce((sum, item) => sum + item.count, 0);
+  const totalUsd = checkedItems.reduce((sum, item) => {
+    const unitUsd = calculateConvertedPrice(
+      item.price,
+      item.currency,
+      rates,
+      inverseRates,
+    );
+    if (unitUsd !== null && unitUsd > 0) {
+      return sum + unitUsd * (item.count || 1);
+    }
+    return sum;
+  }, 0);
 
   // setTitle
   useEffect(() => {
@@ -74,7 +97,7 @@ export default function CartPage({navigation, route}) {
     navigation.setOptions({
       headerTitle: title,
     });
-  }, [totalItems]);
+  }, [navigation, totalItems]);
 
   const changeItem = (url, field, value) => {
     updateField(url, field, value);
@@ -156,20 +179,57 @@ export default function CartPage({navigation, route}) {
     }
 
     var i = 0;
+    let commonMarketplace = '';
     items.forEach(item => {
-      if(item.checked === false){
+      if (item.checked === false) {
         return;
       }
-      // fill post data
+
+      const storeName = item.store ? item.store : '';
+      if (!commonMarketplace && storeName) {
+        commonMarketplace = storeName;
+      }
+
+      const parsedPriceVal = parsePrice(item.price);
+      const normalizedCurr = normalizeCurrency(item.currency, item.price);
+      const convertedPriceVal = calculateConvertedPrice(
+        item.price,
+        item.currency,
+        rates,
+        inverseRates,
+      );
+
+      // fill post data with both new schema fields and backwards compatibility fields
       postData.append('cart[' + i + '][ad]', item.title);
       postData.append('cart[' + i + '][link]', item.url);
       postData.append('cart[' + i + '][sayi]', item.count);
       postData.append('cart[' + i + '][size]', item.size ? item.size : '');
       postData.append('cart[' + i + '][color]', item.color ? item.color : '');
       postData.append('cart[' + i + '][renk]', item.color ? item.color : '');
-      postData.append('cart[' + i + '][store]', item.store ? item.store : '');
-      postData.append('cart[' + i + '][store_name]', item.store ? item.store : '');
-      postData.append('cart[' + i + '][magaza]', item.store ? item.store : '');
+      postData.append('cart[' + i + '][store]', storeName);
+      postData.append('cart[' + i + '][store_name]', storeName);
+      postData.append('cart[' + i + '][magaza]', storeName);
+      postData.append('cart[' + i + '][marketplace]', storeName);
+
+      if (parsedPriceVal !== null) {
+        postData.append('cart[' + i + '][price]', parsedPriceVal);
+        postData.append('cart[' + i + '][original_price]', parsedPriceVal);
+        postData.append('cart[' + i + '][fiyat]', parsedPriceVal);
+      } else {
+        postData.append('cart[' + i + '][fiyat]', item.price ? item.price : '');
+      }
+
+      postData.append('cart[' + i + '][currency]', normalizedCurr);
+      postData.append('cart[' + i + '][original_currency]', normalizedCurr);
+      postData.append('cart[' + i + '][parabirim]', normalizedCurr);
+
+      if (convertedPriceVal !== null) {
+        postData.append('cart[' + i + '][converted_price]', convertedPriceVal);
+        postData.append('cart[' + i + '][price_usd]', convertedPriceVal);
+        postData.append('cart[' + i + '][fiyat_usd]', convertedPriceVal);
+        postData.append('cart[' + i + '][converted_currency]', 'USD');
+        postData.append('cart[' + i + '][target_currency]', 'USD');
+      }
 
       let optionsStr = '';
       if (Array.isArray(item.options) && item.options.length > 0) {
@@ -182,8 +242,6 @@ export default function CartPage({navigation, route}) {
       const combinedDesc = [item.desc, optionsStr].filter(Boolean).join(' | ');
       postData.append('cart[' + i + '][acik]', combinedDesc);
       postData.append('cart[' + i + '][img]', item.image);
-      postData.append('cart[' + i + '][fiyat]', item.price ? item.price : '');
-      postData.append('cart[' + i + '][parabirim]', item.currency ? item.currency : '');
       postData.append('file[' + i + ']', item?.imageData || '');
       i++;
       // add imageData file to postData
@@ -192,6 +250,9 @@ export default function CartPage({navigation, route}) {
     let token = await getToken();
     postData.append('token', token);
     postData.append('teslimatSehirID', teslimatSehirID);
+    if (commonMarketplace) {
+      postData.append('marketplace', commonMarketplace);
+    }
     // console.log("postData", postData);
     const response = await ai.post('new-order-multiple', postData, {
       headers: {
@@ -201,13 +262,11 @@ export default function CartPage({navigation, route}) {
 
     if (response.data.error === false) {
       console.log('Error false', response.data);
-      Alert.alert(tr('Sipariş Alındı'));
 
       // clear cart
-
-      if(checkedLen === items.length) {
+      if (checkedLen === items.length) {
         clearCart();
-      }else{
+      } else {
         // remove checked
         let newItems = items.filter(item => item.checked !== true);
         updateAll(newItems);
@@ -215,10 +274,26 @@ export default function CartPage({navigation, route}) {
 
       setIsSubmitting(false);
 
-      setTimeout(function () {
-        let d = +new Date();
-        navigation.navigate('Orders', {refetch: d});
-      }, 1000);
+      const orderIds = response.data.order_ids || (response.data.order_id ? [response.data.order_id] : []);
+      const grupID = response.data.grupID;
+      const totalUsd = response.data.total_usd;
+
+      // If backend returned direct approval (Status 16) with total_usd and IDs, go directly to PaymentStart
+      if (totalUsd !== undefined && (grupID || (orderIds && orderIds.length > 0))) {
+        navigation.navigate('PaymentStart', {
+          quick: true,
+          tutar: totalUsd,
+          siparis_ids: orderIds,
+          siparis_id: orderIds.length > 0 ? orderIds[0] : null,
+          grupID: grupID,
+        });
+      } else {
+        Alert.alert(tr('Sipariş Alındı'));
+        setTimeout(function () {
+          let d = +new Date();
+          navigation.navigate('Orders', {refetch: d});
+        }, 1000);
+      }
     } else {
       Alert.alert(tr('Hata Oluştu'));
       setIsSubmitting(false);
@@ -254,11 +329,17 @@ export default function CartPage({navigation, route}) {
     infoContainer: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      alignItems: 'flex-start',
+      alignItems: 'center',
       backgroundColor: '#FFF',
       paddingTop: 5,
       paddingHorizontal: 7,
       paddingBottom: 5,
+    },
+    totalUsdText: {
+      fontSize: 15,
+      fontWeight: 'bold',
+      color: Colors.primary || '#F15927',
+      marginTop: 2,
     },
     btn: {
       backgroundColor: '#FF5D5D',
@@ -293,7 +374,7 @@ export default function CartPage({navigation, route}) {
   const onRefresh = useCallback(() => {
     setRefreshing(true);
 
-    setReRender(reRender + 1);
+    setReRender(prev => prev + 1);
     setRefreshing(false);
     console.log('Rendered');
   }, []);
@@ -354,7 +435,7 @@ export default function CartPage({navigation, route}) {
                 navigation={navigation}
               />
             )}
-            keyExtractor={item => item.url}
+            keyExtractor={(item, index) => item.id || `${item.url}_${index}`}
           />
         </View>
       )}
@@ -384,11 +465,18 @@ export default function CartPage({navigation, route}) {
       {!loading && (
         <>
           <View style={styles.infoContainer}>
-            <Text style={{fontSize: 14, color: '#888'}}>
-              {
-                totalItems > 0 ? totalItems + ' ' + t('Ürün') : ''
-              }
-            </Text>
+            <View style={{flexDirection: 'column', alignItems: 'flex-start'}}>
+              <Text style={{fontSize: 14, color: '#888'}}>
+                {
+                  totalItems > 0 ? totalItems + ' ' + t('Ürün') : ''
+                }
+              </Text>
+              {totalUsd > 0 && (
+                <Text style={styles.totalUsdText}>
+                  {`$${totalUsd.toFixed(2)} USD`}
+                </Text>
+              )}
+            </View>
             <View
               style={{
                 flexDirection: 'row',

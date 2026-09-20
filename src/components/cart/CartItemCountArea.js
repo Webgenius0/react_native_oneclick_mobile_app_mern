@@ -25,20 +25,22 @@ export default function({item, onIncrease, onDecrease}) {
     },
   });
 
+  const targetId = item.id || item.url;
+
   return (
     <View
       style={styles.container}>
       <TouchableOpacity
-        onPress={() => onDecrease(item.url)}
+        onPress={() => onDecrease(targetId)}
         style={styles.miniBtn}>
         <Text style={styles.miniBtnText}>-</Text>
       </TouchableOpacity>
       <Text style={styles.text}>{item.count}</Text>
       <TouchableOpacity
-        onPress={() => onIncrease(item.url)}
+        onPress={() => onIncrease(targetId)}
         style={styles.miniBtn}>
         <Text style={styles.miniBtnText}>+</Text>
       </TouchableOpacity>
     </View>
-  )
+  );
 }

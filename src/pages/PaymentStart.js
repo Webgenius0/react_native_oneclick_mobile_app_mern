@@ -64,7 +64,12 @@ export default function ({navigation, route}) {
     grupID = route.params.grupID;
     grup = route.params.grup;
     if (paramSiparisIds) {
-      default_siparis_ids = [paramSiparisIds];
+      default_siparis_ids = Array.isArray(paramSiparisIds)
+        ? paramSiparisIds
+        : [paramSiparisIds];
+    }
+    if (!siparis_id && default_siparis_ids && default_siparis_ids.length > 0) {
+      siparis_id = default_siparis_ids[0];
     }
   } else {
     inputAutoFocus = true;
@@ -92,25 +97,36 @@ export default function ({navigation, route}) {
     console.log('\n');
 
     if (c.data.error === false) {
-      let new_siparisler = c.data.ss;
+      let new_siparisler = c.data.ss || [];
       // sort siparisler by id is = siparis_id
       if (quick) {
         new_siparisler = new_siparisler.sort((a, b) =>
-          a.id === siparis_id || a.grupID === grupID ? -1 : a.id - b.id,
+          a.id === siparis_id || (grupID && a.grupID === grupID) ? -1 : a.id - b.id,
         );
       }
 
-      let new_siparis_ids = new_siparisler
-        .filter(item => item.grupID === grupID)
-        .map(item => item.id);
-      if (!quick) {
+      let new_siparis_ids = [];
+      if (quick) {
+        if (grupID) {
+          new_siparis_ids = new_siparisler
+            .filter(item => item.grupID === grupID)
+            .map(item => item.id);
+        } else if (siparis_id) {
+          new_siparis_ids = new_siparisler
+            .filter(item => item.id === siparis_id)
+            .map(item => item.id);
+        }
+        if (new_siparis_ids.length === 0 && default_siparis_ids.length > 0) {
+          new_siparis_ids = default_siparis_ids;
+        }
+      } else {
         new_siparis_ids = new_siparisler.map(item => item.id);
       }
-      setSiparisler(c.data.ss);
+      setSiparisler(new_siparisler);
       setSiparisIds(new_siparis_ids);
       setLoading(false);
     } else {
-      setSiparisIds([]);
+      setSiparisIds(default_siparis_ids);
       setLoading(false);
     }
   };
@@ -174,8 +190,12 @@ export default function ({navigation, route}) {
   }, []);
 
   useEffect(() => {
-    let newTutar = tutarHesapla(siparisler, siparis_ids, grup);
-    setTutar(newTutar);
+    if (siparisler.length > 0) {
+      let newTutar = tutarHesapla(siparisler, siparis_ids, grup);
+      if (parseFloat(newTutar) > 0) {
+        setTutar(newTutar);
+      }
+    }
   }, [siparisler, siparis_ids, grup]);
 
   const styles = StyleSheet.create({
