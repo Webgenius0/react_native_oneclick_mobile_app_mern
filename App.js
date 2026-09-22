@@ -121,7 +121,7 @@ const App = () => {
         files => {
           if (files && files.length > 0) {
             const sharedText = files[0].text;
-            if (sharedText && (sharedText.includes('trendyol.com') || sharedText.includes('hepsiburada.com') || sharedText.includes('amazon.com.tr'))) {
+            if (sharedText && (sharedText.includes('trendyol.') || sharedText.includes('trendyol.com') || sharedText.includes('hepsiburada.com') || sharedText.includes('amazon.'))) {
               console.log('Shared link received:', sharedText);
               ReceiveSharingIntent.clearReceivedFiles();
             }

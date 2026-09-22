@@ -208,7 +208,10 @@
         "İşlemi Onayla": "İşlemi Onayla",
         "Evet, İptal Et": "Evet, İptal Et",
         "sepetAciklama": "Açıklama - Model / Ağırlık / Ölçü vb.",
-        "sepetBedenUyari": "Ürün detayları (beden, model, ölçüler veya ağırlık) girilmezse siparişiniz eksik veya geçersiz olabilir. Devam etmek ister misiniz?"
+        "sepetBedenUyari": "Ürün detayları (beden, model, ölçüler veya ağırlık) girilmezse siparişiniz eksik veya geçersiz olabilir. Devam etmek ister misiniz?",
+        "lutfenSecimYapin": "Lütfen sepete eklemeden önce ürün seçeneklerini (%{options}) seçiniz.",
+        "eksikUrunDetayi": "Lütfen sipariş vermeden önce seçili ürünlerin beden / renk detaylarını tamamlayınız.",
+        "gecersizUrunSayfasi": "Sadece ürün detay sayfaları sepete eklenebilir. Lütfen bir ürün sayfasına gidip tekrar deneyiniz."
     },
     "en": {
         "Express": "Express",
@@ -419,7 +422,10 @@
         "İşlemi Onayla": "Confirm the action",
         "Evet, İptal Et": "Yes, Cancel",
         "sepetAciklama": "Description - Model / Weight / Measurement etc.",
-        "sepetBedenUyari":"If product details (size,model, measurements, or weight) aren’t entered, your order may be incomplete or invalid. Continue?"
+        "sepetBedenUyari":"If product details (size,model, measurements, or weight) aren’t entered, your order may be incomplete or invalid. Continue?",
+        "lutfenSecimYapin": "Please select the product options (%{options}) before adding to cart.",
+        "eksikUrunDetayi": "Please complete size / color details for the selected products before placing an order.",
+        "gecersizUrunSayfasi": "Only product detail pages can be added to the cart. Please navigate to a specific product page and try again."
     },
     "som": {
         "Express": "Express",
@@ -628,6 +634,9 @@
         "İşlemi Onayla": "Confirm the action",
         "Evet, İptal Et": "Yes, Cancel",
         "sepetAciklama": "Description - Model / Weight / Measurement etc.",
-        "sepetBedenUyari":"Haddii faahfaahinta alaabta (model, size, cabbir ama miisaan) la gelin waayo, dalabkaagu wuxu  noqon karaa mid aan sax ahayn . Sii wad?"
+        "sepetBedenUyari":"Haddii faahfaahinta alaabta (model, size, cabbir ama miisaan) la gelin waayo, dalabkaagu wuxu  noqon karaa mid aan sax ahayn . Sii wad?",
+        "lutfenSecimYapin": "Fadlan dooro xulashooyinka alaabta (%{options}) ka hor inta aadan ku darin gaariga.",
+        "eksikUrunDetayi": "Fadlan buuxi faahfaahinta size / midabka alaabta la doortay ka hor inta aadan dalban.",
+        "gecersizUrunSayfasi": "Kaliya boggaga faahfaahinta alaabta ayaa lagu dari karaa gaariga. Fadlan tag bogga alaabta oo markale isku day."
     }
 }

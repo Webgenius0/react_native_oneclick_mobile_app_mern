@@ -7,12 +7,18 @@ import Error from "../assets/svg/error.svg";
 import Warning from "../assets/svg/warning.svg";
 import Colors from "../assets/Colors";
 import { CommonActions } from "@react-navigation/native";
-
+import { useCartStore } from "../store/useCartStore";
 
 export default function PaymentResponse({navigation, route}){
     const {status} = route.params;
     const w = 100;
     const h = 100;
+
+    React.useEffect(() => {
+      if (status === 'success') {
+        useCartStore.getState().clearCart();
+      }
+    }, [status]);
 
     const git = async (yer) => {
       // reset navigate

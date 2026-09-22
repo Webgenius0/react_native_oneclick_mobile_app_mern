@@ -20,6 +20,7 @@ import {SelectList} from 'react-native-dropdown-select-list/index';
 import Colors from '../assets/Colors';
 import {delay, getUserAgent} from '../helpers/common';
 import DeviceInfo from 'react-native-device-info';
+import {useCartStore} from '../store/useCartStore';
 
 export default function EDahab({navigation, route}) {
   const g = GlobalStyle;
@@ -104,6 +105,7 @@ export default function EDahab({navigation, route}) {
     console.log('r', r?.data);
 
     if (r?.data?.error === false) {
+      useCartStore.getState().clearCart();
       Toast.show({
         type: 'success',
         text1: t('Ödeme Başarılı'),

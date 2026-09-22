@@ -21,10 +21,16 @@ export const normalizeCartItem = item => {
     return null;
   }
 
-  // Clean and preserve options array
+  // Clean and preserve options array (restricted to Size, Color, Storage, Weight/Volume)
+  const ALLOWED_OPTION_NAMES = ['size', 'color', 'storage', 'weight', 'volume'];
   let options = Array.isArray(item.options) ? [...item.options] : [];
   options = options.filter(
-    opt => opt && opt.name && Array.isArray(opt.values) && opt.values.length > 0,
+    opt =>
+      opt &&
+      opt.name &&
+      ALLOWED_OPTION_NAMES.includes(opt.name.trim().toLowerCase()) &&
+      Array.isArray(opt.values) &&
+      opt.values.length > 0,
   );
 
   let size = item.size ? String(item.size).trim() : '';
@@ -50,7 +56,7 @@ export const normalizeCartItem = item => {
     options.push({
       name: 'Size',
       values: sizes.length > 0 ? sizes : [size],
-      selected: size || (sizes.length > 0 ? sizes[0] : ''),
+      selected: size || '',
     });
   }
 
@@ -71,14 +77,14 @@ export const normalizeCartItem = item => {
     options.push({
       name: 'Color',
       values: colors.length > 0 ? colors : [color],
-      selected: color || (colors.length > 0 ? colors[0] : ''),
+      selected: color || '',
     });
   }
 
-  // Ensure each option has a valid non-empty selected value if values exist
+  // Keep selected value clean without blindly picking values[0]
   options = options.map(opt => ({
     ...opt,
-    selected: opt.selected ? String(opt.selected).trim() : (opt.values[0] ? String(opt.values[0]).trim() : ''),
+    selected: opt.selected ? String(opt.selected).trim() : '',
   }));
 
   const itemKey = item.id || generateItemKey({ ...item, size, color, options });
@@ -102,6 +108,40 @@ export const normalizeCartItem = item => {
     price: item.price ?? '',
     currency: item.currency ?? '',
   };
+};
+
+export const isCartItemComplete = item => {
+  if (!item) return false;
+  // A valid product item must have an image and title
+  if (!item.image || !item.title) return false;
+  const lowerTitle = String(item.title).trim().toLowerCase();
+  if (lowerTitle === 'product' || lowerTitle === 'trendyol tr' || lowerTitle.includes('fashion, electronics')) {
+    return false;
+  }
+
+  // If user provided a custom description, it satisfies missing details
+  if (item.desc && String(item.desc).trim()) return true;
+
+  // Check Size requirement if size choices exist
+  if (item.hasSize && Array.isArray(item.sizes) && item.sizes.length > 1 && !item.size) {
+    return false;
+  }
+
+  // Check Color requirement if color choices exist
+  if (item.hasColor && Array.isArray(item.colors) && item.colors.length > 1 && !item.color) {
+    return false;
+  }
+
+  // Check generic options (e.g. Weight/Volume)
+  if (Array.isArray(item.options)) {
+    for (const opt of item.options) {
+      if (opt && Array.isArray(opt.values) && opt.values.length > 1 && (!opt.selected || !String(opt.selected).trim())) {
+        return false;
+      }
+    }
+  }
+
+  return true;
 };
 
 const matchesItem = (item, idOrUrl) => {
@@ -206,15 +246,20 @@ const useCartStore = create(
         })),
       updateField: (idOrUrl, field, value) =>
         set(state => ({
-          items: state.items.map(i =>
-            matchesItem(i, idOrUrl)
-              ? {
-                  ...i,
-                  [field]: value,
-                  ...(field === 'desc' ? { description: value } : {}),
-                }
-              : i,
-          ),
+          items: state.items.map(i => {
+            if (!matchesItem(i, idOrUrl)) {
+              return i;
+            }
+            const updated = {
+              ...i,
+              [field]: value,
+              ...(field === 'desc' ? { description: value } : {}),
+            };
+            if (field === 'size' || field === 'color') {
+              return normalizeCartItem(updated);
+            }
+            return updated;
+          }),
         })),
       checkItem: item => {
         const targetId = item?.id || item?.url;

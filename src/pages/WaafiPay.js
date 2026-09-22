@@ -20,6 +20,7 @@ import Loading from '../components/Loading';
 import Colors from '../assets/Colors';
 import DeviceInfo from 'react-native-device-info';
 import {getUserAgent} from '../helpers/common';
+import {useCartStore} from '../store/useCartStore';
 
 export default function WaafiPay({navigation, route}) {
   const g = GlobalStyle;
@@ -143,6 +144,7 @@ export default function WaafiPay({navigation, route}) {
     console.log('r', r?.data);
 
     if (r?.data?.error === false) {
+      useCartStore.getState().clearCart();
       Toast.show({
         type: 'success',
         text1: t('Ödeme Başarılı'),

@@ -20,6 +20,7 @@ import React from 'react';
 import Dump from '../Dump';
 import { useExchangeRateStore } from '../../store/useExchangeRateStore';
 import { normalizeCurrency } from '../../helpers/currencyHelper';
+import { getStoreName } from '../../helpers/storeHelper';
 
 const CartItem = ({
   item,
@@ -28,6 +29,7 @@ const CartItem = ({
   onDecrease,
   checkItem,
   onChange,
+  onUpdateOption,
   navigation,
 }) => {
   const targetId = item.id || item.url;
@@ -40,6 +42,11 @@ const CartItem = ({
   };
 
   const changeOption = (optionName, selectedValue) => {
+    if (typeof onUpdateOption === 'function') {
+      onUpdateOption(targetId, optionName, selectedValue);
+      return;
+    }
+
     const currentOptions = Array.isArray(item.options) ? item.options : [];
     const updatedOptions = currentOptions.map(opt =>
       opt.name.toLowerCase() === optionName.toLowerCase()
@@ -85,15 +92,17 @@ const CartItem = ({
             <View style={styles.flexColumn}>
               <View style={styles.itemHeader}>
                 <View style={styles.flex1}>
-                  {Boolean(item?.store) && (
+                  {Boolean(item?.store || getStoreName(item?.url, '')) && (
                     <View style={styles.storeBadge}>
-                      <Text style={styles.storeBadgeText}>{item.store}</Text>
+                      <Text style={styles.storeBadgeText}>
+                        {item?.store || getStoreName(item?.url, '')}
+                      </Text>
                     </View>
                   )}
                   <TouchableOpacity onPress={() => openUrl(item.url)}>
                     <Text style={styles.url}>{item.title || item.url}</Text>
                   </TouchableOpacity>
-                  {Boolean(item?.price) && (
+                  {Boolean(item?.price) ? (
                     <View style={styles.priceContainer}>
                       <Text style={styles.priceText}>
                         {String(item.price).toLowerCase().includes(String(item.currency || '').toLowerCase())
@@ -105,6 +114,12 @@ const CartItem = ({
                           {` (~$${convertedUsd.toFixed(2)} USD)`}
                         </Text>
                       )}
+                    </View>
+                  ) : (
+                    <View style={styles.priceContainer}>
+                      <Text style={styles.pendingPriceText}>
+                        {t('Fiyat Hesaplanıyor')}
+                      </Text>
                     </View>
                   )}
                 </View>
@@ -456,6 +471,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#2e7d32',
+  },
+  pendingPriceText: {
+    fontSize: 13,
+    color: '#888',
+    fontStyle: 'italic',
   },
   cb: {
     marginBottom: 10,

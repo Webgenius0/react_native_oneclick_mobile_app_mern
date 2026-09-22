@@ -24,7 +24,7 @@ import FastImage from 'react-native-fast-image';
 import gs from '../assets/GlobalStyle';
 import {delay, randomNumber, shorten} from '../helpers/common';
 
-import {devCart, useCartStore} from '../store/useCartStore';
+import {devCart, useCartStore, isCartItemComplete} from '../store/useCartStore';
 import CartItem from '../components/cart/CartItem';
 import Colors from '../assets/Colors';
 import CartManuelItemModal from '../components/cart/CartManuelItemModal';
@@ -55,6 +55,7 @@ export default function CartPage({navigation, route}) {
     decreaseCount,
     clearCart,
     updateField,
+    updateOption,
   } = useCartStore();
 
   const [modalVisible, setModalVisible] = useState(false);
@@ -147,35 +148,24 @@ export default function CartPage({navigation, route}) {
     }
 
 
-    // Check if any checked item has both size (if size is applicable) and desc empty
-    const hasEmptyDetails = items.some(
-      item => item.checked === true && item.hasSize && !item.size && !item.desc,
+    // Check if any checked item has incomplete variant details
+    const incompleteItems = items.filter(
+      item => item.checked === true && !isCartItemComplete(item),
     );
-    
-    if (hasEmptyDetails) {
-      const confirmed = await new Promise((resolve) => {
-        Alert.alert(
-          t('Uyarı'),
-          t('sepetBedenUyari'),
-          [
-            {
-              text: t('Hayır'),
-              onPress: () => resolve(false),
-              style: 'cancel',
-            },
-            {
-              text: t('Evet'),
-              onPress: () => resolve(true),
-            },
-          ],
-          { cancelable: false }
-        );
-      });
-      
-      if (!confirmed) {
-        setIsSubmitting(false);
-        return;
-      }
+
+    if (incompleteItems.length > 0) {
+      const incompleteNames = incompleteItems
+        .map(i => i.title || i.url)
+        .slice(0, 3)
+        .join('\n• ');
+
+      Alert.alert(
+        t('Uyarı'),
+        `${t('eksikUrunDetayi') || 'Lütfen sipariş vermeden önce seçili ürünlerin beden / renk detaylarını tamamlayınız.'}\n\n• ${incompleteNames}`,
+        [{ text: t('Tamam') || 'Tamam' }]
+      );
+      setIsSubmitting(false);
+      return;
     }
 
     var i = 0;
@@ -234,9 +224,12 @@ export default function CartPage({navigation, route}) {
       let optionsStr = '';
       if (Array.isArray(item.options) && item.options.length > 0) {
         optionsStr = item.options
-          .map(o => `${o.name}: ${o.selected || (o.values && o.values[0]) || ''}`)
+          .filter(o => o && o.name && o.selected)
+          .map(o => `${o.name}: ${o.selected}`)
           .join(', ');
-        postData.append('cart[' + i + '][options]', optionsStr);
+        if (optionsStr) {
+          postData.append('cart[' + i + '][options]', optionsStr);
+        }
       }
 
       const combinedDesc = [item.desc, optionsStr].filter(Boolean).join(' | ');
@@ -263,22 +256,14 @@ export default function CartPage({navigation, route}) {
     if (response.data.error === false) {
       console.log('Error false', response.data);
 
-      // clear cart
-      if (checkedLen === items.length) {
-        clearCart();
-      } else {
-        // remove checked
-        let newItems = items.filter(item => item.checked !== true);
-        updateAll(newItems);
-      }
-
       setIsSubmitting(false);
 
       const orderIds = response.data.order_ids || (response.data.order_id ? [response.data.order_id] : []);
       const grupID = response.data.grupID;
       const totalUsd = response.data.total_usd;
 
-      // If backend returned direct approval (Status 16) with total_usd and IDs, go directly to PaymentStart
+      // If backend returned direct approval (Status 16) with total_usd and IDs, go directly to PaymentStart.
+      // DO NOT clear cart here: cart items remain until payment is successfully completed!
       if (totalUsd !== undefined && (grupID || (orderIds && orderIds.length > 0))) {
         navigation.navigate('PaymentStart', {
           quick: true,
@@ -288,6 +273,14 @@ export default function CartPage({navigation, route}) {
           grupID: grupID,
         });
       } else {
+        // For orders that do not go to online payment (quote request or manual review), clear cart
+        if (checkedLen === items.length) {
+          clearCart();
+        } else {
+          let newItems = items.filter(item => item.checked !== true);
+          updateAll(newItems);
+        }
+
         Alert.alert(tr('Sipariş Alındı'));
         setTimeout(function () {
           let d = +new Date();
@@ -432,6 +425,7 @@ export default function CartPage({navigation, route}) {
                 onIncrease={increaseCount}
                 onDecrease={decreaseCount}
                 onChange={changeItem}
+                onUpdateOption={updateOption}
                 navigation={navigation}
               />
             )}

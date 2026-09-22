@@ -96,11 +96,13 @@ export const normalizeCurrency = (rawCurrency, rawPrice = '') => {
 
 /**
  * Parses numeric price from string or number.
- * Handles European/Turkish formats ("1.299,99" or "179,10") and US formats ("1,299.99" or "179.10").
+ * Handles European/Turkish formats ("1.299,99", "1.299 TL", "179,10") and US formats ("1,299.99", "1,450 AED", "179.10").
+ * Robustly removes discount percentages, currency symbols, and distinguishes thousands vs decimal separators.
  * @param {string|number} rawPrice
+ * @param {string} rawCurrency
  * @returns {number|null} parsed float or null if invalid
  */
-export const parsePrice = rawPrice => {
+export const parsePrice = (rawPrice, rawCurrency = '') => {
   if (typeof rawPrice === 'number') {
     return isNaN(rawPrice) || rawPrice <= 0 ? null : rawPrice;
   }
@@ -111,29 +113,62 @@ export const parsePrice = rawPrice => {
 
   let str = String(rawPrice).trim();
 
-  // Strip currency symbols and letters (keep digits, comma, dot, minus)
-  str = str.replace(/[^0-9.,-]/g, '').trim();
+  // Strip discount percentages e.g. '-30%', '%25', '30% off', 'Save 20%'
+  str = str.replace(/[-–]?\s*\d+(?:\.\d+)?\s*%\s*(?:off|indirim)?/gi, '');
+  str = str.replace(/%\s*\d+(?:\.\d+)?/gi, '');
+  str = str.replace(/\b(?:save|indirim|coupon|kupon|off)\b[^\d]*\d+(?:\.\d+)?%?/gi, '');
+
+  // Strip currency symbols and letters (keep digits, comma, dot, minus, space)
+  str = str.replace(/[^0-9.,\s-]/g, '').trim();
   if (!str) {
     return null;
   }
 
-  const hasComma = str.includes(',');
-  const hasDot = str.includes('.');
+  // Remove spaces between digits: "1 450" -> "1450"
+  str = str.replace(/\s+/g, '');
 
-  if (hasComma && hasDot) {
-    // Both comma and dot present: determine which is decimal by position
+  const curr = String(rawCurrency || '').trim().toUpperCase();
+  const commaCount = (str.match(/,/g) || []).length;
+  const dotCount = (str.match(/\./g) || []).length;
+
+  if (commaCount > 0 && dotCount > 0) {
+    // Both comma and dot present: determine decimal vs thousands by position of the last separator
     const lastComma = str.lastIndexOf(',');
     const lastDot = str.lastIndexOf('.');
     if (lastComma > lastDot) {
-      // European/Turkish format: 1.299,99 -> 1299.99
+      // European/Turkish format: 1.299,99 or 24.999,00 -> 1299.99
       str = str.replace(/\./g, '').replace(',', '.');
     } else {
-      // US format: 1,299.99 -> 1299.99
+      // US format: 1,299.99 or 24,999.00 -> 1299.99
       str = str.replace(/,/g, '');
     }
-  } else if (hasComma && !hasDot) {
-    // Only comma present: 179,10 -> 179.10
-    str = str.replace(',', '.');
+  } else if (commaCount > 1) {
+    // Multiple commas: 1,250,000 -> 1250000
+    str = str.replace(/,/g, '');
+  } else if (dotCount > 1) {
+    // Multiple dots: 1.250.000 -> 1250000
+    str = str.replace(/\./g, '');
+  } else if (commaCount === 1) {
+    // Single comma: e.g. "199,99" (decimal) vs "1,450" (thousands)
+    const parts = str.split(',');
+    const before = parts[0];
+    const after = parts[1];
+    if (after.length === 3 && before !== '0' && !['KWD', 'BHD', 'OMR'].includes(curr)) {
+      // Thousands: 1,450 -> 1450
+      str = str.replace(',', '');
+    } else {
+      // Decimal: 199,99 -> 199.99 or 0,500 -> 0.500
+      str = str.replace(',', '.');
+    }
+  } else if (dotCount === 1) {
+    // Single dot: e.g. "199.99" (decimal) vs "1.450" or "2.999" (thousands in Turkish/European/Arabic)
+    const parts = str.split('.');
+    const before = parts[0];
+    const after = parts[1];
+    if (after.length === 3 && before !== '0' && !['KWD', 'BHD', 'OMR'].includes(curr)) {
+      // Thousands: 1.450 -> 1450 or 2.999 -> 2999
+      str = str.replace('.', '');
+    }
   }
 
   const num = parseFloat(str);
@@ -155,12 +190,12 @@ export const calculateConvertedPrice = (
   rates = {},
   inverseRates = {},
 ) => {
-  const price = parsePrice(rawPrice);
+  const currency = normalizeCurrency(rawCurrency, rawPrice);
+  const price = parsePrice(rawPrice, currency);
   if (price === null) {
     return null;
   }
 
-  const currency = normalizeCurrency(rawCurrency, rawPrice);
   if (currency === 'USD') {
     return parseFloat(price.toFixed(2));
   }

@@ -2,7 +2,8 @@ import {Platform} from 'react-native';
 import { AGGRESSIVE_TAP_FIX } from './aggressiveTapFix';
 
 export const isTrendyol = page_url => {
-  return page_url.indexOf('trendyol.com') > -1;
+  if (!page_url || typeof page_url !== 'string') return false;
+  return page_url.indexOf('trendyol.') > -1 || page_url.indexOf('trendyol.com') > -1;
 };
 export const injectedJavascript = params => {
   var page_url = params?.page_url || '';
@@ -22,6 +23,7 @@ export const injectedJavascript = params => {
   }
 
   if (isTrendyol(page_url)) {
+    str += fixTrendyolMobileLayout();
     str += hideTrendyolBanners();
     // str += translatePage();
   }
@@ -95,10 +97,120 @@ export const getMetaTagTitle = page_url => {
 `;
 };
 
+export const fixTrendyolMobileLayout = () => {
+  return `
+    (function() {
+      var STYLE_ID = 'oneclick-trendyol-mobile-fix';
+      var css = [
+        '.pageLayout .content .productDetailWrapper {',
+        '  display: flex !important;',
+        '  flex-direction: column !important;',
+        '  width: 100% !important;',
+        '  max-width: 100% !important;',
+        '  box-sizing: border-box !important;',
+        '  padding: 0 12px 100px 12px !important;',
+        '  margin: 0 !important;',
+        '  overflow-x: hidden !important;',
+        '}',
+        '.pageLayout .content .productDetailWrapper .leftSide {',
+        '  width: 100% !important;',
+        '  max-width: 100% !important;',
+        '  margin: 0 0 12px 0 !important;',
+        '}',
+        '.pageLayout .content .productDetailWrapper .product-image-gallery-container {',
+        '  width: 100% !important;',
+        '  max-width: 100% !important;',
+        '}',
+        '.pageLayout .content .productDetailWrapper .product-image-gallery-viewport {',
+        '  width: 100% !important;',
+        '  max-width: 100% !important;',
+        '  display: flex !important;',
+        '  justify-content: center !important;',
+        '}',
+        '.pageLayout .content .productDetailWrapper .product-image-gallery-viewport img {',
+        '  max-width: 100% !important;',
+        '  height: auto !important;',
+        '  max-height: 380px !important;',
+        '  object-fit: contain !important;',
+        '}',
+        '.pageLayout .content .productDetailWrapper .rightArea,',
+        '.pageLayout .content .productDetailWrapper .rightSide,',
+        '.pageLayout .content .productDetailWrapper .main {',
+        '  width: 100% !important;',
+        '  max-width: 100% !important;',
+        '}',
+        '.pageLayout .content .productDetailWrapper .sectionRowSecond {',
+        '  display: flex !important;',
+        '  flex-direction: column !important;',
+        '  width: 100% !important;',
+        '  gap: 12px !important;',
+        '}',
+        '.pageLayout .content .productDetailWrapper .product-actions-fragment,',
+        '.pageLayout .content .productDetailWrapper .product-actions,',
+        '.pageLayout .content .productDetailWrapper [data-testid="product-actions"],',
+        '.product-actions-fragment,',
+        '.product-actions {',
+        '  position: fixed !important;',
+        '  bottom: 0 !important;',
+        '  left: 0 !important;',
+        '  right: 0 !important;',
+        '  width: 100% !important;',
+        '  background: #ffffff !important;',
+        '  padding: 8px 16px !important;',
+        '  box-shadow: 0 -3px 12px rgba(0, 0, 0, 0.15) !important;',
+        '  z-index: 999999 !important;',
+        '  box-sizing: border-box !important;',
+        '  display: flex !important;',
+        '  flex-direction: row !important;',
+        '  gap: 10px !important;',
+        '  align-items: center !important;',
+        '}',
+        '.product-actions .add-to-cart-button,',
+        '.product-actions [data-testid="add-to-cart-button"],',
+        'button.add-to-cart-button {',
+        '  display: flex !important;',
+        '  visibility: visible !important;',
+        '  opacity: 1 !important;',
+        '  flex: 1 1 auto !important;',
+        '  width: 100% !important;',
+        '  min-height: 48px !important;',
+        '  justify-content: center !important;',
+        '  align-items: center !important;',
+        '}',
+        '.product-actions .buy-now-button,',
+        'button.buy-now-button {',
+        '  display: flex !important;',
+        '  visibility: visible !important;',
+        '  opacity: 1 !important;',
+        '  flex: 1 1 auto !important;',
+        '  min-height: 48px !important;',
+        '  justify-content: center !important;',
+        '  align-items: center !important;',
+        '}'
+      ].join('\\n');
+
+      function applyStyles() {
+        if (!document.getElementById(STYLE_ID)) {
+          var style = document.createElement('style');
+          style.id = STYLE_ID;
+          style.type = 'text/css';
+          style.appendChild(document.createTextNode(css));
+          (document.head || document.documentElement).appendChild(style);
+        }
+      }
+
+      applyStyles();
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', applyStyles);
+      }
+    })();
+  `;
+};
+
 export const hideTrendyolBanners = () => {
   return `
     (function(){
-      var cleaned = { accept: false, modal: false, banner: false, basket: false };
+      var cleaned = { accept: false, modal: false, banner: false };
       var attempts = 0;
       var maxAttempts = 30;
 
@@ -127,15 +239,12 @@ export const hideTrendyolBanners = () => {
           }
         }
 
-        if (!cleaned.basket) {
-          var buttons = document.querySelectorAll('.button_add_to_basket');
-          if (buttons.length > 0) {
-            buttons.forEach(function(button) { button.style.display = 'none'; });
-            cleaned.basket = true;
-          }
+        var anladimBtn = document.querySelector('.anladim-button, [class*="anladim"]');
+        if (anladimBtn && anladimBtn.offsetParent !== null) {
+          anladimBtn.click();
         }
 
-        return cleaned.accept && cleaned.modal && cleaned.banner && cleaned.basket;
+        return cleaned.accept && cleaned.modal && cleaned.banner;
       }
 
       var interval = setInterval(function() {

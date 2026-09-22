@@ -57,7 +57,7 @@ export const normalizeDimName = rawName => {
     if (lower === ignoreDims[i] || lower.indexOf(ignoreDims[i]) > -1) return null;
   }
 
-  // Standard aliases
+  // Essential variant dimensions only (Size, Color, Weight/Volume)
   if (
     lower.indexOf('beden') > -1 ||
     lower.indexOf('size') > -1 ||
@@ -74,6 +74,14 @@ export const normalizeDimName = rawName => {
   ) return 'Color';
 
   if (
+    lower.indexOf('hafıza') > -1 ||
+    lower.indexOf('storage') > -1 ||
+    lower.indexOf('dahili hafıza') > -1 ||
+    lower.indexOf('kapasite') > -1 ||
+    lower.indexOf('capacity') > -1
+  ) return 'Storage';
+
+  if (
     lower.indexOf('ağırlık') > -1 ||
     lower.indexOf('weight') > -1 ||
     lower.indexOf('gram') > -1 ||
@@ -83,67 +91,8 @@ export const normalizeDimName = rawName => {
   if (
     lower.indexOf('hacim') > -1 ||
     lower.indexOf('volume') > -1 ||
-    lower.indexOf('kapasite') > -1 ||
-    lower.indexOf('capacity') > -1 ||
-    lower.indexOf('hafıza') > -1 ||
-    lower.indexOf('storage') > -1
+    lower.indexOf('ml') > -1
   ) return 'Volume';
-
-  if (
-    lower.indexOf('stil') > -1 ||
-    lower.indexOf('style') > -1 ||
-    lower.indexOf('tarz') > -1
-  ) return 'Style';
-
-  if (
-    lower.indexOf('model') > -1 ||
-    lower.indexOf('tip') > -1 ||
-    lower === 'type'
-  ) return 'Model';
-
-  if (
-    lower.indexOf('materyal') > -1 ||
-    lower.indexOf('malzeme') > -1 ||
-    lower.indexOf('material') > -1
-  ) return 'Material';
-
-  if (
-    lower.indexOf('paket') > -1 ||
-    lower.indexOf('pack') > -1 ||
-    lower.indexOf('adetli') > -1 ||
-    lower.indexOf('set') > -1
-  ) return 'Pack';
-
-  if (
-    lower.indexOf('desen') > -1 ||
-    lower.indexOf('pattern') > -1
-  ) return 'Pattern';
-
-  if (
-    lower.indexOf('uzunluk') > -1 ||
-    lower.indexOf('length') > -1
-  ) return 'Length';
-
-  if (
-    lower.indexOf('genişlik') > -1 ||
-    lower.indexOf('width') > -1
-  ) return 'Width';
-
-  if (
-    lower.indexOf('aroma') > -1 ||
-    lower.indexOf('flavor') > -1 ||
-    lower.indexOf('flavour') > -1 ||
-    lower.indexOf('tat') > -1
-  ) return 'Flavor';
-
-  // Generic fallback: valid dimension name must be 2 to 24 letters/spaces
-  if (/^[a-zA-ZçğıöşüÇĞİÖŞÜ\s\-]{2,24}$/.test(n)) {
-    // Title Case the clean name
-    return n
-      .split(/[\s\-]+/)
-      .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-      .join(' ');
-  }
 
   return null;
 };
@@ -157,7 +106,7 @@ export const generateItemKey = item => {
   if (Array.isArray(item.options) && item.options.length > 0) {
     item.options.forEach(opt => {
       if (opt && opt.name) {
-        const val = opt.selected || (Array.isArray(opt.values) && opt.values[0]) || '';
+        const val = opt.selected || '';
         if (val) {
           optionTokens.push(`${opt.name.trim().toLowerCase()}:${val.trim().toLowerCase()}`);
         }
