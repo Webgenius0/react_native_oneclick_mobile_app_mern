@@ -38,18 +38,23 @@ export const normalizeCartItem = item => {
   let color = item.color ? String(item.color).trim() : '';
   let colors = Array.isArray(item.colors) ? item.colors.map(c => String(c).trim()) : [];
 
+  let newPrice = item.price ?? '';
+
   // Bidirectional sync: if options has Size, sync size & sizes
   const sizeOpt = options.find(
     o => o.name && o.name.toLowerCase() === 'size',
   );
   if (sizeOpt) {
-    if (!size && sizeOpt.selected) {
-      size = String(sizeOpt.selected).trim();
-    } else if (size && !sizeOpt.selected) {
+    if (size) {
       sizeOpt.selected = size;
+    } else if (sizeOpt.selected) {
+      size = String(sizeOpt.selected).trim();
     }
     if (sizes.length === 0 && Array.isArray(sizeOpt.values)) {
       sizes = sizeOpt.values.map(s => String(s).trim());
+    }
+    if (size && sizeOpt.prices && sizeOpt.prices[size]) {
+      newPrice = sizeOpt.prices[size];
     }
   } else if (size || sizes.length > 0) {
     // If top level size is present but not in options, push into options
@@ -57,6 +62,7 @@ export const normalizeCartItem = item => {
       name: 'Size',
       values: sizes.length > 0 ? sizes : [size],
       selected: size || '',
+      prices: {},
     });
   }
 
@@ -65,26 +71,38 @@ export const normalizeCartItem = item => {
     o => o.name && o.name.toLowerCase() === 'color',
   );
   if (colorOpt) {
-    if (!color && colorOpt.selected) {
-      color = String(colorOpt.selected).trim();
-    } else if (color && !colorOpt.selected) {
+    if (color) {
       colorOpt.selected = color;
+    } else if (colorOpt.selected) {
+      color = String(colorOpt.selected).trim();
     }
     if (colors.length === 0 && Array.isArray(colorOpt.values)) {
       colors = colorOpt.values.map(c => String(c).trim());
+    }
+    if (color && colorOpt.prices && colorOpt.prices[color]) {
+      newPrice = colorOpt.prices[color];
     }
   } else if (color || colors.length > 0) {
     options.push({
       name: 'Color',
       values: colors.length > 0 ? colors : [color],
       selected: color || '',
+      prices: {},
     });
+  }
+
+  // Check any selected generic option (e.g. Storage, Volume) with an explicit price
+  for (const opt of options) {
+    if (opt && opt.selected && opt.prices && opt.prices[opt.selected]) {
+      newPrice = opt.prices[opt.selected];
+    }
   }
 
   // Keep selected value clean without blindly picking values[0]
   options = options.map(opt => ({
     ...opt,
     selected: opt.selected ? String(opt.selected).trim() : '',
+    prices: opt.prices || {},
   }));
 
   const itemKey = item.id || generateItemKey({ ...item, size, color, options });
@@ -105,7 +123,7 @@ export const normalizeCartItem = item => {
     store: item.store ?? item.storeName ?? '',
     desc: item.desc ?? item.description ?? '',
     description: item.description ?? item.desc ?? '',
-    price: item.price ?? '',
+    price: newPrice,
     currency: item.currency ?? '',
   };
 };
@@ -223,8 +241,11 @@ const useCartStore = create(
               return i;
             }
             const currentOptions = Array.isArray(i.options) ? i.options : [];
+            const targetOpt = currentOptions.find(
+              opt => opt && opt.name && opt.name.toLowerCase() === optionName.toLowerCase(),
+            );
             const updatedOptions = currentOptions.map(opt =>
-              opt.name.toLowerCase() === optionName.toLowerCase()
+              opt && opt.name && opt.name.toLowerCase() === optionName.toLowerCase()
                 ? { ...opt, selected: selectedValue }
                 : opt,
             );
@@ -234,13 +255,19 @@ const useCartStore = create(
             const isColor =
               optionName.toLowerCase().includes('color') ||
               optionName.toLowerCase().includes('renk');
+
+            let newPrice = i.price;
+            if (targetOpt && targetOpt.prices && targetOpt.prices[selectedValue]) {
+              newPrice = targetOpt.prices[selectedValue];
+            }
+
             const updatedItem = {
               ...i,
+              price: newPrice,
               options: updatedOptions,
               ...(isSize ? { size: selectedValue } : {}),
               ...(isColor ? { color: selectedValue } : {}),
             };
-            // Regenerate ID with the new option choice
             return normalizeCartItem(updatedItem);
           }),
         })),

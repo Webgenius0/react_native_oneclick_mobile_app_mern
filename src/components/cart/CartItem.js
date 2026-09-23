@@ -48,12 +48,19 @@ const CartItem = ({
     }
 
     const currentOptions = Array.isArray(item.options) ? item.options : [];
+    const targetOpt = currentOptions.find(
+      opt => opt && opt.name && opt.name.toLowerCase() === optionName.toLowerCase(),
+    );
     const updatedOptions = currentOptions.map(opt =>
-      opt.name.toLowerCase() === optionName.toLowerCase()
+      opt && opt.name && opt.name.toLowerCase() === optionName.toLowerCase()
         ? { ...opt, selected: selectedValue }
         : opt,
     );
     onChange(targetId, 'options', updatedOptions);
+
+    if (targetOpt && targetOpt.prices && targetOpt.prices[selectedValue]) {
+      onChange(targetId, 'price', targetOpt.prices[selectedValue]);
+    }
 
     const lowerName = optionName.toLowerCase();
     if (lowerName.includes('size') || lowerName.includes('beden')) {
@@ -176,6 +183,19 @@ const CartItem = ({
                                   isSelected && styles.chipTextSelected,
                                 ]}>
                                 {val}
+                                {Boolean(
+                                  opt.prices &&
+                                    opt.prices[val] &&
+                                    opt.prices[val] !== item.price,
+                                ) && (
+                                  <Text
+                                    style={[
+                                      styles.chipPriceText,
+                                      isSelected && styles.chipPriceTextSelected,
+                                    ]}>
+                                    {` (${opt.prices[val]} ${item.currency || ''})`}
+                                  </Text>
+                                )}
                               </Text>
                             </TouchableOpacity>
                           );
@@ -421,6 +441,15 @@ const styles = StyleSheet.create({
   chipTextSelected: {
     color: '#FFF',
     fontWeight: '700',
+  },
+  chipPriceText: {
+    fontSize: 10,
+    fontWeight: '400',
+    color: '#666',
+  },
+  chipPriceTextSelected: {
+    color: '#FFF',
+    fontWeight: '600',
   },
   countRow: {
     flexDirection: 'row',

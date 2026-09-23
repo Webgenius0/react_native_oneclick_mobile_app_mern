@@ -1304,26 +1304,84 @@ export default function Webview({ route, navigation }) {
               }
             } catch(_eSh) {}
 
-            // 3c. Live DOM elements (Amazon mobile/desktop, Shein, Trendyol, Zara, etc.)
+            // 3c. Prioritized DOM price extraction
             if (!price) {
-              var priceEl = document.querySelector(
-                'span.prc-dsc, .prc-dsc, .prc-box-dsc, .product-price-container .prc-dsc, ' +
-                '#corePriceDisplay_mobile_feature_div .a-offscreen, #corePrice_mobile_feature_div .a-offscreen, ' +
-                '#apex_mobile_feature_div .a-offscreen, #corePrice_feature_div .a-offscreen, #corePriceDisplay_feature_div .a-offscreen, ' +
-                '#corePriceDisplay_desktop_feature_div .a-offscreen, #corePrice_desktop .a-offscreen, ' +
-                '.apexPriceToPay .a-offscreen, #newAccordionRow .a-price .a-offscreen, #price_inside_buybox, ' +
-                '#priceblock_ourprice, #priceblock_dealprice, .a-price:not([data-a-strike="true"]) .a-offscreen, ' +
-                '.reinventPriceAccordionHeader_feature_div .a-price, .a-price.aok-align-center .a-offscreen, .a-price .a-offscreen, ' +
-                '.goods-detail-price .price, .product-price-info .discount-price, .normal-price-box .price, ' +
-                '.product-intro__price-new, .goods-price, span[class*="price-val"], div[class*="price-val"], .from-price, ' +
-                '.price-item--sale, .price-item, [data-test-id="price-current-price"], ' +
-                '#offering-price, .product-price, .pdp-price, span.price, div.price, ' +
-                '.product-intro__head-price, div.product-price-container'
-              );
-              if (priceEl && priceEl.textContent) {
-                var parsed = parsePriceAndCurrency(priceEl.textContent);
-                if (parsed.price) price = parsed.price;
-                if (parsed.currency && !currency) currency = parsed.currency;
+              var candidatePriceSelectors = [
+                '#corePriceDisplay_mobile_feature_div .priceToPay .a-offscreen',
+                '#corePrice_mobile_feature_div .priceToPay .a-offscreen',
+                '#apex_mobile_feature_div .priceToPay .a-offscreen',
+                '.priceToPay .a-offscreen',
+                '#corePriceDisplay_mobile_feature_div .a-price:not([data-a-strike="true"]) .a-offscreen',
+                '#corePrice_mobile_feature_div .a-price:not([data-a-strike="true"]) .a-offscreen',
+                '#apex_mobile_feature_div .a-price:not([data-a-strike="true"]) .a-offscreen',
+                '#corePriceDisplay_mobile_feature_div .a-price .a-offscreen',
+                '#corePrice_mobile_feature_div .a-price .a-offscreen',
+                '#apex_mobile_feature_div .a-price .a-offscreen',
+                '.reinventPricePriceToPayMargin .a-offscreen',
+                '#corePriceDisplay_desktop_feature_div .priceToPay .a-offscreen',
+                '#corePrice_desktop .priceToPay .a-offscreen',
+                '#corePriceDisplay_desktop_feature_div .a-offscreen',
+                '#corePrice_desktop .a-offscreen',
+                '#corePrice_feature_div .a-offscreen',
+                '#corePriceDisplay_feature_div .a-offscreen',
+                '.apexPriceToPay .a-offscreen',
+                '#priceblock_ourprice',
+                '#priceblock_dealprice',
+                '#priceblock_saleprice',
+                '#price_inside_buybox',
+                '#newAccordionRow .a-price .a-offscreen',
+                '.a-price:not([data-a-strike="true"]) .a-offscreen',
+                'span.prc-dsc',
+                '.prc-dsc',
+                '.prc-box-dsc',
+                '.product-price-container .prc-dsc',
+                '.goods-detail-price .price',
+                '.product-price-info .discount-price',
+                '.product-intro__price-new',
+                '.goods-price',
+                '[data-test-id="price-current-price"]',
+                '[data-qa="div-price-now"]',
+                '.priceNow',
+                '#offering-price',
+                '[itemprop="price"]',
+                '#corePriceDisplay_mobile_feature_div .a-price-whole',
+                '#corePrice_mobile_feature_div .a-price-whole',
+                '#apex_mobile_feature_div .a-price-whole',
+                '.priceToPay .a-price-whole',
+                'span[data-a-size="l"] .a-offscreen',
+                'span[data-a-size="xl"] .a-offscreen',
+                'span[data-a-size="m"] .a-offscreen',
+                '#apex_mobile_feature_div .a-price',
+                '#corePriceDisplay_mobile_feature_div .a-price',
+                '.priceToPay',
+                '[data-feature-name="corePrice"] .a-offscreen',
+                '[data-feature-name="corePriceDisplay"] .a-offscreen',
+                '[data-feature-name="apex"] .a-offscreen',
+                'span.a-color-price',
+                '.price-item--sale',
+                '.price-item',
+                '.product-price',
+                '.pdp-price'
+              ];
+
+              for (var s = 0; s < candidatePriceSelectors.length; s++) {
+                var elList = document.querySelectorAll(candidatePriceSelectors[s]);
+                for (var ei = 0; ei < elList.length; ei++) {
+                  var currEl = elList[ei];
+                  var raw = (currEl.tagName === 'META' ? currEl.getAttribute('content') : '') ||
+                            currEl.getAttribute('content') ||
+                            currEl.textContent ||
+                            currEl.innerText || '';
+                  if (raw && /\\d/.test(raw)) {
+                    var parsed = parsePriceAndCurrency(raw);
+                    if (parsed.price) {
+                      price = parsed.price;
+                      if (parsed.currency && !currency) currency = parsed.currency;
+                      break;
+                    }
+                  }
+                }
+                if (price) break;
               }
             }
 
@@ -1353,8 +1411,15 @@ export default function Webview({ route, navigation }) {
 
             // 3d. JSON-LD and Meta fallbacks
             if (!price) {
-              var metaPrice = document.querySelector('meta[property="og:price:amount"], meta[property="product:price:amount"], meta[itemprop="price"], meta[name="twitter:data1"]');
-              if (metaPrice && metaPrice.content) price = cleanText(metaPrice.content);
+              var metaPrice = document.querySelector('meta[property="og:price:amount"], meta[property="product:price:amount"], meta[itemprop="price"], meta[name="twitter:data1"], [itemprop="price"]');
+              if (metaPrice) {
+                var rawMeta = metaPrice.getAttribute('content') || metaPrice.getAttribute('value') || metaPrice.textContent || '';
+                if (rawMeta && /\\d/.test(rawMeta)) {
+                  var parsedMeta = parsePriceAndCurrency(rawMeta);
+                  if (parsedMeta.price) price = parsedMeta.price;
+                  if (parsedMeta.currency && !currency) currency = parsedMeta.currency;
+                }
+              }
             }
             if (!currency) {
               var metaCurrency = document.querySelector('meta[property="og:price:currency"], meta[property="product:price:currency"], meta[itemprop="priceCurrency"], meta[name="twitter:label1"]');
@@ -1392,19 +1457,40 @@ export default function Webview({ route, navigation }) {
 
             // 5. Options & Variants (Size, Color, Capacity, Model)
             var optionsMap = {};
-            var addOptionValue = function(dimName, val, isSelected) {
+            var addOptionValue = function(dimName, val, isSelected, explicitPrice) {
               var normName = normalizeDimName(dimName);
               if (!normName) return;
-              var cleanVal = cleanOptionValue(val);
+              if (!val) return;
+              var strVal = String(val).trim();
+
+              var optPrice = explicitPrice ? String(explicitPrice).trim() : '';
+              if (!optPrice && strVal) {
+                var pMatch = strVal.match(/[\(\[]\s*[+\-]?\s*([0-9]{1,3}(?:[., ][0-9]{3})+(?:[.,][0-9]{1,2})|[0-9]+(?:[.,][0-9]{1,2})|[0-9]+)\s*[\)\]]|[-–]\s*[$€£₺]?\s*([0-9]{1,3}(?:[., ][0-9]{3})+(?:[.,][0-9]{1,2})|[0-9]+(?:[.,][0-9]{1,2})|[0-9]+)/);
+                if (pMatch) {
+                  optPrice = pMatch[1] || pMatch[2] || '';
+                }
+              }
+
+              var cleanVal = cleanOptionValue(strVal);
               if (!cleanVal) return;
+
               if (!optionsMap[normName]) {
-                optionsMap[normName] = { name: normName, values: [], selected: '' };
+                optionsMap[normName] = { name: normName, values: [], selected: '', prices: {} };
+              }
+              if (!optionsMap[normName].prices) {
+                optionsMap[normName].prices = {};
               }
               if (optionsMap[normName].values.indexOf(cleanVal) === -1) {
                 optionsMap[normName].values.push(cleanVal);
               }
+              if (optPrice) {
+                optionsMap[normName].prices[cleanVal] = optPrice;
+              }
               if (isSelected) {
                 optionsMap[normName].selected = cleanVal;
+                if (!optionsMap[normName].prices[cleanVal] && price) {
+                  optionsMap[normName].prices[cleanVal] = String(price).trim();
+                }
               }
             };
             var setOptionSelected = function(dimName, selVal) {
@@ -1413,12 +1499,18 @@ export default function Webview({ route, navigation }) {
               var cleanVal = cleanOptionValue(selVal);
               if (!cleanVal) return;
               if (!optionsMap[normName]) {
-                optionsMap[normName] = { name: normName, values: [cleanVal], selected: cleanVal };
+                optionsMap[normName] = { name: normName, values: [cleanVal], selected: cleanVal, prices: {} };
               } else {
                 optionsMap[normName].selected = cleanVal;
                 if (optionsMap[normName].values.indexOf(cleanVal) === -1) {
                   optionsMap[normName].values.unshift(cleanVal);
                 }
+              }
+              if (!optionsMap[normName].prices) {
+                optionsMap[normName].prices = {};
+              }
+              if (price && !optionsMap[normName].prices[cleanVal]) {
+                optionsMap[normName].prices[cleanVal] = String(price).trim();
               }
             };
 
@@ -1445,13 +1537,29 @@ export default function Webview({ route, navigation }) {
               var shData = window.productIntroData || window.gbProductIntroData;
               if (shData && shData.detail) {
                 var dt = shData.detail;
+                var skuPriceMap = {};
+                if (Array.isArray(dt.skuList)) {
+                  for (var sk = 0; sk < dt.skuList.length; sk++) {
+                    var sku = dt.skuList[sk];
+                    var skP = (sku.sku_sale_price && (sku.sku_sale_price.amount || sku.sku_sale_price.usdAmount)) ||
+                              (sku.sale_price && (sku.sale_price.amount || sku.sale_price.usdAmount)) || '';
+                    if (skP && Array.isArray(sku.attr_value_id)) {
+                      for (var avid = 0; avid < sku.attr_value_id.length; avid++) {
+                        skuPriceMap[String(sku.attr_value_id[avid])] = String(skP);
+                      }
+                    }
+                  }
+                }
+
                 if (Array.isArray(dt.mainSaleAttribute)) {
                   for (var m = 0; m < dt.mainSaleAttribute.length; m++) {
                     var mItem = dt.mainSaleAttribute[m];
                     var mDim = normalizeDimName(mItem.attr_name || 'Color');
                     if (mDim && Array.isArray(mItem.attr_value_list)) {
                       for (var mv = 0; mv < mItem.attr_value_list.length; mv++) {
-                        addOptionValue(mDim, mItem.attr_value_list[mv].attr_value_name, !!mItem.attr_value_list[mv].is_default);
+                        var mValItem = mItem.attr_value_list[mv];
+                        var mPrice = skuPriceMap[String(mValItem.attr_value_id)] || '';
+                        addOptionValue(mDim, mValItem.attr_value_name, !!mValItem.is_default, mPrice);
                       }
                     }
                   }
@@ -1462,7 +1570,9 @@ export default function Webview({ route, navigation }) {
                     var saDim = normalizeDimName(saItem.attr_name || 'Size');
                     if (saDim && Array.isArray(saItem.attr_value_list)) {
                       for (var sav = 0; sav < saItem.attr_value_list.length; sav++) {
-                        addOptionValue(saDim, saItem.attr_value_list[sav].attr_value_name, !!saItem.attr_value_list[sav].is_default);
+                        var sValItem = saItem.attr_value_list[sav];
+                        var sPrice = skuPriceMap[String(sValItem.attr_value_id)] || '';
+                        addOptionValue(saDim, sValItem.attr_value_name, !!sValItem.is_default, sPrice);
                       }
                     }
                   }
@@ -1506,12 +1616,33 @@ export default function Webview({ route, navigation }) {
                   var btn = itemEl.querySelector('.a-button-text, button, span') || itemEl;
                   val = btn.textContent;
                 }
+
+                var optPrice = '';
+                var pEl = itemEl.querySelector('.twisterSwatchPrice, [class*="SwatchPrice"], [class*="swatch-price"], .a-color-secondary, .twister-price, .a-size-mini');
+                if (pEl && pEl.textContent && /\\d/.test(pEl.textContent)) {
+                  var pMatches = pEl.textContent.match(/([0-9]{1,3}(?:[., ][0-9]{3})+(?:[.,][0-9]{1,2})|[0-9]+(?:[.,][0-9]{1,2})|[0-9]+)/);
+                  if (pMatches) optPrice = pMatches[0];
+                }
+
                 var isSel = isElementActive(itemEl) || isElementActive(itemEl.parentElement);
-                addOptionValue(dimName, val, isSel);
+                addOptionValue(dimName, val, isSel, optPrice);
               }
             }
 
             // 5d. Trendyol attributes
+            if (window.__PRODUCT_DETAIL_APP_INITIAL_STATE__ && window.__PRODUCT_DETAIL_APP_INITIAL_STATE__.product) {
+              var tpP = window.__PRODUCT_DETAIL_APP_INITIAL_STATE__.product;
+              if (Array.isArray(tpP.variants)) {
+                for (var vi = 0; vi < tpP.variants.length; vi++) {
+                  var vItem = tpP.variants[vi];
+                  if (vItem && vItem.attributeValue) {
+                    var vPrice = (vItem.price && vItem.price.discountedPrice && (vItem.price.discountedPrice.value || vItem.price.discountedPrice.text)) ||
+                                 (vItem.price && vItem.price.sellingPrice && (vItem.price.sellingPrice.value || vItem.price.sellingPrice.text)) || '';
+                    addOptionValue('Size', vItem.attributeValue, !!vItem.selected, vPrice ? String(vPrice) : '');
+                  }
+                }
+              }
+            }
             var spItems = document.querySelectorAll('.sp-itm, .size-options .sp-itm, .sp-v .sp-itm, .size-item');
             for (var sp = 0; sp < spItems.length; sp++) {
               addOptionValue('Size', spItems[sp].textContent, isElementActive(spItems[sp]));
@@ -1546,7 +1677,12 @@ export default function Webview({ route, navigation }) {
               var sOpts = selBox.querySelectorAll('option');
               for (var so = 0; so < sOpts.length; so++) {
                 if (sOpts[so].value && sOpts[so].value !== '-1') {
-                  addOptionValue(selName, sOpts[so].textContent, sOpts[so].selected);
+                  var sOptPrice = sOpts[so].getAttribute('data-price') || '';
+                  if (!sOptPrice && sOpts[so].textContent) {
+                    var pSelMatch = sOpts[so].textContent.match(/[\(\[]\s*[+\-]?\s*([0-9]{1,3}(?:[., ][0-9]{3})+(?:[.,][0-9]{1,2})|[0-9]+(?:[.,][0-9]{1,2})|[0-9]+)\s*[\)\]]|[-–]\s*[$€£₺]?\s*([0-9]{1,3}(?:[., ][0-9]{3})+(?:[.,][0-9]{1,2})|[0-9]+(?:[.,][0-9]{1,2})|[0-9]+)/);
+                    if (pSelMatch) sOptPrice = pSelMatch[1] || pSelMatch[2] || '';
+                  }
+                  addOptionValue(selName, sOpts[so].textContent, sOpts[so].selected, sOptPrice);
                 }
               }
             }
@@ -1560,6 +1696,10 @@ export default function Webview({ route, navigation }) {
               var opt = optionsMap[dimKeys[dk]];
               if (opt && opt.values.length > 0 && opt.values.length <= 40) {
                 opt.selected = opt.selected || '';
+                opt.prices = opt.prices || {};
+                if (price && opt.selected && !opt.prices[opt.selected]) {
+                  opt.prices[opt.selected] = String(price).trim();
+                }
                 finalOptions.push(opt);
                 if (opt.name === 'Size') sizeObj = opt;
                 if (opt.name === 'Color') colorObj = opt;
