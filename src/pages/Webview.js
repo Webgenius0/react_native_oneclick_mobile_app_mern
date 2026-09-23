@@ -147,13 +147,23 @@ const getFallbackTitleFromUrl = (url, fallback) => {
   try {
     const parsed = url.split('?')[0].split('#')[0];
     const segments = parsed.split('/').filter(Boolean);
-    const last = segments[segments.length - 1] || '';
-    const slug = last.replace(/\.(html?|php|asp)$/i, '').replace(/-p-\d+.*$/i, '');
-    if (slug && slug.length > 3) {
-      const decoded = decodeURIComponent(slug).replace(/[-_+]/g, ' ').replace(/\s+/g, ' ').trim();
-      if (decoded.length > 3 && !/^\d+$/.test(decoded)) {
-        return decoded;
+    let asinCandidate = '';
+    for (let i = segments.length - 1; i >= 0; i--) {
+      const seg = segments[i] || '';
+      const slug = seg.replace(/\.(html?|php|asp)$/i, '').replace(/-p-\d+.*$/i, '');
+      if (slug && slug.length > 3 && !/^(dp|gp|product|d|item|items|goods)$/i.test(slug)) {
+        if (/^[a-z0-9]{8,12}$/i.test(slug) && i > 0) {
+          if (!asinCandidate) asinCandidate = slug;
+          continue;
+        }
+        const decoded = decodeURIComponent(slug).replace(/[-_+]/g, ' ').replace(/\s+/g, ' ').trim();
+        if (decoded.length > 3 && !/^\d+$/.test(decoded)) {
+          return decoded;
+        }
       }
+    }
+    if (asinCandidate) {
+      return asinCandidate;
     }
   } catch (_e) {}
   return '';
@@ -1065,6 +1075,7 @@ export default function Webview({ route, navigation }) {
               if (!raw || typeof raw !== 'string') return '';
               return raw
                 .replace(/\\s*Fiyatı,\\s*Yorumları\\s*-\\s*Trendyol/gi, '')
+                .replace(/\\s*[:|-]\\s*Amazon\\.[a-z.]+(\\s*:.*)?$/gi, '')
                 .replace(/\\s*:\\s*Amazon\\.[a-z.]+/gi, '')
                 .replace(/\\s*-\\s*Amazon\\.[a-z.]+/gi, '')
                 .replace(/\\s*\\|\\s*Shein/gi, '')
@@ -1168,7 +1179,7 @@ export default function Webview({ route, navigation }) {
             // 1. Title
             var title = '';
             var titleEl = document.querySelector(
-              '#productTitle, h1#title, h1.pr-new-br span, [data-automation-id="product-title"], .product-title, .pdp-title, ' +
+              '#productTitle, #title, #title_feature_div span, #title_feature_div, [data-feature-name="title"], h1#title, h1.pr-new-br span, [data-automation-id="product-title"], .product-title, .pdp-title, ' +
               '.goods-detail-info__name, .product-intro__head-name, .product-intro__title, .goods-title, h1'
             );
             if (titleEl && titleEl.textContent && titleEl.textContent.trim()) {
@@ -1186,14 +1197,18 @@ export default function Webview({ route, navigation }) {
             var image = '';
             var imgEl = document.querySelector(
               '#landingImage, #main-image, #imgBlkFront, img.a-dynamic-image, [data-a-image-name="landingImage"], ' +
-              '#main-image-container img, .product-slide-item img, img[src*="cdn.dsmcdn.com/mnresize"], ' +
+              '#main-image-container img, #imageBlock img, #canvasImage, #ebooks-img-canvas img, .a-carousel-card img, ' +
+              'div[data-action="main-image-click"] img, div#media-canvas img, img[data-a-hires], ' +
+              'img[src*="media-amazon.com/images/I/"], img[src*="images-amazon.com/images/I/"], ' +
+              '.product-slide-item img, img[src*="cdn.dsmcdn.com/mnresize"], ' +
               'img[data-src*="cdn.dsmcdn.com/mnresize"], .product-image-gallery-viewport img, ' +
               'img[src*="media/images"], img[data-src*="media/images"], .detail-section-img, .base-product-image img, ' +
               '.gallery-container img, img.product-intro__head-main-img, img[src*="ltwebstatic.com"], img[data-src*="ltwebstatic.com"], ' +
               '.crop-image-container img, [data-test-id="product-image"] img, img.product-image'
             );
             if (imgEl) {
-              image = parseImageUrl(imgEl.getAttribute('data-old-hires')) ||
+              image = parseImageUrl(imgEl.getAttribute('data-a-hires')) ||
+                      parseImageUrl(imgEl.getAttribute('data-old-hires')) ||
                       parseImageUrl(imgEl.getAttribute('data-src')) ||
                       parseImageUrl(imgEl.getAttribute('data-original')) ||
                       parseImageUrl(imgEl.getAttribute('data-a-dynamic-image')) ||
@@ -1294,9 +1309,11 @@ export default function Webview({ route, navigation }) {
               var priceEl = document.querySelector(
                 'span.prc-dsc, .prc-dsc, .prc-box-dsc, .product-price-container .prc-dsc, ' +
                 '#corePriceDisplay_mobile_feature_div .a-offscreen, #corePrice_mobile_feature_div .a-offscreen, ' +
+                '#apex_mobile_feature_div .a-offscreen, #corePrice_feature_div .a-offscreen, #corePriceDisplay_feature_div .a-offscreen, ' +
                 '#corePriceDisplay_desktop_feature_div .a-offscreen, #corePrice_desktop .a-offscreen, ' +
                 '.apexPriceToPay .a-offscreen, #newAccordionRow .a-price .a-offscreen, #price_inside_buybox, ' +
                 '#priceblock_ourprice, #priceblock_dealprice, .a-price:not([data-a-strike="true"]) .a-offscreen, ' +
+                '.reinventPriceAccordionHeader_feature_div .a-price, .a-price.aok-align-center .a-offscreen, .a-price .a-offscreen, ' +
                 '.goods-detail-price .price, .product-price-info .discount-price, .normal-price-box .price, ' +
                 '.product-intro__price-new, .goods-price, span[class*="price-val"], div[class*="price-val"], .from-price, ' +
                 '.price-item--sale, .price-item, [data-test-id="price-current-price"], ' +
@@ -1307,6 +1324,30 @@ export default function Webview({ route, navigation }) {
                 var parsed = parsePriceAndCurrency(priceEl.textContent);
                 if (parsed.price) price = parsed.price;
                 if (parsed.currency && !currency) currency = parsed.currency;
+              }
+            }
+
+            // 3c-2. JSON-LD schema price check (Amazon, Shopify, etc.)
+            if (!price) {
+              var jsonLdPriceScripts = document.querySelectorAll('script[type="application/ld+json"]');
+              for (var jld = 0; jld < jsonLdPriceScripts.length; jld++) {
+                try {
+                  var ldPriceData = JSON.parse(jsonLdPriceScripts[jld].textContent);
+                  var ldPriceArr = Array.isArray(ldPriceData) ? ldPriceData : [ldPriceData];
+                  for (var kld = 0; kld < ldPriceArr.length; kld++) {
+                    var pItem = ldPriceArr[kld];
+                    var offers = pItem && (pItem.offers || (pItem['@graph'] && Array.isArray(pItem['@graph']) && pItem['@graph'].find(function(g) { return g.offers; }) ? pItem['@graph'].find(function(g) { return g.offers; }).offers : null));
+                    if (offers) {
+                      var offer = Array.isArray(offers) ? offers[0] : offers;
+                      if (offer && offer.price) {
+                        price = String(offer.price).trim();
+                        if (offer.priceCurrency && !currency) currency = String(offer.priceCurrency).trim();
+                        break;
+                      }
+                    }
+                  }
+                } catch(_eLd) {}
+                if (price) break;
               }
             }
 
@@ -1529,7 +1570,7 @@ export default function Webview({ route, navigation }) {
 
             var isProduct = (function() {
               var pLoc = window.location.href || '';
-              var pPath = (window.location.pathname || '').toLowerCase().replace(/\/+$/, '');
+              var pPath = (window.location.pathname || '').toLowerCase().replace(new RegExp('/+$'), '');
               var pHost = (window.location.hostname || '').toLowerCase();
 
               // Explicit non-product pages
@@ -1561,7 +1602,7 @@ export default function Webview({ route, navigation }) {
 
               // Amazon specific
               if (pHost.indexOf('amazon.') > -1) {
-                if (/\/(dp|gp\/product|d)\/[a-z0-9]{8,12}/i.test(pPath)) return true;
+                if (new RegExp('/(dp|gp/product|d)/[a-z0-9]{8,12}', 'i').test(pPath)) return true;
                 if (document.querySelector('#add-to-cart-button, #buy-now-button, #ppd, #dp')) return true;
                 return false;
               }
@@ -1569,14 +1610,14 @@ export default function Webview({ route, navigation }) {
               // Shein specific
               if (pHost.indexOf('shein.') > -1) {
                 if (window.productIntroData || window.gbProductIntroData) return true;
-                if (/-p-\d+\.html/i.test(pPath) || pPath.indexOf('/goods-p-') > -1 || pPath.indexOf('/item/') > -1) return true;
+                if (new RegExp('-p-[0-9]+\\\\.html', 'i').test(pPath) || pPath.indexOf('/goods-p-') > -1 || pPath.indexOf('/item/') > -1) return true;
                 if (document.querySelector('.product-intro__add-btn, .shein-add-to-cart')) return true;
                 return false;
               }
 
               // Hepsiburada specific
               if (pHost.indexOf('hepsiburada.') > -1) {
-                if (/-p-[a-z0-9]+/i.test(pPath) || /-pm-[a-z0-9]+/i.test(pPath)) return true;
+                if (new RegExp('-p-[a-z0-9]+', 'i').test(pPath) || new RegExp('-pm-[a-z0-9]+', 'i').test(pPath)) return true;
                 if (document.querySelector('#addToCart, [data-test-id="addToCart"]')) return true;
                 return false;
               }
@@ -1630,11 +1671,11 @@ export default function Webview({ route, navigation }) {
                 'button[id*="add-to-cart"], button[class*="add-to-cart"]'
               )) return true;
 
-              if (document.querySelector('#productTitle, h1#title, .product-title, .pdp-title, .goods-detail-info__name')) {
+              if (document.querySelector('#productTitle, #title, #title_feature_div span, #title_feature_div, [data-feature-name="title"], h1#title, .product-title, .pdp-title, .goods-detail-info__name')) {
                 return true;
               }
 
-              if (/\/(products?|items?|goods|p)\/[^/?#]+/i.test(pPath) || /-p-\d+/i.test(pPath)) {
+              if (new RegExp('/(products?|items?|goods|p)/[^/?#]+', 'i').test(pPath) || new RegExp('-p-[0-9]+', 'i').test(pPath)) {
                 return true;
               }
 
@@ -1820,14 +1861,18 @@ export default function Webview({ route, navigation }) {
 
     const finalStore = getStoreName(currentUrlRef.current, freshSnapshot?.store || route?.params?.ad);
 
+    const resolvedImage = finalImage || freshSnapshot?.image || imageRef.current || '';
+    const resolvedPrice = freshSnapshot?.price || priceRef.current || '';
+    const resolvedCurrency = freshSnapshot?.currency || currencyRef.current || 'TL';
+
     addItem({
       title: finalTitle,
       url: currentUrlRef.current,
       count: 1,
       checked: true,
-      image: finalImage,
-      price: priceRef.current,
-      currency: currencyRef.current,
+      image: resolvedImage,
+      price: resolvedPrice,
+      currency: resolvedCurrency,
       store: finalStore,
       options: finalOptions,
       hasSize: hasSize,

@@ -109,7 +109,7 @@ export const getMetaTagImage = page_url => {
             val = keys[0];
           }
         } catch(e) {
-          var match = val.match(/https?:\/\/[^"\\s\\\\]+/);
+          var match = val.match(new RegExp('https?://[^"\\\\s\\\\\\\\]+'));
           if (match) val = match[0];
         }
       }
@@ -126,14 +126,18 @@ export const getMetaTagImage = page_url => {
         // 1. Primary DOM Product Selectors (Mobile/Desktop galleries)
         var imgEl = document.querySelector(
           '#landingImage, #main-image, #imgBlkFront, img.a-dynamic-image, [data-a-image-name="landingImage"], ' +
-          '#main-image-container img, .product-slide-item img, img[src*="cdn.dsmcdn.com/mnresize"], ' +
+          '#main-image-container img, #imageBlock img, #canvasImage, #ebooks-img-canvas img, .a-carousel-card img, ' +
+          'div[data-action="main-image-click"] img, div#media-canvas img, img[data-a-hires], ' +
+          'img[src*="media-amazon.com/images/I/"], img[src*="images-amazon.com/images/I/"], ' +
+          '.product-slide-item img, img[src*="cdn.dsmcdn.com/mnresize"], ' +
           'img[data-src*="cdn.dsmcdn.com/mnresize"], .product-image-gallery-viewport img, ' +
           'img[src*="media/images"], img[data-src*="media/images"], .detail-section-img, .base-product-image img, ' +
           '.gallery-container img, img.product-intro__head-main-img, .crop-image-container img, ' +
           '[data-test-id="product-image"] img, img.product-image'
         );
         if (imgEl) {
-          var candDom = parseImageUrl(imgEl.getAttribute('data-old-hires')) ||
+          var candDom = parseImageUrl(imgEl.getAttribute('data-a-hires')) ||
+                         parseImageUrl(imgEl.getAttribute('data-old-hires')) ||
                          parseImageUrl(imgEl.getAttribute('data-src')) ||
                          parseImageUrl(imgEl.getAttribute('data-original')) ||
                          parseImageUrl(imgEl.getAttribute('data-a-dynamic-image')) ||
@@ -209,6 +213,7 @@ export const getMetaTagTitle = page_url => {
       if (!raw || typeof raw !== 'string') return '';
       return raw
         .replace(/\\s*Fiyatı,\\s*Yorumları\\s*-\\s*Trendyol/gi, '')
+        .replace(/\\s*[:|-]\\s*Amazon\\.[a-z.]+(\\s*:.*)?$/gi, '')
         .replace(/\\s*:\\s*Amazon\\.[a-z.]+/gi, '')
         .replace(/\\s*-\\s*Amazon\\.[a-z.]+/gi, '')
         .replace(/\\s*\\|\\s*Shein/gi, '')
@@ -220,7 +225,7 @@ export const getMetaTagTitle = page_url => {
       attempts++;
       try {
         var title = '';
-        var titleEl = document.querySelector('#productTitle, h1#title, h1.pr-new-br span, [data-automation-id="product-title"], .product-title, .pdp-title, .goods-detail-info__name, .product-intro__head-name, .product-intro__title, .goods-title');
+        var titleEl = document.querySelector('#productTitle, #title, #title_feature_div span, #title_feature_div, [data-feature-name="title"], h1#title, h1.pr-new-br span, [data-automation-id="product-title"], .product-title, .pdp-title, .goods-detail-info__name, .product-intro__head-name, .product-intro__title, .goods-title');
         if (titleEl && titleEl.textContent && titleEl.textContent.trim()) {
           title = cleanTitle(titleEl.textContent.trim());
         }
@@ -343,9 +348,11 @@ export const getMetaTagPriceAndCurrency = page_url => {
           priceEl = document.querySelector(
             'span.prc-dsc, .prc-dsc, .prc-box-dsc, .product-price-container .prc-dsc, ' +
             '#corePriceDisplay_mobile_feature_div .a-offscreen, #corePrice_mobile_feature_div .a-offscreen, ' +
+            '#apex_mobile_feature_div .a-offscreen, #corePrice_feature_div .a-offscreen, #corePriceDisplay_feature_div .a-offscreen, ' +
             '#corePriceDisplay_desktop_feature_div .a-offscreen, #corePrice_desktop .a-offscreen, ' +
             '.apexPriceToPay .a-offscreen, #newAccordionRow .a-price .a-offscreen, #price_inside_buybox, ' +
             '#priceblock_ourprice, #priceblock_dealprice, .a-price:not([data-a-strike="true"]) .a-offscreen, ' +
+            '.reinventPriceAccordionHeader_feature_div .a-price, .a-price.aok-align-center .a-offscreen, .a-price .a-offscreen, ' +
             '.goods-detail-price .price, .product-price-info .discount-price, .normal-price-box .price, ' +
             '.product-intro__price-new, .goods-price, span[class*="price-val"], div[class*="price-val"], .from-price, ' +
             '.price-item--sale, .price-item, [data-test-id="price-current-price"], ' +
@@ -356,6 +363,30 @@ export const getMetaTagPriceAndCurrency = page_url => {
             var parsed = parsePriceAndCurrency(priceEl.textContent);
             if (parsed.price) price = parsed.price;
             if (parsed.currency && !currency) currency = parsed.currency;
+          }
+        }
+
+        // 2b. JSON-LD schema price check (Amazon, Shopify, etc.)
+        if (!price) {
+          var jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
+          for (var jld = 0; jld < jsonLdScripts.length; jld++) {
+            try {
+              var ldData = JSON.parse(jsonLdScripts[jld].textContent);
+              var ldArr = Array.isArray(ldData) ? ldData : [ldData];
+              for (var kld = 0; kld < ldArr.length; kld++) {
+                var item = ldArr[kld];
+                var offers = item && (item.offers || (item['@graph'] && Array.isArray(item['@graph']) && item['@graph'].find(function(g) { return g.offers; }) ? item['@graph'].find(function(g) { return g.offers; }).offers : null));
+                if (offers) {
+                  var offer = Array.isArray(offers) ? offers[0] : offers;
+                  if (offer && offer.price) {
+                    price = String(offer.price).trim();
+                    if (offer.priceCurrency && !currency) currency = String(offer.priceCurrency).trim();
+                    break;
+                  }
+                }
+              }
+            } catch(_eLd) {}
+            if (price) break;
           }
         }
 
@@ -1303,6 +1334,7 @@ export const getProductSnapshotBridge = page_url => {
           if (!raw || typeof raw !== 'string') return '';
           return raw
             .replace(/\\s*Fiyatı,\\s*Yorumları\\s*-\\s*Trendyol/gi, '')
+            .replace(/\\s*[:|-]\\s*Amazon\\.[a-z.]+(\\s*:.*)?$/gi, '')
             .replace(/\\s*:\\s*Amazon\\.[a-z.]+/gi, '')
             .replace(/\\s*-\\s*Amazon\\.[a-z.]+/gi, '')
             .replace(/\\s*\\|\\s*Shein/gi, '')
@@ -1310,7 +1342,7 @@ export const getProductSnapshotBridge = page_url => {
             .trim();
         };
 
-        var titleEl = document.querySelector('#productTitle, h1#title, h1.pr-new-br span, [data-automation-id="product-title"], .product-title, .pdp-title, .goods-detail-info__name, .product-intro__head-name, .product-intro__title, .goods-title');
+        var titleEl = document.querySelector('#productTitle, #title, #title_feature_div span, #title_feature_div, [data-feature-name="title"], h1#title, h1.pr-new-br span, [data-automation-id="product-title"], .product-title, .pdp-title, .goods-detail-info__name, .product-intro__head-name, .product-intro__title, .goods-title');
         if (titleEl && titleEl.textContent && titleEl.textContent.trim()) {
           snapshot.title = cleanTitle(titleEl.textContent.trim());
         }
@@ -1378,14 +1410,18 @@ export const getProductSnapshotBridge = page_url => {
 
         var imgEl = document.querySelector(
           '#landingImage, #main-image, #imgBlkFront, img.a-dynamic-image, [data-a-image-name="landingImage"], ' +
-          '#main-image-container img, .product-slide-item img, img[src*="cdn.dsmcdn.com/mnresize"], ' +
+          '#main-image-container img, #imageBlock img, #canvasImage, #ebooks-img-canvas img, .a-carousel-card img, ' +
+          'div[data-action="main-image-click"] img, div#media-canvas img, img[data-a-hires], ' +
+          'img[src*="media-amazon.com/images/I/"], img[src*="images-amazon.com/images/I/"], ' +
+          '.product-slide-item img, img[src*="cdn.dsmcdn.com/mnresize"], ' +
           'img[data-src*="cdn.dsmcdn.com/mnresize"], .product-image-gallery-viewport img, ' +
           'img[src*="media/images"], img[data-src*="media/images"], .detail-section-img, .base-product-image img, ' +
           '.gallery-container img, img.product-intro__head-main-img, img[src*="ltwebstatic.com"], img[data-src*="ltwebstatic.com"], ' +
           '.crop-image-container img, [data-test-id="product-image"] img, img.product-image'
         );
         if (imgEl) {
-          snapshot.image = parseImageUrl(imgEl.getAttribute('data-old-hires')) ||
+          snapshot.image = parseImageUrl(imgEl.getAttribute('data-a-hires')) ||
+                           parseImageUrl(imgEl.getAttribute('data-old-hires')) ||
                            parseImageUrl(imgEl.getAttribute('data-src')) ||
                            parseImageUrl(imgEl.getAttribute('data-original')) ||
                            parseImageUrl(imgEl.getAttribute('data-a-dynamic-image')) ||
@@ -1458,9 +1494,11 @@ export const getProductSnapshotBridge = page_url => {
           var priceEl = document.querySelector(
             'span.prc-dsc, .prc-dsc, .prc-box-dsc, .product-price-container .prc-dsc, ' +
             '#corePriceDisplay_mobile_feature_div .a-offscreen, #corePrice_mobile_feature_div .a-offscreen, ' +
+            '#apex_mobile_feature_div .a-offscreen, #corePrice_feature_div .a-offscreen, #corePriceDisplay_feature_div .a-offscreen, ' +
             '#corePriceDisplay_desktop_feature_div .a-offscreen, #corePrice_desktop .a-offscreen, ' +
             '.apexPriceToPay .a-offscreen, #newAccordionRow .a-price .a-offscreen, #price_inside_buybox, ' +
             '#priceblock_ourprice, #priceblock_dealprice, .a-price:not([data-a-strike="true"]) .a-offscreen, ' +
+            '.reinventPriceAccordionHeader_feature_div .a-price, .a-price.aok-align-center .a-offscreen, .a-price .a-offscreen, ' +
             '.goods-detail-price .price, .product-price-info .discount-price, .normal-price-box .price, ' +
             '.product-intro__price-new, .goods-price, span[class*="price-val"], div[class*="price-val"], .from-price, ' +
             '.price-item--sale, .price-item, [data-test-id="price-current-price"], ' +
@@ -1471,6 +1509,30 @@ export const getProductSnapshotBridge = page_url => {
             var parsed = parsePriceAndCurrency(priceEl.textContent);
             if (parsed.price) snapshot.price = parsed.price;
             if (parsed.currency && !snapshot.currency) snapshot.currency = parsed.currency;
+          }
+        }
+
+        // 3c-2. JSON-LD schema price check (Amazon, Shopify, etc.)
+        if (!snapshot.price) {
+          var jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
+          for (var jld = 0; jld < jsonLdScripts.length; jld++) {
+            try {
+              var ldData = JSON.parse(jsonLdScripts[jld].textContent);
+              var ldArr = Array.isArray(ldData) ? ldData : [ldData];
+              for (var kld = 0; kld < ldArr.length; kld++) {
+                var item = ldArr[kld];
+                var offers = item && (item.offers || (item['@graph'] && Array.isArray(item['@graph']) && item['@graph'].find(function(g) { return g.offers; }) ? item['@graph'].find(function(g) { return g.offers; }).offers : null));
+                if (offers) {
+                  var offer = Array.isArray(offers) ? offers[0] : offers;
+                  if (offer && offer.price) {
+                    snapshot.price = String(offer.price).trim();
+                    if (offer.priceCurrency && !snapshot.currency) snapshot.currency = String(offer.priceCurrency).trim();
+                    break;
+                  }
+                }
+              }
+            } catch(_eLd) {}
+            if (snapshot.price) break;
           }
         }
 
