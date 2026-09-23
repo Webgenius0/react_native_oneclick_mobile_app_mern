@@ -40,6 +40,40 @@ export const cleanOptionValue = text => {
   return clean;
 };
 
+/**
+ * Returns true when the supplied text looks like a placeholder/prompt
+ * rather than a genuine user selection (e.g. "Select", "Choose an option",
+ * "Beden Seçiniz", "Please Select", etc.).
+ */
+export const isPlaceholderValue = text => {
+  if (!text || typeof text !== 'string') return true;
+  const val = text.replace(/[\s\-_]+/g, ' ').trim().toLowerCase();
+  if (!val) return true;
+
+  const placeholders = [
+    'select', 'choose', 'pick', 'seçiniz', 'seç', 'seçin',
+    'lütfen seçin', 'lütfen seçiniz', 'please select', 'please choose',
+    'select size', 'select color', 'select colour', 'select option',
+    'choose size', 'choose color', 'choose colour', 'choose option',
+    'pick a size', 'pick a color', 'pick a colour',
+    'beden seçiniz', 'renk seçiniz', 'boyut seçiniz',
+    'beden seç', 'renk seç',
+    'select a size', 'select a color', 'select a colour',
+    'choose a size', 'choose a color', 'choose a colour',
+    '-- please select --', '- please select -',
+    '-- select --', '- select -',
+  ];
+
+  for (let i = 0; i < placeholders.length; i++) {
+    if (val === placeholders[i]) return true;
+  }
+
+  // Catch patterns like "Select ___" or "Choose ___"
+  if (/^(select|choose|pick|seç|seçiniz|lütfen)\b/i.test(val)) return true;
+
+  return false;
+};
+
 export const normalizeDimName = rawName => {
   if (!rawName || typeof rawName !== 'string') return null;
   const n = cleanText(rawName);

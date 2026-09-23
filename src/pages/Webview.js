@@ -14,6 +14,7 @@ import { useWebviewStore } from '../store/useWebviewStore';
 import { userAgent } from '../helpers/webview';
 import { injectedJavascript } from '../helpers/webview1';
 import { getStoreName, isProductUrl } from '../helpers/storeHelper';
+import { isPlaceholderValue } from '../helpers/variantUtils';
 import { t } from '../translate/i18n';
 
 const styles = StyleSheet.create({
@@ -114,14 +115,22 @@ const isDifferentProduct = (urlA, urlB) => {
     if (cleanA === cleanB) {
       return false;
     }
+    // Amazon ASIN match
     const asinA = cleanA.match(/\/dp\/([a-z0-9]+)/i);
     const asinB = cleanB.match(/\/dp\/([a-z0-9]+)/i);
     if (asinA && asinB && asinA[1] === asinB[1]) {
       return false;
     }
+    // Trendyol/Shein/Hepsiburada product ID match
     const pIdA = cleanA.match(/-p-(\d+)/i);
     const pIdB = cleanB.match(/-p-(\d+)/i);
     if (pIdA && pIdB && pIdA[1] === pIdB[1]) {
+      return false;
+    }
+    // Amazon gp/product ID match
+    const gpA = cleanA.match(/\/gp\/product\/([a-z0-9]+)/i);
+    const gpB = cleanB.match(/\/gp\/product\/([a-z0-9]+)/i);
+    if (gpA && gpB && gpA[1] === gpB[1]) {
       return false;
     }
   } catch (_e) {}
@@ -1666,11 +1675,11 @@ export default function Webview({ route, navigation }) {
       const [resolvedOpts, resolvedSnapshot] = await Promise.all([
         Promise.race([
           optionPromise,
-          new Promise(resolve => setTimeout(() => resolve(null), 2500)),
+          new Promise(resolve => setTimeout(() => resolve(null), 3500)),
         ]),
         Promise.race([
           snapshotPromise,
-          new Promise(resolve => setTimeout(() => resolve(null), 2500)),
+          new Promise(resolve => setTimeout(() => resolve(null), 3500)),
         ]),
       ]);
 
@@ -1687,31 +1696,53 @@ export default function Webview({ route, navigation }) {
       if (freshSnapshot.currency) currencyRef.current = freshSnapshot.currency;
     }
 
-    const isStoreOrInvalidTitle = title => {
-      if (!title || typeof title !== 'string') return true;
-      const clean = title.trim().toLowerCase();
-      const storeParam = String(route?.params?.ad || '').trim().toLowerCase();
-      if (!clean || clean === 'product' || clean === 'oneclick' || clean === '-' || clean === storeParam) return true;
-      if (clean.includes('trendyol') && (clean.includes('fashion') || clean.includes('home') || clean.includes('electronics') || clean.includes('beauty') || clean.includes('online alisveris') || clean.includes('online alışveriş'))) return true;
-      if (clean.includes('amazon') && (clean.includes('online shopping') || clean.includes('prices') || clean.includes('spend less'))) return true;
-      if (clean.includes('shein') && (clean.includes('online fashion') || clean.includes('women clothing'))) return true;
-      return false;
-    };
+    // --- Determine whether the current page is a product page ---
+    const snapshotIsProduct = freshSnapshot?.isProduct;
+    const urlIsProduct = isProductUrl(currentUrlRef.current);
+    // Only block when BOTH signals agree this is NOT a product page
+    const pageIsProduct = snapshotIsProduct === true || urlIsProduct === true ||
+      (snapshotIsProduct === undefined && urlIsProduct === undefined);
 
-    const finalTitle = titleRef.current || getFallbackTitleFromUrl(currentUrlRef.current, '');
-    const finalImage = (imageRef.current || '').trim();
-
-    // Validate that current page is a real product page and has real product details
-    const pageIsProduct = freshSnapshot?.isProduct !== undefined
-      ? Boolean(freshSnapshot.isProduct)
-      : isProductUrl(currentUrlRef.current);
-
-    if (!pageIsProduct || isStoreOrInvalidTitle(finalTitle) || !finalImage) {
+    if (!pageIsProduct) {
       Alert.alert(
         t('Uyarı') || 'Uyarı',
         t('gecersizUrunSayfasi') ||
           'Sadece ürün detay sayfaları sepete eklenebilir. Lütfen bir ürün sayfasına gidip tekrar deneyiniz.',
-        [{ text: t('Tamam') || 'Tamam' }]
+        [{ text: t('Tamam') || 'Tamam' }],
+      );
+      return;
+    }
+
+    // --- Validate product data ---
+    const finalTitle = titleRef.current || getFallbackTitleFromUrl(currentUrlRef.current, '');
+    const finalImage = (imageRef.current || '').trim();
+
+    // Only block for truly generic / site-level titles (no product name at all)
+    const isGenericTitle = (title) => {
+      if (!title || typeof title !== 'string') return true;
+      const clean = title.trim().toLowerCase();
+      if (!clean || clean === 'product' || clean === 'oneclick' || clean === '-') return true;
+      // Pure store homepage titles (no product name mixed in)
+      const genericPatterns = [
+        /^trendyol\s*[-–|:]?\s*(fashion|home|electronics|beauty|online al[ıi][sş]veri[sş]|en uygun fiyat)/i,
+        /^amazon\s*[-–|.]?\s*(com|ae|sa|de|co\.uk)?\s*[-–|:]?\s*(online shopping|spend less|smile more|low prices)?\s*$/i,
+        /^shein\s*[-–|:]?\s*(online fashion|women'?s? clothing|affordable)/i,
+        /^hepsiburada\s*[-–|:]?/i,
+        /^noon\s*[-–|:]?\s*(online shopping)?\s*$/i,
+      ];
+      for (const pat of genericPatterns) {
+        if (pat.test(clean)) return true;
+      }
+      return false;
+    };
+
+    if (isGenericTitle(finalTitle) && !finalImage) {
+      // Both title and image are missing/generic — likely not on a real product
+      Alert.alert(
+        t('Uyarı') || 'Uyarı',
+        t('gecersizUrunSayfasi') ||
+          'Sadece ürün detay sayfaları sepete eklenebilir. Lütfen bir ürün sayfasına gidip tekrar deneyiniz.',
+        [{ text: t('Tamam') || 'Tamam' }],
       );
       return;
     }
@@ -1746,7 +1777,7 @@ export default function Webview({ route, navigation }) {
       finalOptions.forEach(opt => {
         if (opt && Array.isArray(opt.values) && opt.values.length > 1) {
           const sel = (opt.selected || '').trim();
-          if (!sel) {
+          if (!sel || isPlaceholderValue(sel)) {
             const optName = opt.name || 'Option';
             if (!missingOptions.includes(optName)) {
               missingOptions.push(optName);
@@ -1756,13 +1787,13 @@ export default function Webview({ route, navigation }) {
       });
     }
 
-    if (hasSize && sizes.length > 1 && !selectedSize) {
+    if (hasSize && sizes.length > 1 && (!selectedSize || isPlaceholderValue(selectedSize))) {
       if (!missingOptions.includes('Size')) {
         missingOptions.push('Size');
       }
     }
 
-    if (hasColor && colors.length > 1 && !selectedColor) {
+    if (hasColor && colors.length > 1 && (!selectedColor || isPlaceholderValue(selectedColor))) {
       if (!missingOptions.includes('Color')) {
         missingOptions.push('Color');
       }
