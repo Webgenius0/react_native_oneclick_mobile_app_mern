@@ -98,12 +98,23 @@ export const normalizeCartItem = item => {
     }
   }
 
-  // Keep selected value clean without blindly picking values[0]
-  options = options.map(opt => ({
-    ...opt,
-    selected: opt.selected ? String(opt.selected).trim() : '',
-    prices: opt.prices || {},
-  }));
+  // Keep selected value clean and ensure values only contains selected value if selected
+  options = options.map(opt => {
+    const sel = opt.selected ? String(opt.selected).trim() : '';
+    return {
+      ...opt,
+      selected: sel,
+      values: sel ? [sel] : (Array.isArray(opt.values) ? opt.values : []),
+      prices: opt.prices || {},
+    };
+  });
+
+  if (size) {
+    sizes = [size];
+  }
+  if (color) {
+    colors = [color];
+  }
 
   const itemKey = item.id || generateItemKey({ ...item, size, color, options });
 

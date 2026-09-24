@@ -283,6 +283,43 @@ export const getMetaTagPriceAndCurrency = page_url => {
         var price = '';
         var currency = '';
 
+        var isStruckOrOldPriceElement = function(el) {
+          if (!el) return false;
+          try {
+            if (el.tagName === 'DEL' || el.tagName === 'S' || el.tagName === 'STRIKE') return true;
+            if (el.getAttribute && el.getAttribute('data-a-strike') === 'true') return true;
+            var cls = String(el.className || '');
+            if (/\\b(prc-org|prc-box-org|prc-slg|a-text-price|basisPrice|line-through|crossed)\\b/i.test(cls)) return true;
+            if (/\\b(original-price|originalPrice|orig-price|old-price|oldPrice|oldprice|was-price|wasPrice|price-was)\\b/i.test(cls)) return true;
+            if (el.closest && el.closest('del, s, strike, [data-a-strike="true"], .a-text-price, .basisPrice, .prc-org, .prc-box-org, [class*="original-price"], [class*="old-price"], [class*="was-price"]')) {
+              return true;
+            }
+          } catch(_e) {}
+          return false;
+        };
+
+        var getCleanElementPriceText = function(el) {
+          if (!el) return '';
+          if (isStruckOrOldPriceElement(el)) return '';
+          if (el.tagName === 'META') return el.getAttribute('content') || '';
+          try {
+            var clone = el.cloneNode(true);
+            var oldNodes = clone.querySelectorAll(
+              'del, s, strike, [data-a-strike="true"], .a-text-price, .basisPrice, .prc-org, .prc-box-org, .prc-slg, ' +
+              '[class*="original-price"], [class*="originalPrice"], [class*="orig-price"], ' +
+              '[class*="old-price"], [class*="oldPrice"], [class*="oldprice"], ' +
+              '[class*="was-price"], [class*="wasPrice"], [class*="price-was"], ' +
+              '[class*="strike"], [class*="line-through"], [class*="crossed"]'
+            );
+            for (var oi = 0; oi < oldNodes.length; oi++) {
+              oldNodes[oi].remove();
+            }
+            return clone.textContent || clone.innerText || '';
+          } catch(_eClone) {
+            return el.textContent || el.innerText || '';
+          }
+        };
+
         var parsePriceAndCurrency = function(rawText) {
           if (!rawText || typeof rawText !== 'string') return { price: '', currency: '' };
           var t = rawText.replace(/\\s+/g, ' ').trim();
@@ -298,131 +335,141 @@ export const getMetaTagPriceAndCurrency = page_url => {
           t = t.replace(/[-–]?[ \\t]*[0-9]+(?:\\.[0-9]+)?[ \\t]*%[ \\t]*(?:off|indirim|discount|saving|savings)?/gi, '');
           t = t.replace(/%[ \\t]*[0-9]+(?:\\.[0-9]+)?/gi, '');
           t = t.replace(/(?:save|off|indirim)[ \\t]+[0-9]+(?:\\.[0-9]+)?%?/gi, '');
+          t = t.replace(/(?:save|tasarruf|indirim|saving|savings)\\s*[$€£₺]?\\s*[0-9]+(?:[.,][0-9]{1,2})?/gi, '');
 
           // Match price numbers:
           var matches = t.match(/([0-9]{1,3}(?:[., ][0-9]{3})+(?:[.,][0-9]{1,2})(?![0-9])|[0-9]{1,3}(?:[., ][0-9]{3})+(?![0-9])|[0-9]+(?:[.,][0-9]{1,2})(?![0-9])|[0-9]+)/g);
-          var cleanPrice = (matches && matches.length > 0) ? matches[0].trim() : '';
+          if (!matches || matches.length === 0) return { price: '', currency: detectedCurr };
 
+          // If multiple prices exist in text (e.g. was 50 now 35), pick the last/discounted price!
+          var cleanPrice = matches[matches.length - 1].trim();
           return { price: cleanPrice, currency: detectedCurr };
         };
 
-        // 1a. Check Trendyol application state
-        try {
-          if (window.__PRODUCT_DETAIL_APP_INITIAL_STATE__ && window.__PRODUCT_DETAIL_APP_INITIAL_STATE__.product) {
-            var tpPrice = window.__PRODUCT_DETAIL_APP_INITIAL_STATE__.product.price;
-            if (tpPrice) {
-              var dPrice = tpPrice.discountedPrice;
-              var sPrice = tpPrice.sellingPrice;
-              if (dPrice) {
-                if (typeof dPrice === 'object') {
-                  price = String(dPrice.value || dPrice.text || '').trim();
-                } else {
-                  price = String(dPrice).trim();
-                }
-              } else if (sPrice) {
-                if (typeof sPrice === 'object') {
-                  price = String(sPrice.value || sPrice.text || '').trim();
-                } else {
-                  price = String(sPrice).trim();
-                }
-              }
-              if (tpPrice.currency) currency = String(tpPrice.currency).trim();
-            }
-          }
-        } catch(_eTp) {}
+        // 1. Prioritized DOM Discount / Current Price extraction (gives live on-screen discounted prices)
+        var candidatePriceSelectors = [
+          // Trendyol Discount / Campaign Prices
+          'span.prc-dsc',
+          '.prc-dsc',
+          '.prc-box-dsc',
+          '.product-price-container .prc-dsc',
+          '.basket-discount-price',
+          '.campaign-price',
+          '.badge-basket-discount',
+          '.discounted-price',
 
-        // 1b. Check Shein application state
-        try {
-          var shData = window.productIntroData || window.gbProductIntroData;
-          if (shData && shData.detail && shData.detail.salePrice) {
-            var sp = shData.detail.salePrice;
-            if (sp.amount) price = String(sp.amount).trim();
-            else if (sp.usdAmount) price = String(sp.usdAmount).trim();
-            if (sp.currency) currency = String(sp.currency).trim();
-          }
-        } catch(_eSh) {}
+          // Amazon PriceToPay / Deal / BuyBox / Non-struck Prices
+          '#corePriceDisplay_mobile_feature_div .priceToPay .a-offscreen',
+          '#corePrice_mobile_feature_div .priceToPay .a-offscreen',
+          '#apex_mobile_feature_div .priceToPay .a-offscreen',
+          '.priceToPay .a-offscreen',
+          '#corePriceDisplay_desktop_feature_div .priceToPay .a-offscreen',
+          '#corePrice_desktop .priceToPay .a-offscreen',
+          '.apexPriceToPay .a-offscreen',
+          '#priceblock_dealprice',
+          '#priceblock_saleprice',
+          '#price_inside_buybox',
+          '#corePriceDisplay_mobile_feature_div .a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
+          '#corePrice_mobile_feature_div .a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
+          '#apex_mobile_feature_div .a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
+          '.a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
+          '.reinventPricePriceToPayMargin .a-offscreen',
 
-        // 2. Prioritized DOM price extraction
+          // Shein Discounted Prices
+          '.product-intro__price-new',
+          '.goods-detail-price .discount-price',
+          '.product-price-info .discount-price',
+          '.goods-detail-price .price',
+          '.goods-price',
+
+          // Hepsiburada / Noon Current Prices
+          '[data-test-id="price-current-price"]',
+          '[data-test-id="price-discount-price"]',
+          '[data-qa="div-price-now"]',
+          '.priceNow',
+          '#offering-price',
+
+          // Generic E-Commerce / Shopify / WooCommerce Sale Prices
+          'ins .amount',
+          'ins [class*="price"]',
+          '.price-item--sale',
+          '.special-price',
+          '.sale-price',
+          '.discount-price',
+          '.discounted-price',
+          '[class*="discountPrice"]',
+          '[class*="discountedPrice"]',
+          '[class*="salePrice"]',
+          '.product-price-container',
+          '.product-price',
+          '.pdp-price'
+        ];
+
         var priceEl = null;
-        if (!price) {
-          var candidatePriceSelectors = [
-            '#corePriceDisplay_mobile_feature_div .priceToPay .a-offscreen',
-            '#corePrice_mobile_feature_div .priceToPay .a-offscreen',
-            '#apex_mobile_feature_div .priceToPay .a-offscreen',
-            '.priceToPay .a-offscreen',
-            '#corePriceDisplay_mobile_feature_div .a-price:not([data-a-strike="true"]) .a-offscreen',
-            '#corePrice_mobile_feature_div .a-price:not([data-a-strike="true"]) .a-offscreen',
-            '#apex_mobile_feature_div .a-price:not([data-a-strike="true"]) .a-offscreen',
-            '#corePriceDisplay_mobile_feature_div .a-price .a-offscreen',
-            '#corePrice_mobile_feature_div .a-price .a-offscreen',
-            '#apex_mobile_feature_div .a-price .a-offscreen',
-            '.reinventPricePriceToPayMargin .a-offscreen',
-            '#corePriceDisplay_desktop_feature_div .priceToPay .a-offscreen',
-            '#corePrice_desktop .priceToPay .a-offscreen',
-            '#corePriceDisplay_desktop_feature_div .a-offscreen',
-            '#corePrice_desktop .a-offscreen',
-            '#corePrice_feature_div .a-offscreen',
-            '#corePriceDisplay_feature_div .a-offscreen',
-            '.apexPriceToPay .a-offscreen',
-            '#priceblock_ourprice',
-            '#priceblock_dealprice',
-            '#priceblock_saleprice',
-            '#price_inside_buybox',
-            '#newAccordionRow .a-price .a-offscreen',
-            '.a-price:not([data-a-strike="true"]) .a-offscreen',
-            'span.prc-dsc',
-            '.prc-dsc',
-            '.prc-box-dsc',
-            '.product-price-container .prc-dsc',
-            '.goods-detail-price .price',
-            '.product-price-info .discount-price',
-            '.product-intro__price-new',
-            '.goods-price',
-            '[data-test-id="price-current-price"]',
-            '[data-qa="div-price-now"]',
-            '.priceNow',
-            '#offering-price',
-            '[itemprop="price"]',
-            '#corePriceDisplay_mobile_feature_div .a-price-whole',
-            '#corePrice_mobile_feature_div .a-price-whole',
-            '#apex_mobile_feature_div .a-price-whole',
-            '.priceToPay .a-price-whole',
-            'span[data-a-size="l"] .a-offscreen',
-            'span[data-a-size="xl"] .a-offscreen',
-            'span[data-a-size="m"] .a-offscreen',
-            '#apex_mobile_feature_div .a-price',
-            '#corePriceDisplay_mobile_feature_div .a-price',
-            '.priceToPay',
-            '[data-feature-name="corePrice"] .a-offscreen',
-            '[data-feature-name="corePriceDisplay"] .a-offscreen',
-            '[data-feature-name="apex"] .a-offscreen',
-            'span.a-color-price',
-            '.price-item--sale',
-            '.price-item',
-            '.product-price',
-            '.pdp-price'
-          ];
-
-          for (var s = 0; s < candidatePriceSelectors.length; s++) {
-            var elList = document.querySelectorAll(candidatePriceSelectors[s]);
-            for (var ei = 0; ei < elList.length; ei++) {
-              var currEl = elList[ei];
-              var raw = (currEl.tagName === 'META' ? currEl.getAttribute('content') : '') ||
-                        currEl.getAttribute('content') ||
-                        currEl.textContent ||
-                        currEl.innerText || '';
-              if (raw && /\\d/.test(raw)) {
-                var parsed = parsePriceAndCurrency(raw);
-                if (parsed.price) {
-                  price = parsed.price;
-                  if (parsed.currency && !currency) currency = parsed.currency;
-                  priceEl = currEl;
-                  break;
-                }
+        for (var s = 0; s < candidatePriceSelectors.length; s++) {
+          var elList = document.querySelectorAll(candidatePriceSelectors[s]);
+          for (var ei = 0; ei < elList.length; ei++) {
+            var currEl = elList[ei];
+            if (isStruckOrOldPriceElement(currEl)) continue;
+            var raw = getCleanElementPriceText(currEl);
+            if (raw && /\\d/.test(raw)) {
+              var parsed = parsePriceAndCurrency(raw);
+              if (parsed.price) {
+                price = parsed.price;
+                if (parsed.currency && !currency) currency = parsed.currency;
+                priceEl = currEl;
+                break;
               }
             }
-            if (price) break;
           }
+          if (price) break;
+        }
+
+        // 2a. Check Trendyol application state (if DOM extraction hasn't found price yet)
+        if (!price) {
+          try {
+            if (window.__PRODUCT_DETAIL_APP_INITIAL_STATE__ && window.__PRODUCT_DETAIL_APP_INITIAL_STATE__.product) {
+              var tpProd = window.__PRODUCT_DETAIL_APP_INITIAL_STATE__.product;
+              var selectedVarPrice = null;
+              if (Array.isArray(tpProd.variants)) {
+                var selVar = tpProd.variants.find(function(v) { return v && v.selected; });
+                if (selVar && selVar.price) {
+                  selectedVarPrice = selVar.price;
+                }
+              }
+              var tpPrice = selectedVarPrice || tpProd.price;
+              if (tpPrice) {
+                var dPrice = tpPrice.discountedPrice;
+                var sPrice = tpPrice.sellingPrice;
+                if (dPrice) {
+                  var dVal = typeof dPrice === 'object' ? (dPrice.value || dPrice.text || '') : dPrice;
+                  if (dVal && dVal !== '0' && dVal !== 0) {
+                    price = String(dVal).trim();
+                  }
+                }
+                if (!price && sPrice) {
+                  var sVal = typeof sPrice === 'object' ? (sPrice.value || sPrice.text || '') : sPrice;
+                  if (sVal) price = String(sVal).trim();
+                }
+                if (tpPrice.currency && !currency) currency = String(tpPrice.currency).trim();
+              }
+            }
+          } catch(_eTp) {}
+        }
+
+        // 2b. Check Shein application state
+        if (!price) {
+          try {
+            var shData = window.productIntroData || window.gbProductIntroData;
+            if (shData && shData.detail) {
+              var sp = (shData.detail.currentSku && shData.detail.currentSku.sku_sale_price) || shData.detail.salePrice;
+              if (sp) {
+                if (sp.amount) price = String(sp.amount).trim();
+                else if (sp.usdAmount) price = String(sp.usdAmount).trim();
+                if (sp.currency && !currency) currency = String(sp.currency).trim();
+              }
+            }
+          } catch(_eSh) {}
         }
 
         // 2b. JSON-LD schema price check (Amazon, Shopify, etc.)
@@ -818,7 +865,8 @@ export const getProductOptionsBridge = page_url => {
                   for (var sav = 0; sav < saItem.attr_value_list.length; sav++) {
                     var sValItem = saItem.attr_value_list[sav];
                     var sPrice = skuPriceMap[String(sValItem.attr_value_id)] || '';
-                    addOptionValue(saDim, sValItem.attr_value_name, !!sValItem.is_default, sPrice);
+                    // Do NOT use is_default for size: Shein size must only be selected if user explicitly taps it!
+                    addOptionValue(saDim, sValItem.attr_value_name, false, sPrice);
                   }
                 }
               }
@@ -836,11 +884,23 @@ export const getProductOptionsBridge = page_url => {
           addOptionValue('Color', sciVal, isSciSel);
         }
 
+        var isSheinSizeSelected = function(el) {
+          if (!el) return false;
+          if (isElementActive(el)) return true;
+          var input = el.querySelector('input[type="radio"], input[type="checkbox"]');
+          if (input && input.checked) return true;
+          var parent = el.parentElement;
+          if (parent && !/\b(list|container|wrap|choose|group|items|row|box|content)\b/i.test(parent.className || '')) {
+            if (isElementActive(parent)) return true;
+          }
+          return false;
+        };
+
         var shSizeItems = document.querySelectorAll('.goods-size__radio, .goods-size__item, .product-intro__size-choose .choose-item, div[class*="size-item"], div[class*="size_item"], .goods-size-item, div[class*="attr-radio"], .form-size-item, span[class*="val-size"]');
         for (var szi = 0; szi < shSizeItems.length; szi++) {
           var sziEl = shSizeItems[szi];
           var sziVal = sziEl.getAttribute('title') || sziEl.getAttribute('aria-label') || sziEl.textContent;
-          var isSziSel = isElementActive(sziEl) || isElementActive(sziEl.parentElement);
+          var isSziSel = isSheinSizeSelected(sziEl);
           addOptionValue('Size', sziVal, isSziSel);
         }
 
@@ -1578,6 +1638,43 @@ export const getProductSnapshotBridge = page_url => {
 
       // 3. Price & Currency
       try {
+        var isStruckOrOldPriceElement = function(el) {
+          if (!el) return false;
+          try {
+            if (el.tagName === 'DEL' || el.tagName === 'S' || el.tagName === 'STRIKE') return true;
+            if (el.getAttribute && el.getAttribute('data-a-strike') === 'true') return true;
+            var cls = String(el.className || '');
+            if (/\\b(prc-org|prc-box-org|prc-slg|a-text-price|basisPrice|line-through|crossed)\\b/i.test(cls)) return true;
+            if (/\\b(original-price|originalPrice|orig-price|old-price|oldPrice|oldprice|was-price|wasPrice|price-was)\\b/i.test(cls)) return true;
+            if (el.closest && el.closest('del, s, strike, [data-a-strike="true"], .a-text-price, .basisPrice, .prc-org, .prc-box-org, [class*="original-price"], [class*="old-price"], [class*="was-price"]')) {
+              return true;
+            }
+          } catch(_e) {}
+          return false;
+        };
+
+        var getCleanElementPriceText = function(el) {
+          if (!el) return '';
+          if (isStruckOrOldPriceElement(el)) return '';
+          if (el.tagName === 'META') return el.getAttribute('content') || '';
+          try {
+            var clone = el.cloneNode(true);
+            var oldNodes = clone.querySelectorAll(
+              'del, s, strike, [data-a-strike="true"], .a-text-price, .basisPrice, .prc-org, .prc-box-org, .prc-slg, ' +
+              '[class*="original-price"], [class*="originalPrice"], [class*="orig-price"], ' +
+              '[class*="old-price"], [class*="oldPrice"], [class*="oldprice"], ' +
+              '[class*="was-price"], [class*="wasPrice"], [class*="price-was"], ' +
+              '[class*="strike"], [class*="line-through"], [class*="crossed"]'
+            );
+            for (var oi = 0; oi < oldNodes.length; oi++) {
+              oldNodes[oi].remove();
+            }
+            return clone.textContent || clone.innerText || '';
+          } catch(_eClone) {
+            return el.textContent || el.innerText || '';
+          }
+        };
+
         var parsePriceAndCurrency = function(rawText) {
           if (!rawText || typeof rawText !== 'string') return { price: '', currency: '' };
           var t = rawText.replace(/\\s+/g, ' ').trim();
@@ -1592,120 +1689,138 @@ export const getProductSnapshotBridge = page_url => {
           t = t.replace(/[-–]?[ \\t]*[0-9]+(?:\\.[0-9]+)?[ \\t]*%[ \\t]*(?:off|indirim|discount|saving|savings)?/gi, '');
           t = t.replace(/%[ \\t]*[0-9]+(?:\\.[0-9]+)?/gi, '');
           t = t.replace(/(?:save|off|indirim)[ \\t]+[0-9]+(?:\\.[0-9]+)?%?/gi, '');
+          t = t.replace(/(?:save|tasarruf|indirim|saving|savings)\\s*[$€£₺]?\\s*[0-9]+(?:[.,][0-9]{1,2})?/gi, '');
 
           var matches = t.match(/([0-9]{1,3}(?:[., ][0-9]{3})+(?:[.,][0-9]{1,2})(?![0-9])|[0-9]{1,3}(?:[., ][0-9]{3})+(?![0-9])|[0-9]+(?:[.,][0-9]{1,2})(?![0-9])|[0-9]+)/g);
-          var cleanPrice = (matches && matches.length > 0) ? matches[0].trim() : '';
+          if (!matches || matches.length === 0) return { price: '', currency: detectedCurr };
 
+          // Pick the last/discounted price if multiple prices are present
+          var cleanPrice = matches[matches.length - 1].trim();
           return { price: cleanPrice, currency: detectedCurr };
         };
 
-        // 3a. Trendyol App State
-        try {
-          if (window.__PRODUCT_DETAIL_APP_INITIAL_STATE__ && window.__PRODUCT_DETAIL_APP_INITIAL_STATE__.product) {
-            var tpP = window.__PRODUCT_DETAIL_APP_INITIAL_STATE__.product.price;
-            if (tpP) {
-              var dP = tpP.discountedPrice;
-              var sP = tpP.sellingPrice;
-              if (dP) {
-                snapshot.price = (typeof dP === 'object') ? String(dP.value || dP.text || '').trim() : String(dP).trim();
-              } else if (sP) {
-                snapshot.price = (typeof sP === 'object') ? String(sP.value || sP.text || '').trim() : String(sP).trim();
+        // 3a. Prioritized DOM Discount / Current Price extraction
+        var candidatePriceSelectors = [
+          // Trendyol Discount / Campaign Prices
+          'span.prc-dsc',
+          '.prc-dsc',
+          '.prc-box-dsc',
+          '.product-price-container .prc-dsc',
+          '.basket-discount-price',
+          '.campaign-price',
+          '.badge-basket-discount',
+          '.discounted-price',
+
+          // Amazon PriceToPay / Deal / BuyBox / Non-struck Prices
+          '#corePriceDisplay_mobile_feature_div .priceToPay .a-offscreen',
+          '#corePrice_mobile_feature_div .priceToPay .a-offscreen',
+          '#apex_mobile_feature_div .priceToPay .a-offscreen',
+          '.priceToPay .a-offscreen',
+          '#corePriceDisplay_desktop_feature_div .priceToPay .a-offscreen',
+          '#corePrice_desktop .priceToPay .a-offscreen',
+          '.apexPriceToPay .a-offscreen',
+          '#priceblock_dealprice',
+          '#priceblock_saleprice',
+          '#price_inside_buybox',
+          '#corePriceDisplay_mobile_feature_div .a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
+          '#corePrice_mobile_feature_div .a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
+          '#apex_mobile_feature_div .a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
+          '.a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
+          '.reinventPricePriceToPayMargin .a-offscreen',
+
+          // Shein Discounted Prices
+          '.product-intro__price-new',
+          '.goods-detail-price .discount-price',
+          '.product-price-info .discount-price',
+          '.goods-detail-price .price',
+          '.goods-price',
+
+          // Hepsiburada / Noon Current Prices
+          '[data-test-id="price-current-price"]',
+          '[data-test-id="price-discount-price"]',
+          '[data-qa="div-price-now"]',
+          '.priceNow',
+          '#offering-price',
+
+          // Generic E-Commerce / Shopify / WooCommerce Sale Prices
+          'ins .amount',
+          'ins [class*="price"]',
+          '.price-item--sale',
+          '.special-price',
+          '.sale-price',
+          '.discount-price',
+          '.discounted-price',
+          '[class*="discountPrice"]',
+          '[class*="discountedPrice"]',
+          '[class*="salePrice"]',
+          '.product-price-container',
+          '.product-price',
+          '.pdp-price'
+        ];
+
+        for (var s = 0; s < candidatePriceSelectors.length; s++) {
+          var elList = document.querySelectorAll(candidatePriceSelectors[s]);
+          for (var ei = 0; ei < elList.length; ei++) {
+            var currEl = elList[ei];
+            if (isStruckOrOldPriceElement(currEl)) continue;
+            var raw = getCleanElementPriceText(currEl);
+            if (raw && /\\d/.test(raw)) {
+              var parsed = parsePriceAndCurrency(raw);
+              if (parsed.price) {
+                snapshot.price = parsed.price;
+                if (parsed.currency && !snapshot.currency) snapshot.currency = parsed.currency;
+                break;
               }
-              if (tpP.currency) snapshot.currency = String(tpP.currency).trim();
             }
           }
-        } catch(_eTp) {}
+          if (snapshot.price) break;
+        }
 
-        // 3b. Shein App State
-        try {
-          var shD = window.productIntroData || window.gbProductIntroData;
-          if (shD && shD.detail && shD.detail.salePrice) {
-            var sp = shD.detail.salePrice;
-            if (sp.amount) snapshot.price = String(sp.amount).trim();
-            else if (sp.usdAmount) snapshot.price = String(sp.usdAmount).trim();
-            if (sp.currency) snapshot.currency = String(sp.currency).trim();
-          }
-        } catch(_eSh) {}
-
-        // 3c. Prioritized DOM price extraction
+        // 3b. Trendyol App State (fallback)
         if (!snapshot.price) {
-          var candidatePriceSelectors = [
-            '#corePriceDisplay_mobile_feature_div .priceToPay .a-offscreen',
-            '#corePrice_mobile_feature_div .priceToPay .a-offscreen',
-            '#apex_mobile_feature_div .priceToPay .a-offscreen',
-            '.priceToPay .a-offscreen',
-            '#corePriceDisplay_mobile_feature_div .a-price:not([data-a-strike="true"]) .a-offscreen',
-            '#corePrice_mobile_feature_div .a-price:not([data-a-strike="true"]) .a-offscreen',
-            '#apex_mobile_feature_div .a-price:not([data-a-strike="true"]) .a-offscreen',
-            '#corePriceDisplay_mobile_feature_div .a-price .a-offscreen',
-            '#corePrice_mobile_feature_div .a-price .a-offscreen',
-            '#apex_mobile_feature_div .a-price .a-offscreen',
-            '.reinventPricePriceToPayMargin .a-offscreen',
-            '#corePriceDisplay_desktop_feature_div .priceToPay .a-offscreen',
-            '#corePrice_desktop .priceToPay .a-offscreen',
-            '#corePriceDisplay_desktop_feature_div .a-offscreen',
-            '#corePrice_desktop .a-offscreen',
-            '#corePrice_feature_div .a-offscreen',
-            '#corePriceDisplay_feature_div .a-offscreen',
-            '.apexPriceToPay .a-offscreen',
-            '#priceblock_ourprice',
-            '#priceblock_dealprice',
-            '#priceblock_saleprice',
-            '#price_inside_buybox',
-            '#newAccordionRow .a-price .a-offscreen',
-            '.a-price:not([data-a-strike="true"]) .a-offscreen',
-            'span.prc-dsc',
-            '.prc-dsc',
-            '.prc-box-dsc',
-            '.product-price-container .prc-dsc',
-            '.goods-detail-price .price',
-            '.product-price-info .discount-price',
-            '.product-intro__price-new',
-            '.goods-price',
-            '[data-test-id="price-current-price"]',
-            '[data-qa="div-price-now"]',
-            '.priceNow',
-            '#offering-price',
-            '[itemprop="price"]',
-            '#corePriceDisplay_mobile_feature_div .a-price-whole',
-            '#corePrice_mobile_feature_div .a-price-whole',
-            '#apex_mobile_feature_div .a-price-whole',
-            '.priceToPay .a-price-whole',
-            'span[data-a-size="l"] .a-offscreen',
-            'span[data-a-size="xl"] .a-offscreen',
-            'span[data-a-size="m"] .a-offscreen',
-            '#apex_mobile_feature_div .a-price',
-            '#corePriceDisplay_mobile_feature_div .a-price',
-            '.priceToPay',
-            '[data-feature-name="corePrice"] .a-offscreen',
-            '[data-feature-name="corePriceDisplay"] .a-offscreen',
-            '[data-feature-name="apex"] .a-offscreen',
-            'span.a-color-price',
-            '.price-item--sale',
-            '.price-item',
-            '.product-price',
-            '.pdp-price'
-          ];
-
-          for (var s = 0; s < candidatePriceSelectors.length; s++) {
-            var elList = document.querySelectorAll(candidatePriceSelectors[s]);
-            for (var ei = 0; ei < elList.length; ei++) {
-              var currEl = elList[ei];
-              var raw = (currEl.tagName === 'META' ? currEl.getAttribute('content') : '') ||
-                        currEl.getAttribute('content') ||
-                        currEl.textContent ||
-                        currEl.innerText || '';
-              if (raw && /\\d/.test(raw)) {
-                var parsed = parsePriceAndCurrency(raw);
-                if (parsed.price) {
-                  snapshot.price = parsed.price;
-                  if (parsed.currency && !snapshot.currency) snapshot.currency = parsed.currency;
-                  break;
+          try {
+            if (window.__PRODUCT_DETAIL_APP_INITIAL_STATE__ && window.__PRODUCT_DETAIL_APP_INITIAL_STATE__.product) {
+              var tpP = window.__PRODUCT_DETAIL_APP_INITIAL_STATE__.product;
+              var selectedVarPrice = null;
+              if (Array.isArray(tpP.variants)) {
+                var selVar = tpP.variants.find(function(v) { return v && v.selected; });
+                if (selVar && selVar.price) {
+                  selectedVarPrice = selVar.price;
                 }
               }
+              var tpPrice = selectedVarPrice || tpP.price;
+              if (tpPrice) {
+                var dP = tpPrice.discountedPrice;
+                var sP = tpPrice.sellingPrice;
+                if (dP) {
+                  var dVal = (typeof dP === 'object') ? (dP.value || dP.text || '') : dP;
+                  if (dVal && dVal !== '0' && dVal !== 0) {
+                    snapshot.price = String(dVal).trim();
+                  }
+                }
+                if (!snapshot.price && sP) {
+                  var sVal = (typeof sP === 'object') ? (sP.value || sP.text || '') : sP;
+                  if (sVal) snapshot.price = String(sVal).trim();
+                }
+                if (tpPrice.currency && !snapshot.currency) snapshot.currency = String(tpPrice.currency).trim();
+              }
             }
-            if (snapshot.price) break;
-          }
+          } catch(_eTp) {}
+        }
+
+        // 3c. Shein App State (fallback)
+        if (!snapshot.price) {
+          try {
+            var shD = window.productIntroData || window.gbProductIntroData;
+            if (shD && shD.detail) {
+              var sp = (shD.detail.currentSku && shD.detail.currentSku.sku_sale_price) || shD.detail.salePrice;
+              if (sp) {
+                if (sp.amount) snapshot.price = String(sp.amount).trim();
+                else if (sp.usdAmount) snapshot.price = String(sp.usdAmount).trim();
+                if (sp.currency && !snapshot.currency) snapshot.currency = String(sp.currency).trim();
+              }
+            }
+          } catch(_eSh) {}
         }
 
         // 3c-2. JSON-LD schema price check (Amazon, Shopify, etc.)

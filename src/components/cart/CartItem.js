@@ -143,64 +143,47 @@ const CartItem = ({
               {/* Dynamic Product Options (Model, Weight, Size, Color, etc.) */}
               {Array.isArray(item?.options) && item.options.length > 0 ? (
                 item.options.map((opt, optIdx) => {
-                  if (
-                    !opt ||
-                    !opt.name ||
-                    !Array.isArray(opt.values) ||
-                    opt.values.length === 0
-                  ) {
+                  if (!opt || !opt.name) {
                     return null;
                   }
+                  const selectedVal = (opt.selected || (Array.isArray(opt.values) && opt.values.length === 1 ? opt.values[0] : '') || '').trim();
                   return (
                     <View key={optIdx} style={styles.optionContainer}>
                       <View style={styles.optionHeaderRow}>
                         <Text style={styles.optionLabel}>{opt.name}:</Text>
-                        {Boolean(opt.selected) && (
-                          <Text style={styles.optionSelectedValue}>
-                            {opt.selected}
-                          </Text>
-                        )}
+                        {Boolean(selectedVal) ? (
+                          <View style={styles.selectedBadge}>
+                            <Text style={styles.selectedBadgeText}>
+                              {selectedVal}
+                              {Boolean(
+                                opt.prices &&
+                                  opt.prices[selectedVal] &&
+                                  opt.prices[selectedVal] !== item.price,
+                              ) && (
+                                <Text style={styles.badgePriceText}>
+                                  {` (${opt.prices[selectedVal]} ${item.currency || ''})`}
+                                </Text>
+                              )}
+                            </Text>
+                          </View>
+                        ) : null}
                       </View>
-                      <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.chipsScrollContent}>
-                        {opt.values.map((val, valIdx) => {
-                          const isSelected =
-                            String(opt.selected || '').trim().toLowerCase() ===
-                            String(val).trim().toLowerCase();
-                          return (
+                      {/* Only show selection choices if no option is selected yet */}
+                      {!selectedVal && Array.isArray(opt.values) && opt.values.length > 0 && (
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          contentContainerStyle={styles.chipsScrollContent}>
+                          {opt.values.map((val, valIdx) => (
                             <TouchableOpacity
                               key={valIdx}
                               onPress={() => changeOption(opt.name, val)}
-                              style={[
-                                styles.chip,
-                                isSelected && styles.chipSelected,
-                              ]}>
-                              <Text
-                                style={[
-                                  styles.chipText,
-                                  isSelected && styles.chipTextSelected,
-                                ]}>
-                                {val}
-                                {Boolean(
-                                  opt.prices &&
-                                    opt.prices[val] &&
-                                    opt.prices[val] !== item.price,
-                                ) && (
-                                  <Text
-                                    style={[
-                                      styles.chipPriceText,
-                                      isSelected && styles.chipPriceTextSelected,
-                                    ]}>
-                                    {` (${opt.prices[val]} ${item.currency || ''})`}
-                                  </Text>
-                                )}
-                              </Text>
+                              style={styles.chip}>
+                              <Text style={styles.chipText}>{val}</Text>
                             </TouchableOpacity>
-                          );
-                        })}
-                      </ScrollView>
+                          ))}
+                        </ScrollView>
+                      )}
                     </View>
                   );
                 })
@@ -209,43 +192,38 @@ const CartItem = ({
                   {/* Conditional Size Option */}
                   {Boolean(item?.hasSize) && (
                     <View style={styles.optionContainer}>
-                      <Text style={styles.optionLabel}>{t('Beden')}:</Text>
-                      {Array.isArray(item.sizes) && item.sizes.length > 0 ? (
-                        <ScrollView
-                          horizontal
-                          showsHorizontalScrollIndicator={false}
-                          contentContainerStyle={styles.chipsScrollContent}>
-                          {item.sizes.map((s, idx) => {
-                            const isSelected =
-                              String(item.size || '').trim() ===
-                              String(s).trim();
-                            return (
+                      <View style={styles.optionHeaderRow}>
+                        <Text style={styles.optionLabel}>{t('Beden')}:</Text>
+                        {Boolean(item?.size) && (
+                          <View style={styles.selectedBadge}>
+                            <Text style={styles.selectedBadgeText}>{item.size}</Text>
+                          </View>
+                        )}
+                      </View>
+                      {!item?.size && (
+                        Array.isArray(item.sizes) && item.sizes.length > 0 ? (
+                          <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.chipsScrollContent}>
+                            {item.sizes.map((s, idx) => (
                               <TouchableOpacity
                                 key={idx}
                                 onPress={() => changeItem('size', s)}
-                                style={[
-                                  styles.chip,
-                                  isSelected && styles.chipSelected,
-                                ]}>
-                                <Text
-                                  style={[
-                                    styles.chipText,
-                                    isSelected && styles.chipTextSelected,
-                                  ]}>
-                                  {s}
-                                </Text>
+                                style={styles.chip}>
+                                <Text style={styles.chipText}>{s}</Text>
                               </TouchableOpacity>
-                            );
-                          })}
-                        </ScrollView>
-                      ) : (
-                        <TextInput
-                          style={styles.input}
-                          value={item?.size ?? ''}
-                          placeholder={t('Beden')}
-                          placeholderTextColor={'#8f8f8f'}
-                          onChangeText={text => changeItem('size', text)}
-                        />
+                            ))}
+                          </ScrollView>
+                        ) : (
+                          <TextInput
+                            style={styles.input}
+                            value={item?.size ?? ''}
+                            placeholder={t('Beden')}
+                            placeholderTextColor={'#8f8f8f'}
+                            onChangeText={text => changeItem('size', text)}
+                          />
+                        )
                       )}
                     </View>
                   )}
@@ -253,45 +231,40 @@ const CartItem = ({
                   {/* Conditional Color Option */}
                   {Boolean(item?.hasColor) && (
                     <View style={styles.optionContainer}>
-                      <Text style={styles.optionLabel}>
-                        {t('Renk') || 'Renk'}:
-                      </Text>
-                      {Array.isArray(item.colors) && item.colors.length > 0 ? (
-                        <ScrollView
-                          horizontal
-                          showsHorizontalScrollIndicator={false}
-                          contentContainerStyle={styles.chipsScrollContent}>
-                          {item.colors.map((c, idx) => {
-                            const isSelected =
-                              String(item.color || '').trim() ===
-                              String(c).trim();
-                            return (
+                      <View style={styles.optionHeaderRow}>
+                        <Text style={styles.optionLabel}>
+                          {t('Renk') || 'Renk'}:
+                        </Text>
+                        {Boolean(item?.color) && (
+                          <View style={styles.selectedBadge}>
+                            <Text style={styles.selectedBadgeText}>{item.color}</Text>
+                          </View>
+                        )}
+                      </View>
+                      {!item?.color && (
+                        Array.isArray(item.colors) && item.colors.length > 0 ? (
+                          <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.chipsScrollContent}>
+                            {item.colors.map((c, idx) => (
                               <TouchableOpacity
                                 key={idx}
                                 onPress={() => changeItem('color', c)}
-                                style={[
-                                  styles.chip,
-                                  isSelected && styles.chipSelected,
-                                ]}>
-                                <Text
-                                  style={[
-                                    styles.chipText,
-                                    isSelected && styles.chipTextSelected,
-                                  ]}>
-                                  {c}
-                                </Text>
+                                style={styles.chip}>
+                                <Text style={styles.chipText}>{c}</Text>
                               </TouchableOpacity>
-                            );
-                          })}
-                        </ScrollView>
-                      ) : (
-                        <TextInput
-                          style={styles.input}
-                          value={item?.color ?? ''}
-                          placeholder={t('Renk') || 'Renk'}
-                          placeholderTextColor={'#8f8f8f'}
-                          onChangeText={text => changeItem('color', text)}
-                        />
+                            ))}
+                          </ScrollView>
+                        ) : (
+                          <TextInput
+                            style={styles.input}
+                            value={item?.color ?? ''}
+                            placeholder={t('Renk') || 'Renk'}
+                            placeholderTextColor={'#8f8f8f'}
+                            onChangeText={text => changeItem('color', text)}
+                          />
+                        )
                       )}
                     </View>
                   )}
@@ -406,6 +379,25 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#F15927',
     marginLeft: 5,
+  },
+  selectedBadge: {
+    backgroundColor: '#FFF1EC',
+    borderColor: '#F15927',
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginLeft: 6,
+  },
+  selectedBadgeText: {
+    color: '#F15927',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  badgePriceText: {
+    color: '#666',
+    fontSize: 11,
+    fontWeight: '500',
   },
   optionContainer: {
     marginVertical: 4,
