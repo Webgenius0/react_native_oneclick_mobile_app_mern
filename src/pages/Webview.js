@@ -1109,7 +1109,13 @@ export default function Webview({ route, navigation }) {
               if (!rawName || typeof rawName !== 'string') return null;
               var n = cleanText(rawName);
               var lower = n.toLowerCase();
-              var ignoreDims = ['quantity', 'adet', 'miktar', 'qty', 'seller', 'satıcı', 'kargo', 'teslimat', 'price', 'fiyat', 'sepet', 'cart'];
+              var ignoreDims = [
+                'quantity', 'adet', 'miktar', 'qty', 'seller', 'satıcı', 'kargo', 'teslimat',
+                'price', 'fiyat', 'sepet', 'cart', 'taksit', 'adres', 'address', 'rating',
+                'review', 'kupon', 'coupon', 'shipping', 'delivery', 'guide', 'rehber',
+                'tablo', 'chart', 'model', 'waist', 'bust', 'hip', 'hips', 'height', 'shoulder',
+                'omuz', 'göğüs', 'bel', 'basen', 'boy', 'paça', 'uzunluk', 'length', 'sleeve', 'kol'
+              ];
               for (var i = 0; i < ignoreDims.length; i++) {
                 if (lower === ignoreDims[i] || lower.indexOf(ignoreDims[i]) > -1) return null;
               }
@@ -1409,9 +1415,9 @@ export default function Webview({ route, navigation }) {
                 if (el.tagName === 'DEL' || el.tagName === 'S' || el.tagName === 'STRIKE') return true;
                 if (el.getAttribute && el.getAttribute('data-a-strike') === 'true') return true;
                 var cls = String(el.className || '');
-                if (/\\b(prc-org|prc-box-org|prc-slg|a-text-price|basisPrice|line-through|crossed)\\b/i.test(cls)) return true;
-                if (/\\b(original-price|originalPrice|orig-price|old-price|oldPrice|oldprice|was-price|wasPrice|price-was)\\b/i.test(cls)) return true;
-                if (el.closest && el.closest('del, s, strike, [data-a-strike="true"], .a-text-price, .basisPrice, .prc-org, .prc-box-org, [class*="original-price"], [class*="old-price"], [class*="was-price"]')) {
+                if (/\b(bsc-strikethrough-price|prc-org|prc-box-org|prc-slg|a-text-price|basisPrice|line-through|crossed)\b/i.test(cls)) return true;
+                if (/\b(original-price|originalPrice|orig-price|old-price|oldPrice|oldprice|was-price|wasPrice|price-was|del-price|head-price-del|market-price|retail-price)\b/i.test(cls)) return true;
+                if (el.closest && el.closest('del, s, strike, [data-a-strike="true"], .bsc-strikethrough-price, .a-text-price, .basisPrice, .prc-org, .prc-box-org, [class*="original-price"], [class*="old-price"], [class*="was-price"], [class*="head-price-del"], [class*="strikethrough"], [class*="del-price"]')) {
                   return true;
                 }
               } catch(_e) {}
@@ -1421,11 +1427,15 @@ export default function Webview({ route, navigation }) {
             var getCleanElementPriceText = function(el) {
               if (!el) return '';
               if (isStruckOrOldPriceElement(el)) return '';
-              if (el.tagName === 'META') return el.getAttribute('content') || '';
+              if (el.tagName === 'META') return el.getAttribute('content') || el.content || '';
+              if (el.getAttribute && el.getAttribute('content') && /^\d/.test(el.getAttribute('content'))) {
+                return el.getAttribute('content');
+              }
               try {
                 var clone = el.cloneNode(true);
                 var oldNodes = clone.querySelectorAll(
-                  'del, s, strike, [data-a-strike="true"], .a-text-price, .basisPrice, .prc-org, .prc-box-org, .prc-slg, ' +
+                  'del, s, strike, [data-a-strike="true"], .bsc-strikethrough-price, .a-text-price, .basisPrice, .prc-org, .prc-box-org, .prc-slg, ' +
+                  '[class*="bsc-strikethrough"], [class*="head-price-del"], [class*="del-price"], [class*="market-price"], [class*="retail-price"], ' +
                   '[class*="original-price"], [class*="originalPrice"], [class*="orig-price"], ' +
                   '[class*="old-price"], [class*="oldPrice"], [class*="oldprice"], ' +
                   '[class*="was-price"], [class*="wasPrice"], [class*="price-was"], ' +
@@ -1442,7 +1452,7 @@ export default function Webview({ route, navigation }) {
 
             var parsePriceAndCurrency = function(rawText) {
               if (!rawText || typeof rawText !== 'string') return { price: '', currency: '' };
-              var t = rawText.replace(/\\s+/g, ' ').trim();
+              var t = rawText.replace(/\s+/g, ' ').trim();
               // Convert Arabic-Indic digits ٠-٩ to 0-9
               t = t.replace(/[٠-٩]/g, function(d) { return String.fromCharCode(d.charCodeAt(0) - 1632 + 48); });
               var detectedCurr = '';
@@ -1451,27 +1461,37 @@ export default function Webview({ route, navigation }) {
               else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:KWD|د\.?ك)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'KWD';
               else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:QAR|ر\.?ق)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'QAR';
               else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:TL|TRY)(?:$|[^a-zA-Z\u0600-\u06FF])|₺/i.test(t)) detectedCurr = 'TL';
-              else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:USD|US\\$)(?:$|[^a-zA-Z\u0600-\u06FF])|\\$/i.test(t)) detectedCurr = 'USD';
+              else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:USD|US\$)(?:$|[^a-zA-Z\u0600-\u06FF])|\$/i.test(t)) detectedCurr = 'USD';
               else if (/(?:^|[^a-zA-Z\u0600-\u06FF])EUR(?:$|[^a-zA-Z\u0600-\u06FF])|€/i.test(t)) detectedCurr = 'EUR';
               else if (/(?:^|[^a-zA-Z\u0600-\u06FF])GBP(?:$|[^a-zA-Z\u0600-\u06FF])|£/i.test(t)) detectedCurr = 'GBP';
 
               // Strip discount percentages e.g. '-30%', '%25', '30% off', 'Save 20%'
-              t = t.replace(/[-–]?[ \\t]*[0-9]+(?:\\.[0-9]+)?[ \\t]*%[ \\t]*(?:off|indirim|discount|saving|savings)?/gi, '');
-              t = t.replace(/%[ \\t]*[0-9]+(?:\\.[0-9]+)?/gi, '');
-              t = t.replace(/(?:save|off|indirim)[ \\t]+[0-9]+(?:\\.[0-9]+)?%?/gi, '');
-              t = t.replace(/(?:save|tasarruf|indirim|saving|savings)\\s*[$€£₺]?\\s*[0-9]+(?:[.,][0-9]{1,2})?/gi, '');
+              t = t.replace(/[-–]?[ \t]*[0-9]+(?:\.[0-9]+)?[ \t]*%[ \t]*(?:off|indirim|discount|saving|savings)?/gi, '');
+              t = t.replace(/%[ \t]*[0-9]+(?:\.[0-9]+)?/gi, '');
+              t = t.replace(/(?:save|off|indirim)[ \t]+[0-9]+(?:\.[0-9]+)?%?/gi, '');
+              t = t.replace(/(?:save|tasarruf|indirim|saving|savings)\s*[$€£₺]?\s*[0-9]+(?:[.,][0-9]{1,2})?/gi, '');
 
               // Match price numbers:
               var matches = t.match(/([0-9]{1,3}(?:[., ][0-9]{3})+(?:[.,][0-9]{1,2})(?![0-9])|[0-9]{1,3}(?:[., ][0-9]{3})+(?![0-9])|[0-9]+(?:[.,][0-9]{1,2})(?![0-9])|[0-9]+)/g);
               if (!matches || matches.length === 0) return { price: '', currency: detectedCurr };
 
-              // If multiple prices exist in text (e.g. was 50 now 35), pick the last/discounted price!
-              var cleanPrice = matches[matches.length - 1].trim();
+              // In clean element, the first price is the selling/discount price
+              var cleanPrice = matches[0].trim();
               return { price: cleanPrice, currency: detectedCurr };
             };
 
             // 3a. Prioritized DOM Discount / Current Price extraction (gives live on-screen discounted prices)
             var candidatePriceSelectors = [
+              // Shein Mobile & Desktop Live Discount / Selling Prices
+              '.bsc-main-price',
+              '[class*="bsc-main-price"]',
+              '.product-intro__head-price-text',
+              '.product-intro__head-price',
+              '.product-intro__price-new',
+              '.product-intro__price',
+              '[itemprop="price"]',
+              'span[itemprop="price"]',
+
               // Trendyol Discount / Campaign Prices
               'span.prc-dsc',
               '.prc-dsc',
@@ -1499,12 +1519,7 @@ export default function Webview({ route, navigation }) {
               '.a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
               '.reinventPricePriceToPayMargin .a-offscreen',
 
-              // Shein Mobile & Desktop Discounted / Current Prices
-              '.product-intro__head-price',
-              '.product-intro__price',
-              '.product-intro__price-new',
-              '[class*="product-intro__head-price"]',
-              '[class*="product-intro__price"]',
+              // Additional Shein / General Selectors
               '[class*="from-price"]',
               '[class*="goods-detail-price"]',
               '[class*="discount-price"]',
@@ -1519,8 +1534,6 @@ export default function Webview({ route, navigation }) {
               '.goods-detail-price .price',
               '.goods-price',
               '[data-test-id*="price"]',
-              '[aria-label*="Price" i]',
-              '[aria-label*="price" i]',
 
               // Hepsiburada / Noon Current Prices
               '[data-test-id="price-current-price"]',
@@ -1551,7 +1564,7 @@ export default function Webview({ route, navigation }) {
                 var currEl = elList[ei];
                 if (isStruckOrOldPriceElement(currEl)) continue;
                 var raw = getCleanElementPriceText(currEl);
-                if (raw && /\\d/.test(raw)) {
+                if (raw && /\d/.test(raw)) {
                   var parsed = parsePriceAndCurrency(raw);
                   if (parsed.price) {
                     price = parsed.price;
@@ -1596,8 +1609,22 @@ export default function Webview({ route, navigation }) {
             }
 
             // 3c. Check Shein application state
-            if (!price) {
+            if (!price || !currency) {
               try {
+                if (window.gbCommonInfo) {
+                  if (!currency && window.gbCommonInfo.currency) {
+                    currency = String(window.gbCommonInfo.currency).trim();
+                  }
+                  if (!price && window.gbCommonInfo.contextForSSR && window.gbCommonInfo.contextForSSR.googleSEO && window.gbCommonInfo.contextForSSR.googleSEO.goodsDetailSchema) {
+                    var shSchema = window.gbCommonInfo.contextForSSR.googleSEO.goodsDetailSchema;
+                    if (shSchema.offers) {
+                      var off = shSchema.offers;
+                      var pOff = off.price || off.lowPrice || '';
+                      if (pOff) price = String(pOff).trim();
+                      if (!currency && off.priceCurrency) currency = String(off.priceCurrency).trim();
+                    }
+                  }
+                }
                 var shData = window.productIntroData || window.gbProductIntroData;
                 if (shData && shData.detail) {
                   var dt = shData.detail;
@@ -1630,9 +1657,9 @@ export default function Webview({ route, navigation }) {
             // 3c-1. OpenGraph / Product Meta Price
             if (!price) {
               try {
-                var metaPrice = document.querySelector('meta[property="product:price:amount"], meta[property="og:price:amount"], meta[itemprop="price"], meta[name="twitter:data1"]');
+                var metaPrice = document.querySelector('meta[property="product:price:amount"], meta[property="og:price:amount"], meta[name="twitter:data1"], [itemprop="price"]');
                 if (metaPrice) {
-                  var mpVal = metaPrice.getAttribute('content') || metaPrice.content || '';
+                  var mpVal = metaPrice.getAttribute('content') || metaPrice.content || metaPrice.textContent || '';
                   var pResMeta = parsePriceAndCurrency(mpVal);
                   if (pResMeta.price) {
                     price = pResMeta.price;
@@ -1674,7 +1701,7 @@ export default function Webview({ route, navigation }) {
               var metaPrice = document.querySelector('meta[property="og:price:amount"], meta[property="product:price:amount"], meta[itemprop="price"], meta[name="twitter:data1"], [itemprop="price"]');
               if (metaPrice) {
                 var rawMeta = metaPrice.getAttribute('content') || metaPrice.getAttribute('value') || metaPrice.textContent || '';
-                if (rawMeta && /\\d/.test(rawMeta)) {
+                if (rawMeta && /\d/.test(rawMeta)) {
                   var parsedMeta = parsePriceAndCurrency(rawMeta);
                   if (parsedMeta.price) price = parsedMeta.price;
                   if (parsedMeta.currency && !currency) currency = parsedMeta.currency;
@@ -1723,6 +1750,24 @@ export default function Webview({ route, navigation }) {
               if (!val) return;
               var strVal = String(val).trim();
 
+              // If a value contains embedded "/ Size: ...", separate them
+              var sizeEmbedMatch = strVal.match(/^(.*?)\s*[\/,|]\s*(?:size|beden|numara)\s*:\s*([^,\/|]+)/i);
+              if (sizeEmbedMatch) {
+                strVal = sizeEmbedMatch[1].trim();
+                var extractedSize = cleanOptionValue(sizeEmbedMatch[2]);
+                if (extractedSize) {
+                  setOptionSelected('Size', extractedSize);
+                }
+              }
+              var colorEmbedMatch = strVal.match(/^(.*?)\s*[\/,|]\s*(?:color|renk)\s*:\s*([^,\/|]+)/i);
+              if (colorEmbedMatch) {
+                strVal = colorEmbedMatch[1].trim();
+                var extractedColor = cleanOptionValue(colorEmbedMatch[2]);
+                if (extractedColor) {
+                  setOptionSelected('Color', extractedColor);
+                }
+              }
+
               var optPrice = explicitPrice ? String(explicitPrice).trim() : '';
               if (!optPrice && strVal) {
                 var pMatch = strVal.match(/[\(\[]\s*[+\-]?\s*([0-9]{1,3}(?:[., ][0-9]{3})+(?:[.,][0-9]{1,2})|[0-9]+(?:[.,][0-9]{1,2})|[0-9]+)\s*[\)\]]|[-–]\s*[$€£₺]?\s*([0-9]{1,3}(?:[., ][0-9]{3})+(?:[.,][0-9]{1,2})|[0-9]+(?:[.,][0-9]{1,2})|[0-9]+)/);
@@ -1733,6 +1778,13 @@ export default function Webview({ route, navigation }) {
 
               var cleanVal = cleanOptionValue(strVal);
               if (!cleanVal) return;
+
+              // Pure measurements in cm (e.g. "83 cm") must NOT overwrite or be added as Size when clothing sizes exist
+              if (normName === 'Size' && /^\d+(?:\.\d+)?\s*(?:cm|inch|in|mm)$/i.test(cleanVal)) {
+                if (optionsMap['Size'] && optionsMap['Size'].values.some(function(v) { return !/^\d+(?:\.\d+)?\s*(?:cm|inch|in|mm)$/i.test(v); })) {
+                  return;
+                }
+              }
 
               if (!optionsMap[normName]) {
                 optionsMap[normName] = { name: normName, values: [], selected: '', prices: {} };
@@ -1756,8 +1808,22 @@ export default function Webview({ route, navigation }) {
             var setOptionSelected = function(dimName, selVal) {
               var normName = normalizeDimName(dimName);
               if (!normName) return;
-              var cleanVal = cleanOptionValue(selVal);
+              var strSel = String(selVal).trim();
+              var sizeMatch = strSel.match(/^(.*?)\s*[\/,|]\s*(?:size|beden|numara)\s*:\s*([^,\/|]+)/i);
+              if (sizeMatch) {
+                strSel = sizeMatch[1].trim();
+                var embSize = cleanOptionValue(sizeMatch[2]);
+                if (embSize) setOptionSelected('Size', embSize);
+              }
+              var cleanVal = cleanOptionValue(strSel);
               if (!cleanVal) return;
+
+              if (normName === 'Size' && /^\d+(?:\.\d+)?\s*(?:cm|inch|in|mm)$/i.test(cleanVal)) {
+                if (optionsMap['Size'] && optionsMap['Size'].values.some(function(v) { return !/^\d+(?:\.\d+)?\s*(?:cm|inch|in|mm)$/i.test(v); })) {
+                  return;
+                }
+              }
+
               if (!optionsMap[normName]) {
                 optionsMap[normName] = { name: normName, values: [cleanVal], selected: cleanVal, prices: {} };
               } else {
@@ -1774,19 +1840,23 @@ export default function Webview({ route, navigation }) {
               }
             };
 
-            // 5a. Header label detection ("Size: M", "Color: Black")
+            // 5a. Header label detection ("Size: M", "Color: Black", "Color: Blue and White / Size: M")
             try {
               var headerEls = document.querySelectorAll('div, p, span, h2, h3, h4, label');
               for (var hi = 0; hi < headerEls.length; hi++) {
                 var hText = cleanText(headerEls[hi].textContent || '');
-                if (hText && hText.length < 50 && hText.indexOf(':') > -1) {
-                  var colonIdx = hText.indexOf(':');
-                  var prefix = hText.substring(0, colonIdx).trim();
-                  var suffix = hText.substring(colonIdx + 1).trim();
-                  var matchedDim = normalizeDimName(prefix);
-                  if (matchedDim && suffix) {
-                    var cleanedVal = cleanOptionValue(suffix.split(/\\s{2,}|\\n|\\t/)[0]);
-                    if (cleanedVal) setOptionSelected(matchedDim, cleanedVal);
+                if (hText && hText.length < 80 && hText.indexOf(':') > -1) {
+                  var parts = hText.split(/\s*[\/,|]\s*/);
+                  for (var pi = 0; pi < parts.length; pi++) {
+                    var pSub = parts[pi].trim();
+                    var cIdx = pSub.indexOf(':');
+                    if (cIdx > -1) {
+                      var pDim = normalizeDimName(pSub.substring(0, cIdx));
+                      var pVal = cleanOptionValue(pSub.substring(cIdx + 1));
+                      if (pDim && pVal) {
+                        setOptionSelected(pDim, pVal);
+                      }
+                    }
                   }
                 }
               }
@@ -1819,7 +1889,13 @@ export default function Webview({ route, navigation }) {
                       for (var mv = 0; mv < mItem.attr_value_list.length; mv++) {
                         var mValItem = mItem.attr_value_list[mv];
                         var mPrice = skuPriceMap[String(mValItem.attr_value_id)] || '';
-                        addOptionValue(mDim, mValItem.attr_value_name, !!mValItem.is_default, mPrice);
+                        var isMSel = !!mValItem.is_default;
+                        if (dt.currentSku && Array.isArray(dt.currentSku.attr_value_id)) {
+                          if (dt.currentSku.attr_value_id.indexOf(mValItem.attr_value_id) > -1 || dt.currentSku.attr_value_id.indexOf(String(mValItem.attr_value_id)) > -1) {
+                            isMSel = true;
+                          }
+                        }
+                        addOptionValue(mDim, mValItem.attr_value_name, isMSel, mPrice);
                       }
                     }
                   }
@@ -1832,42 +1908,100 @@ export default function Webview({ route, navigation }) {
                       for (var sav = 0; sav < saItem.attr_value_list.length; sav++) {
                         var sValItem = saItem.attr_value_list[sav];
                         var sPrice = skuPriceMap[String(sValItem.attr_value_id)] || '';
-                        // Do NOT use is_default for size: Shein size must only be selected if user explicitly taps it!
-                        addOptionValue(saDim, sValItem.attr_value_name, false, sPrice);
+                        var isSSel = false;
+                        if (dt.currentSku) {
+                          if (Array.isArray(dt.currentSku.attr_value_id)) {
+                            isSSel = dt.currentSku.attr_value_id.indexOf(sValItem.attr_value_id) > -1 || dt.currentSku.attr_value_id.indexOf(String(sValItem.attr_value_id)) > -1;
+                          } else if (dt.currentSku.attr_value_id == sValItem.attr_value_id || (dt.currentSku.attr_value_name && dt.currentSku.attr_value_name === sValItem.attr_value_name)) {
+                            isSSel = true;
+                          }
+                        }
+                        addOptionValue(saDim, sValItem.attr_value_name, isSSel, sPrice);
                       }
+                    }
+                  }
+                }
+
+                if (dt.currentSku && Array.isArray(dt.currentSku.sale_attr_list)) {
+                  for (var cal = 0; cal < dt.currentSku.sale_attr_list.length; cal++) {
+                    var cObj = dt.currentSku.sale_attr_list[cal];
+                    var cName = normalizeDimName(cObj.attr_name || cObj.name || '');
+                    var cVal = cleanOptionValue(cObj.attr_value_name || cObj.value_name || cObj.value || '');
+                    if (cName && cVal) {
+                      setOptionSelected(cName, cVal);
                     }
                   }
                 }
               }
             } catch(_e) {}
 
-            var shColorItems = document.querySelectorAll('.goods-color__radio, .goods-color__item, .form-color-item, div[class*="color-item"], div[class*="color_item"], .product-intro__color-choose .choose-item, .goods-color-item');
+            // Shein Mobile DOM Variant Elements - Color
+            var shColorHeader = document.querySelector('#color-heading, .bs-main-sales-attr__header-title, [class*="main-sales-attr__header"]');
+            if (shColorHeader && shColorHeader.textContent) {
+              var hText = shColorHeader.textContent.trim();
+              var cSep = hText.indexOf(':');
+              if (cSep > -1) {
+                var cHeadVal = cleanOptionValue(hText.substring(cSep + 1));
+                if (cHeadVal) {
+                  setOptionSelected('Color', cHeadVal);
+                }
+              }
+            }
+
+            var shColorItems = document.querySelectorAll(
+              '.bs-color__item, .bs-color-square-image__item, [class*="bs-color"], ' +
+              '.goods-color__radio, .goods-color__item, .form-color-item, ' +
+              'div[class*="color-item"], div[class*="color_item"], ' +
+              '.product-intro__color-choose .choose-item, .goods-color-item'
+            );
             for (var sci = 0; sci < shColorItems.length; sci++) {
               var sciEl = shColorItems[sci];
+              if (sciEl.tagName === 'UL' || (sciEl.tagName === 'DIV' && sciEl.children.length > 2 && !sciEl.getAttribute('role'))) continue;
               var sciImg = sciEl.querySelector('img');
-              var sciVal = sciEl.getAttribute('title') || sciEl.getAttribute('aria-label') || (sciImg ? sciImg.getAttribute('alt') : '') || sciEl.textContent;
-              var isSciSel = isElementActive(sciEl) || isElementActive(sciEl.parentElement);
+              var sciVal = sciEl.getAttribute('aria-label') || sciEl.getAttribute('title') || (sciImg ? (sciImg.getAttribute('alt') || sciImg.getAttribute('title')) : '') || sciEl.textContent;
+              sciVal = cleanOptionValue(sciVal);
+              if (!sciVal) continue;
+              var isSciSel = (sciEl.getAttribute('aria-checked') === 'true') ||
+                             (sciEl.getAttribute('aria-selected') === 'true') ||
+                             /\b(active|selected|color-active)\b/i.test(sciEl.className || '') ||
+                             isElementActive(sciEl) ||
+                             isElementActive(sciEl.parentElement);
               addOptionValue('Color', sciVal, isSciSel);
             }
 
             var isSheinSizeSelected = function(el) {
               if (!el) return false;
+              if (el.getAttribute('aria-selected') === 'true' || el.getAttribute('aria-checked') === 'true') return true;
+              var cls = String(el.className || '');
+              if (/\b(size-active|selected|active|is-selected|is-active)\b/i.test(cls)) return true;
               if (isElementActive(el)) return true;
               var input = el.querySelector('input[type="radio"], input[type="checkbox"]');
               if (input && input.checked) return true;
               var parent = el.parentElement;
+              if (parent && (parent.getAttribute('aria-selected') === 'true' || parent.getAttribute('aria-checked') === 'true')) return true;
               if (parent && !/\b(list|container|wrap|choose|group|items|row|box|content)\b/i.test(parent.className || '')) {
                 if (isElementActive(parent)) return true;
               }
               return false;
             };
 
-            var shSizeItems = document.querySelectorAll('.goods-size__radio, .goods-size__item, .product-intro__size-choose .choose-item, div[class*="size-item"], div[class*="size_item"], .goods-size-item, div[class*="attr-radio"], .form-size-item, span[class*="val-size"]');
+            var shSizeItems = document.querySelectorAll(
+              '.goods-size__sizes-item:not([class*="options-item"]), ' +
+              '.goods-size__sizes li, .choose-size li, [class*="choose-size"] li, ' +
+              '.goods-size__radio, .goods-size__item, .product-intro__size-choose .choose-item, ' +
+              'div[class*="size-item"]:not([class*="options-item"]), div[class*="size_item"], .goods-size-item, div[class*="attr-radio"], .form-size-item'
+            );
             for (var szi = 0; szi < shSizeItems.length; szi++) {
               var sziEl = shSizeItems[szi];
-              var sziVal = sziEl.getAttribute('title') || sziEl.getAttribute('aria-label') || sziEl.textContent;
-              var isSziSel = isSheinSizeSelected(sziEl);
-              addOptionValue('Size', sziVal, isSziSel);
+              if (sziEl.closest && (sziEl.closest('.goods-size__options') || sziEl.closest('[class*="options-item"]'))) continue;
+              if (sziEl.classList && sziEl.classList.contains('goods-size__options-item')) continue;
+              var nameEl = sziEl.querySelector('.goods-size__sizes-item-text, [class*="sizes-item-text"], .val-size, [class*="val-size"], .size-name, [class*="size-name"], .sub-title-main, p');
+              var sziVal = (nameEl ? nameEl.textContent : '') || sziEl.getAttribute('title') || sziEl.getAttribute('aria-label') || sziEl.textContent;
+              if (sziVal) {
+                sziVal = sziVal.trim();
+                var isSziSel = isSheinSizeSelected(sziEl);
+                addOptionValue('Size', sziVal, isSziSel);
+              }
             }
 
             // 5c. Amazon twisters & variants
@@ -2265,16 +2399,17 @@ export default function Webview({ route, navigation }) {
 
     if (missingOptions.length > 0) {
       const translatedNames = missingOptions.map(name => {
-        const lower = name.toLowerCase();
-        if (lower.includes('size') || lower.includes('beden')) return t('Beden') || 'Beden';
-        if (lower.includes('color') || lower.includes('renk')) return t('Renk') || 'Renk';
-        if (lower.includes('weight') || lower.includes('ağırlık')) return t('Ağırlık') || 'Ağırlık';
-        if (lower.includes('volume') || lower.includes('hacim')) return t('Hacim / Kapasite') || 'Hacim';
+        const lower = (name || '').toLowerCase();
+        if (lower.includes('size') || lower.includes('beden')) return t('Beden') || 'Size';
+        if (lower.includes('color') || lower.includes('renk')) return t('Renk') || 'Color';
+        if (lower.includes('weight') || lower.includes('ağırlık')) return t('Ağırlık') || 'Weight';
+        if (lower.includes('volume') || lower.includes('hacim')) return t('Hacim / Kapasite') || 'Volume';
+        if (lower.includes('variant') || lower.includes('varyant') || lower.includes('option')) return t('Varyant') || 'Variant';
         return name;
       }).join(', ');
 
       const alertMsg = t('lutfenSecimYapin', { options: translatedNames }) ||
-        `Lütfen devam etmeden önce (${translatedNames}) seçiminizi yapınız.`;
+        `Lütfen sepete eklemeden önce ürün seçeneklerini (${translatedNames}) seçiniz.`;
 
       Alert.alert(t('Uyarı') || 'Uyarı', alertMsg, [
         { text: t('Tamam') || 'Tamam' }
@@ -2284,9 +2419,20 @@ export default function Webview({ route, navigation }) {
 
     const finalStore = getStoreName(currentUrlRef.current, freshSnapshot?.store || route?.params?.ad);
 
+    const isSheinUrl = currentUrlRef.current.includes('shein.com');
+    const isAmazonUsUrl = currentUrlRef.current.includes('amazon.com');
+    const isUaeUrl = currentUrlRef.current.includes('amazon.ae') || currentUrlRef.current.includes('noon.com');
+    const isSaUrl = currentUrlRef.current.includes('amazon.sa');
+    const fallbackCurrency = (isSheinUrl || isAmazonUsUrl)
+      ? 'USD'
+      : (isUaeUrl ? 'AED' : (isSaUrl ? 'SAR' : 'TL'));
+
     const resolvedImage = finalImage || freshSnapshot?.image || imageRef.current || '';
-    const resolvedPrice = freshSnapshot?.price || priceRef.current || '';
-    const resolvedCurrency = freshSnapshot?.currency || currencyRef.current || 'TL';
+    let resolvedPrice = freshSnapshot?.price || priceRef.current || '';
+    let resolvedCurrency = freshSnapshot?.currency || currencyRef.current || fallbackCurrency;
+    if (resolvedCurrency === 'TL' && (isSheinUrl || isAmazonUsUrl)) {
+      resolvedCurrency = 'USD';
+    }
 
     // Sanitize options so that only the user-selected value is retained
     const sanitizedOptions = finalOptions.map(opt => {
@@ -2348,7 +2494,8 @@ export default function Webview({ route, navigation }) {
             }
             currentUrlRef.current = nextUrl;
 
-            scheduleInject(nextUrl, { delays: SPA_INJECT_DELAYS });
+            const isShein = nextUrl.includes('shein.com');
+            scheduleInject(nextUrl, { delays: isShein ? [300, 1000, 2500, 5000] : SPA_INJECT_DELAYS });
             return;
           }
           case INJECT_STATUS_MESSAGE_TYPE: {

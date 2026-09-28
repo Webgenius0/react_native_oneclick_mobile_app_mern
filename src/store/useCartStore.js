@@ -41,6 +41,49 @@ export const normalizeCartItem = item => {
   let color = item.color ? String(item.color).trim() : '';
   let colors = Array.isArray(item.colors) ? item.colors.map(c => String(c).trim()) : [];
 
+  const isPureMeasurement = val => /^\d+(?:\.\d+)?\s*(?:cm|inch|in|mm)$/i.test(String(val).trim());
+
+  // Separate combined color and size (e.g. "Blue and White / Size: M" or "Blue and White / Beden: M")
+  const colorSizeMatch = color.match(/^(.*?)\s*[\/,|]\s*(?:size|beden|numara)\s*:\s*([^,\/|]+)/i);
+  if (colorSizeMatch) {
+    color = colorSizeMatch[1].trim();
+    const embeddedSize = colorSizeMatch[2].trim();
+    if (!size || isPureMeasurement(size)) {
+      size = embeddedSize;
+    }
+  }
+
+  // Also clean Color option within options array
+  const rawColorOpt = options.find(o => o.name && o.name.toLowerCase() === 'color');
+  if (rawColorOpt) {
+    if (rawColorOpt.selected) {
+      const optMatch = rawColorOpt.selected.match(/^(.*?)\s*[\/,|]\s*(?:size|beden|numara)\s*:\s*([^,\/|]+)/i);
+      if (optMatch) {
+        rawColorOpt.selected = optMatch[1].trim();
+        if (!size || isPureMeasurement(size)) {
+          size = optMatch[2].trim();
+        }
+      }
+    }
+    if (Array.isArray(rawColorOpt.values)) {
+      rawColorOpt.values = rawColorOpt.values.map(v => {
+        const m = String(v).match(/^(.*?)\s*[\/,|]\s*(?:size|beden|numara)\s*:\s*([^,\/|]+)/i);
+        return m ? m[1].trim() : String(v).trim();
+      });
+    }
+    if (!color && rawColorOpt.selected) {
+      color = rawColorOpt.selected;
+    }
+  }
+
+  // If size is a pure measurement (e.g. "83 cm") but clothing sizes (e.g. "M") exist in sizes, prefer the clothing size
+  if (isPureMeasurement(size)) {
+    const validClothingSize = sizes.find(s => !isPureMeasurement(s));
+    if (validClothingSize) {
+      size = validClothingSize;
+    }
+  }
+
   let newPrice = item.price ?? '';
 
   // Bidirectional sync: if options has Size, sync size & sizes
@@ -121,6 +164,27 @@ export const normalizeCartItem = item => {
 
   const itemKey = item.id || generateItemKey({ ...item, size, color, options });
 
+  // If price is missing but size/color has price, recover it
+  if (!newPrice) {
+    if (sizeOpt && size && sizeOpt.prices && sizeOpt.prices[size]) {
+      newPrice = sizeOpt.prices[size];
+    } else if (colorOpt && color && colorOpt.prices && colorOpt.prices[color]) {
+      newPrice = colorOpt.prices[color];
+    }
+  }
+
+  let currency = item.currency ?? '';
+  const itemUrl = item.url ? String(item.url) : '';
+  if (!currency || (currency === 'TL' && (itemUrl.includes('shein.com') || itemUrl.includes('amazon.com')))) {
+    if (itemUrl.includes('shein.com') || itemUrl.includes('amazon.com')) {
+      currency = 'USD';
+    } else if (itemUrl.includes('amazon.ae') || itemUrl.includes('noon.com')) {
+      currency = 'AED';
+    } else if (itemUrl.includes('amazon.sa')) {
+      currency = 'SAR';
+    }
+  }
+
   return {
     ...item,
     id: itemKey,
@@ -139,7 +203,7 @@ export const normalizeCartItem = item => {
     desc: item.desc ?? item.description ?? '',
     description: item.description ?? item.desc ?? '',
     price: newPrice,
-    currency: item.currency ?? '',
+    currency: currency,
   };
 };
 

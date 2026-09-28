@@ -191,5 +191,66 @@ describe('Product Title Extraction & Cleaning Tests', () => {
       const normalized = normalizeCartItem(fallbackItem);
       expect(normalized.title).toBe('Sony WH 1000XM5 Headphones');
     });
+
+    test('normalizeCartItem separates combined color "Blue and White / Size: M" and recovers size M', () => {
+      const sheinItem = {
+        id: 'shein-item-1',
+        url: 'https://m.shein.com/SHEIN-Franclia-Set-p-507928574.html',
+        title: 'SHEIN Franclia Casual Commuter Versatile Set',
+        color: 'Blue and White / Size: M',
+        size: '83 cm',
+        sizes: ['83 cm'],
+        options: [
+          { name: 'Color', values: ['Blue and White / Size: M'], selected: 'Blue and White / Size: M' },
+          { name: 'Size', values: ['83 cm'], selected: '83 cm' }
+        ],
+        price: '45.00',
+        currency: 'SAR',
+      };
+
+      const normalized = normalizeCartItem(sheinItem);
+      expect(normalized.color).toBe('Blue and White');
+      expect(normalized.size).toBe('M');
+      expect(normalized.options.find(o => o.name === 'Color').selected).toBe('Blue and White');
+      expect(normalized.options.find(o => o.name === 'Size').selected).toBe('M');
+    });
+
+    test('normalizeCartItem prefers clothing size over pure measurement like 83 cm when sizes has clothing size', () => {
+      const itemWithMeasurement = {
+        id: 'shein-item-2',
+        url: 'https://m.shein.com/item-p-123.html',
+        title: 'Casual Dress',
+        size: '83 cm',
+        sizes: ['S', 'M', 'L'],
+        price: '25.00',
+        currency: 'USD',
+      };
+
+      const normalized = normalizeCartItem(itemWithMeasurement);
+      expect(normalized.size).toBe('S');
+    });
+
+    test('normalizeCartItem ensures Shein items default to USD currency and recover price', () => {
+      const sheinItem = {
+        id: 'shein-item-3',
+        url: 'https://m.shein.com/Franclia-Spring-Summer-Women-s-2-Piece-Set-p-488479963.html',
+        title: 'Franclia 2-Piece Set',
+        size: 'M',
+        sizes: ['M'],
+        color: 'Apricot',
+        colors: ['Apricot'],
+        options: [
+          { name: 'Color', values: ['Apricot'], selected: 'Apricot', prices: {} },
+          { name: 'Size', values: ['M'], selected: 'M', prices: { 'M': '13.04' } }
+        ],
+        price: '',
+        currency: 'TL',
+      };
+
+      const normalized = normalizeCartItem(sheinItem);
+      expect(normalized.currency).toBe('USD');
+      expect(normalized.price).toBe('13.04');
+    });
   });
 });
+
