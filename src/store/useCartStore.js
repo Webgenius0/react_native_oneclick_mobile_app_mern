@@ -15,11 +15,14 @@ const devCart = [
 ];
 
 import {generateItemKey} from '../helpers/variantUtils';
+import {cleanProductTitle} from '../helpers/storeHelper';
 
 export const normalizeCartItem = item => {
   if (!item) {
     return null;
   }
+
+  const cleanTitle = cleanProductTitle(item.title, item.url);
 
   // Clean and preserve options array (restricted to Size, Color, Storage, Weight/Volume)
   const ALLOWED_OPTION_NAMES = ['size', 'color', 'storage', 'weight', 'volume'];
@@ -121,6 +124,7 @@ export const normalizeCartItem = item => {
   return {
     ...item,
     id: itemKey,
+    title: cleanTitle,
     checked: Object.prototype.hasOwnProperty.call(item, 'checked')
       ? item.checked
       : true,

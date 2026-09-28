@@ -13,7 +13,7 @@ import { useScriptServiceStore } from '../store/useScriptServiceStore';
 import { useWebviewStore } from '../store/useWebviewStore';
 import { userAgent } from '../helpers/webview';
 import { injectedJavascript } from '../helpers/webview1';
-import { getStoreName, isProductUrl } from '../helpers/storeHelper';
+import { cleanProductTitle, getFallbackTitleFromUrl, getStoreName, isProductUrl } from '../helpers/storeHelper';
 import { isPlaceholderValue } from '../helpers/variantUtils';
 import { t } from '../translate/i18n';
 
@@ -135,38 +135,6 @@ const isDifferentProduct = (urlA, urlB) => {
     }
   } catch (_e) {}
   return true;
-};
-
-const getFallbackTitleFromUrl = (url, fallback) => {
-  if (fallback && fallback !== '-' && fallback !== 'OneClick') {
-    return fallback;
-  }
-  if (!url) {
-    return '';
-  }
-  try {
-    const parsed = url.split('?')[0].split('#')[0];
-    const segments = parsed.split('/').filter(Boolean);
-    let asinCandidate = '';
-    for (let i = segments.length - 1; i >= 0; i--) {
-      const seg = segments[i] || '';
-      const slug = seg.replace(/\.(html?|php|asp)$/i, '').replace(/-p-\d+.*$/i, '');
-      if (slug && slug.length > 3 && !/^(dp|gp|product|d|item|items|goods)$/i.test(slug)) {
-        if (/^[a-z0-9]{8,12}$/i.test(slug) && i > 0) {
-          if (!asinCandidate) asinCandidate = slug;
-          continue;
-        }
-        const decoded = decodeURIComponent(slug).replace(/[-_+]/g, ' ').replace(/\s+/g, ' ').trim();
-        if (decoded.length > 3 && !/^\d+$/.test(decoded)) {
-          return decoded;
-        }
-      }
-    }
-    if (asinCandidate) {
-      return asinCandidate;
-    }
-  } catch (_e) {}
-  return '';
 };
 
 const buildInjectKey = (url, script) => `${String(url || '')}\n${String(script || '').length}`;
@@ -1073,15 +1041,50 @@ export default function Webview({ route, navigation }) {
 
             var cleanTitle = function(raw) {
               if (!raw || typeof raw !== 'string') return '';
-              return raw
-                .replace(/\\s*Fiyatı,\\s*Yorumları\\s*-\\s*Trendyol/gi, '')
-                .replace(/\\s*[:|-]\\s*Amazon\\.[a-z.]+(\\s*:.*)?$/gi, '')
-                .replace(/\\s*:\\s*Amazon\\.[a-z.]+/gi, '')
-                .replace(/\\s*-\\s*Amazon\\.[a-z.]+/gi, '')
-                .replace(/\\s*\\|\\s*Shein/gi, '')
-                .replace(/\\s*-\\s*Trendyol/gi, '')
-                .replace(/\\s+/g, ' ')
-                .trim();
+              var str = raw.replace(/\\r\\n|\\r|\\n|\\t/g, ' ').replace(/\\s+/g, ' ').trim();
+              str = str
+                .replace(/&amp;/gi, '&')
+                .replace(/&quot;/gi, '"')
+                .replace(/&#39;|&apos;/gi, "'")
+                .replace(/&lt;/gi, '<')
+                .replace(/&gt;/gi, '>')
+                .replace(/&nbsp;/gi, ' ');
+              str = str.replace(/^(?:Amazon(?:\\.[a-z.]+)?|Trendyol|Hepsiburada(?:\\.com)?|Shein|Zara|Noon|AliExpress|eBay|Walmart(?:\\.com)?|Nike(?:\\.com)?|Apple|Asos|Mango|H&M)\\s*[:|–—\\-]\\s*/gi, '');
+              str = str.replace(/^(?:Visit the\\s+[^\\n\\r]+?\\s+Store|Brand:\\s*[^:\\n\\r]+?)\\s+/gi, '');
+              str = str
+                .replace(/\\s*Fiyatı,?\\s*Yorumları\\s*-\\s*Trendyol.*$/gi, '')
+                .replace(/\\s*Fiyatı\\s*-\\s*Trendyol.*$/gi, '')
+                .replace(/\\s*-\\s*Trendyol.*$/gi, '')
+                .replace(/\\s*\\|\\s*Trendyol.*$/gi, '')
+                .replace(/\\s*Fiyatı\\s*-\\s*Hepsiburada.*$/gi, '')
+                .replace(/\\s*-\\s*Hepsiburada.*$/gi, '')
+                .replace(/\\s*\\|\\s*Hepsiburada.*$/gi, '')
+                .replace(/\\s*[:|–—\\-]\\s*Amazon\\.[a-z.]+(\\s*:.*)?$/gi, '')
+                .replace(/\\s*[:|–—\\-]\\s*Amazon$/gi, '')
+                .replace(/\\s*\\|\\s*Amazon.*$/gi, '')
+                .replace(/\\s*\\|\\s*SHEIN(?:\\s+[A-Z]{2,3})?.*$/gi, '')
+                .replace(/\\s*-\\s*SHEIN(?:\\s+[A-Z]{2,3})?.*$/gi, '')
+                .replace(/\\s*\\|\\s*ZARA(?:\\s+[^|–—\\-]+)?$/gi, '')
+                .replace(/\\s*-\\s*ZARA(?:\\s+[^|–—\\-]+)?$/gi, '')
+                .replace(/\\s*\\|\\s*H&M(?:\\s+[A-Z]{2,3})?.*$/gi, '')
+                .replace(/\\s*-\\s*H&M(?:\\s+[A-Z]{2,3})?.*$/gi, '')
+                .replace(/\\s*\\|\\s*noon.*$/gi, '')
+                .replace(/\\s*-\\s*noon.*$/gi, '')
+                .replace(/\\s*-\\s*AliExpress(?:\\s+\\d+)?.*$/gi, '')
+                .replace(/\\s*\\|\\s*AliExpress.*$/gi, '')
+                .replace(/\\s*\\|\\s*eBay.*$/gi, '')
+                .replace(/\\s*-\\s*eBay.*$/gi, '')
+                .replace(/\\s*\\.?\\s*Nike\\.com.*$/gi, '')
+                .replace(/\\s*\\|\\s*Nike.*$/gi, '')
+                .replace(/\\s*-\\s*Walmart\\.com.*$/gi, '')
+                .replace(/\\s*\\|\\s*Walmart.*$/gi, '')
+                .replace(/\\s*[:|–—\\-]\\s*[a-z0-9-]+\\.(?:com|org|net|tr|ae|sa|co\\.uk|de|fr|es|it|ru|cn)(?:\\.[a-z]+)?\\s*$/gi, '');
+              str = str.replace(/\\s*:\\s*(?:Electronics|Cell Phones & Accessories|Clothing, Shoes & Jewelry|Home & Kitchen|Beauty & Personal Care|Health & Household|Sports & Outdoors|Toys & Games|Automotive|Tools & Home Improvement|Office Products|Pet Supplies|Baby Products|Grocery & Gourmet Food|Moda|Elektronik|Ev & Yaşam|Mutfak|Kişisel Bakım|Spor & Outdoor|Oto & Yapı Market|Kitap|Oyuncak|Bebek|Computers? & Accessories|Video Games|Musical Instruments|Books|Luggage & Travel Gear|Industrial & Scientific)\\s*$/gi, '');
+              str = str.replace(/\\s*\\d+(?:\\.\\d+)?\\s*(?:out of 5 stars|stars|yıldız).*$/gi, '');
+              str = str.replace(/\\s*\\(\\s*\\d+(?:,\\d+)*\\s*(?:ratings?|reviews?|değerlendirme|yorum)\\s*\\).*$/gi, '');
+              str = str.replace(/^[\\s:|–—•·\"'\\-]+|[\\s:|–—•·\"'\\-]+$/g, '').trim();
+              if (/^ref[=_\s-]/i.test(str) || str.toLowerCase().indexOf('ref=') === 0 || /product summary|key product information/i.test(str)) return '';
+              return str.replace(/\\s+/g, ' ').trim();
             };
 
             var cleanOptionValue = function(text) {
@@ -1178,43 +1181,160 @@ export default function Webview({ route, navigation }) {
 
             // 1. Title
             var title = '';
-            var titleEl = document.querySelector(
-              '#productTitle, #title, #title_feature_div span, #title_feature_div, [data-feature-name="title"], h1#title, h1.pr-new-br span, [data-automation-id="product-title"], .product-title, .pdp-title, ' +
-              '.goods-detail-info__name, .product-intro__head-name, .product-intro__title, .goods-title, h1'
-            );
-            if (titleEl && titleEl.textContent && titleEl.textContent.trim()) {
-              title = cleanTitle(titleEl.textContent);
+
+            // Priority 1: JSON-LD Product schema
+            try {
+              var ldScripts = document.querySelectorAll('script[type="application/ld+json"]');
+              for (var j = 0; j < ldScripts.length; j++) {
+                var ldObj = JSON.parse(ldScripts[j].textContent);
+                var ldItems = Array.isArray(ldObj) ? ldObj : [ldObj];
+                for (var k = 0; k < ldItems.length; k++) {
+                  var item = ldItems[k];
+                  if (!item) continue;
+                  if (item['@type'] === 'Product' && item.name && typeof item.name === 'string') {
+                    var cName = cleanTitle(item.name);
+                    if (cName && cName.length > 2) { title = cName; break; }
+                  }
+                  if (Array.isArray(item['@graph'])) {
+                    for (var g = 0; g < item['@graph'].length; g++) {
+                      var gItem = item['@graph'][g];
+                      if (gItem && gItem['@type'] === 'Product' && gItem.name && typeof gItem.name === 'string') {
+                        var cgName = cleanTitle(gItem.name);
+                        if (cgName && cgName.length > 2) { title = cgName; break; }
+                      }
+                    }
+                  }
+                }
+                if (title) break;
+              }
+            } catch (_ldErr) {}
+
+            // Priority 2: High-specificity product title DOM selectors in strict priority order
+            if (!title) {
+              var prioritySelectors = [
+                '#title_feature_div #productTitle',
+                '#title #productTitle',
+                '#productTitle',
+                'h1.pr-new-br span',
+                'h1.pr-new-br',
+                '[data-automation-id="product-title"]',
+                '.goods-detail-info__name',
+                '.product-intro__head-name',
+                '.product-intro__title',
+                '.goods-title',
+                'h1[data-test-id="product-title"]',
+                'h1[itemprop="name"]',
+                'h1#title',
+                '[data-feature-name="title"] h1',
+                '[data-feature-name="title"] #productTitle',
+                '.product-title',
+                '.pdp-title',
+                '.product-detail__title',
+                '.product__title',
+                '#title h1',
+                'h1'
+              ];
+
+              for (var p = 0; p < prioritySelectors.length; p++) {
+                var el = document.querySelector(prioritySelectors[p]);
+                if (el) {
+                  var elClass = String(el.className || '');
+                  if (/\\b(a-offscreen|a-screen-reader|sr-only)\\b/i.test(elClass) ||
+                      (el.offsetParent === null && window.getComputedStyle && window.getComputedStyle(el).position !== 'fixed')) {
+                    continue;
+                  }
+                  var rawText = (el.textContent || '').trim();
+                  if (rawText && rawText.length > 1) {
+                    var cleaned = cleanTitle(rawText);
+                    if (cleaned && cleaned.length > 2 &&
+                        !/^(product|oneclick|-)$/i.test(cleaned) &&
+                        !/product summary|key product information/i.test(cleaned)) {
+                      title = cleaned;
+                      break;
+                    }
+                  }
+                }
+              }
             }
+
+            // Priority 3: OpenGraph / Twitter meta tags
             if (!title) {
               var metaTitle = document.querySelector('meta[property="og:title"], meta[name="twitter:title"], meta[itemprop="name"]');
-              if (metaTitle && metaTitle.content) title = cleanTitle(metaTitle.content);
+              if (metaTitle && metaTitle.content) {
+                var mTitle = cleanTitle(metaTitle.content);
+                if (mTitle && !/product summary|key product information/i.test(mTitle)) {
+                  title = mTitle;
+                }
+              }
             }
+
+            // Priority 4: Document title
             if (!title && document.title) {
-              title = cleanTitle(document.title);
+              var dTitle = cleanTitle(document.title);
+              if (dTitle && !/product summary|key product information/i.test(dTitle)) {
+                title = dTitle;
+              }
             }
 
             // 2. Image
             var image = '';
-            var imgEl = document.querySelector(
-              '#landingImage, #main-image, #imgBlkFront, img.a-dynamic-image, [data-a-image-name="landingImage"], ' +
-              '#main-image-container img, #imageBlock img, #canvasImage, #ebooks-img-canvas img, .a-carousel-card img, ' +
-              'div[data-action="main-image-click"] img, div#media-canvas img, img[data-a-hires], ' +
-              'img[src*="media-amazon.com/images/I/"], img[src*="images-amazon.com/images/I/"], ' +
-              '.product-slide-item img, img[src*="cdn.dsmcdn.com/mnresize"], ' +
-              'img[data-src*="cdn.dsmcdn.com/mnresize"], .product-image-gallery-viewport img, ' +
-              'img[src*="media/images"], img[data-src*="media/images"], .detail-section-img, .base-product-image img, ' +
-              '.gallery-container img, img.product-intro__head-main-img, img[src*="ltwebstatic.com"], img[data-src*="ltwebstatic.com"], ' +
-              '.crop-image-container img, [data-test-id="product-image"] img, img.product-image'
-            );
-            if (imgEl) {
-              image = parseImageUrl(imgEl.getAttribute('data-a-hires')) ||
-                      parseImageUrl(imgEl.getAttribute('data-old-hires')) ||
-                      parseImageUrl(imgEl.getAttribute('data-src')) ||
-                      parseImageUrl(imgEl.getAttribute('data-original')) ||
-                      parseImageUrl(imgEl.getAttribute('data-a-dynamic-image')) ||
-                      parseImageUrl(imgEl.currentSrc) ||
-                      parseImageUrl(imgEl.src) ||
-                      parseImageUrl(imgEl.getAttribute('src')) || '';
+            var imgSelectors = [
+              '#landingImage',
+              '#main-image',
+              '#imgBlkFront',
+              'img.a-dynamic-image',
+              '[data-a-image-name="landingImage"]',
+              '#main-image-container img',
+              '#imageBlock img',
+              '#canvasImage',
+              '#ebooks-img-canvas img',
+              'div[data-action="main-image-click"] img',
+              'div#media-canvas img',
+              'img[data-a-hires]',
+              'img[src*="media-amazon.com/images/I/"]',
+              'img[src*="images-amazon.com/images/I/"]',
+              '.product-slide-item img',
+              'img[src*="cdn.dsmcdn.com/mnresize"]',
+              'img[data-src*="cdn.dsmcdn.com/mnresize"]',
+              '.product-image-gallery-viewport img',
+              'img[src*="media/images"]',
+              'img[data-src*="media/images"]',
+              '.detail-section-img',
+              '.base-product-image img',
+              '.gallery-container img',
+              'img.product-intro__head-main-img',
+              'img[src*="ltwebstatic.com"]',
+              'img[data-src*="ltwebstatic.com"]',
+              '.crop-image-container img',
+              '[data-test-id="product-image"] img',
+              '.a-carousel-card img',
+              'img.product-image'
+            ];
+            for (var sIdx = 0; sIdx < imgSelectors.length; sIdx++) {
+              var candidateEls = document.querySelectorAll(imgSelectors[sIdx]);
+              for (var cIdx = 0; cIdx < candidateEls.length; cIdx++) {
+                var cEl = candidateEls[cIdx];
+                var candUrl = parseImageUrl(cEl.getAttribute('data-a-hires')) ||
+                              parseImageUrl(cEl.getAttribute('data-old-hires')) ||
+                              parseImageUrl(cEl.getAttribute('data-src')) ||
+                              parseImageUrl(cEl.getAttribute('data-original')) ||
+                              parseImageUrl(cEl.getAttribute('data-a-dynamic-image')) ||
+                              parseImageUrl(cEl.currentSrc) ||
+                              parseImageUrl(cEl.src) ||
+                              parseImageUrl(cEl.getAttribute('src')) || '';
+                if (candUrl && isValidImg(candUrl)) {
+                  image = candUrl;
+                  break;
+                }
+              }
+              if (image) break;
+            }
+            if (!image) {
+              var metaImg = document.querySelector('meta[property="og:image"], meta[name="twitter:image"], meta[itemprop="image"], link[rel="image_src"]');
+              if (metaImg) {
+                var candMeta = parseImageUrl(metaImg.content || metaImg.href || metaImg.getAttribute('content') || '');
+                if (candMeta && isValidImg(candMeta)) image = candMeta;
+              }
             }
             if (!image) {
               var jsonLds = document.querySelectorAll('script[type="application/ld+json"]');
@@ -1229,16 +1349,12 @@ export default function Webview({ route, navigation }) {
                       var cImg = Array.isArray(rImg) ? rImg[0] : rImg;
                       if (typeof cImg === 'object' && cImg.url) cImg = cImg.url;
                       var parsed = parseImageUrl(cImg);
-                      if (parsed) { image = parsed; break; }
+                      if (parsed && isValidImg(parsed)) { image = parsed; break; }
                     }
                   }
                 } catch(_ldErr) {}
                 if (image) break;
               }
-            }
-            if (!image) {
-              var metaImg = document.querySelector('meta[property="og:image"], meta[name="twitter:image"], meta[itemprop="image"], link[rel="image_src"]');
-              if (metaImg) image = parseImageUrl(metaImg.content || metaImg.href || '');
             }
 
             // 3. Price & Currency
@@ -1932,10 +2048,16 @@ export default function Webview({ route, navigation }) {
     }
 
     if (freshSnapshot) {
-      if (freshSnapshot.title) titleRef.current = freshSnapshot.title;
+      if (freshSnapshot.title && !/product summary|key product information/i.test(freshSnapshot.title)) {
+        titleRef.current = freshSnapshot.title;
+      } else if (titleRef.current && /product summary|key product information/i.test(titleRef.current)) {
+        titleRef.current = '';
+      }
       if (freshSnapshot.image) imageRef.current = freshSnapshot.image;
       if (freshSnapshot.price) priceRef.current = freshSnapshot.price;
       if (freshSnapshot.currency) currencyRef.current = freshSnapshot.currency;
+    } else if (titleRef.current && /product summary|key product information/i.test(titleRef.current)) {
+      titleRef.current = '';
     }
 
     // --- Determine whether the current page is a product page ---
@@ -1956,14 +2078,17 @@ export default function Webview({ route, navigation }) {
     }
 
     // --- Validate product data ---
-    const finalTitle = titleRef.current || getFallbackTitleFromUrl(currentUrlRef.current, '');
+    const rawTitleCandidate = titleRef.current && !/product summary|key product information/i.test(titleRef.current)
+      ? titleRef.current
+      : '';
+    const finalTitle = rawTitleCandidate || getFallbackTitleFromUrl(currentUrlRef.current, '');
     const finalImage = (imageRef.current || '').trim();
 
     // Only block for truly generic / site-level titles (no product name at all)
     const isGenericTitle = (title) => {
       if (!title || typeof title !== 'string') return true;
       const clean = title.trim().toLowerCase();
-      if (!clean || clean === 'product' || clean === 'oneclick' || clean === '-') return true;
+      if (!clean || clean === 'product' || clean === 'oneclick' || clean === '-' || /product summary|key product information/i.test(clean)) return true;
       // Pure store homepage titles (no product name mixed in)
       const genericPatterns = [
         /^trendyol\s*[-–|:]?\s*(fashion|home|electronics|beauty|online al[ıi][sş]veri[sş]|en uygun fiyat)/i,
@@ -2081,7 +2206,7 @@ export default function Webview({ route, navigation }) {
     const sanitizedColors = selectedColor ? [selectedColor] : colors;
 
     addItem({
-      title: finalTitle,
+      title: cleanProductTitle(finalTitle, currentUrlRef.current),
       url: currentUrlRef.current,
       count: 1,
       checked: true,
@@ -2165,7 +2290,7 @@ export default function Webview({ route, navigation }) {
           }
           case 'productDetailsSnapshot': {
             if (message.data && typeof message.data === 'object') {
-              if (message.data.title) titleRef.current = String(message.data.title).trim();
+              if (message.data.title) titleRef.current = cleanProductTitle(String(message.data.title).trim(), currentUrlRef.current);
               if (message.data.image) imageRef.current = String(message.data.image).trim();
               if (message.data.price) priceRef.current = String(message.data.price).trim();
               if (message.data.currency) currencyRef.current = String(message.data.currency).trim();
@@ -2184,7 +2309,7 @@ export default function Webview({ route, navigation }) {
             return;
           case 'title':
             if (message.data && typeof message.data === 'string') {
-              titleRef.current = message.data.trim();
+              titleRef.current = cleanProductTitle(message.data.trim(), currentUrlRef.current);
             }
             return;
           case 'price':

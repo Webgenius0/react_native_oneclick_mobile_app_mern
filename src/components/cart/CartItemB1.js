@@ -13,6 +13,7 @@ import CartItemCountArea from './CartItemCountArea';
 import {t} from '../../translate/i18n';
 import TrashIcon from '../../assets/svg/trash.svg';
 import CartItemImage from './CartItemImage';
+import {cleanProductTitle} from '../../helpers/storeHelper';
 
 const CartItemB1 = ({
   item,
@@ -76,7 +77,12 @@ const CartItemB1 = ({
                 }}>
                 <View style={{flex: 1}}>
                   <TouchableOpacity onPress={() => openUrl(item.url)}>
-                    <Text style={styles.url}>{item.title || item.url}</Text>
+                    <Text
+                      numberOfLines={2}
+                      ellipsizeMode="tail"
+                      style={styles.url}>
+                      {cleanProductTitle(item.title, item.url)}
+                    </Text>
                   </TouchableOpacity>
                 </View>
                 <View style={{width: 30,
@@ -171,6 +177,7 @@ const styles = StyleSheet.create({
   },
   url: {
     marginBottom: 10,
+    flexShrink: 1,
   },
 });
 

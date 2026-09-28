@@ -1,66 +1,30 @@
-import {useCallback, useContext, useEffect, useState, createRef} from 'react';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {
-  SafeAreaView,
-  Text,
-  View,
-  StyleSheet,
-  Image,
-  Touchable,
-  TouchableOpacity,
-  Alert,
-  ScrollView,
-  Button,
-  FlatList,
-  TextInput,
-  Pressable,
-  RefreshControl,
-} from 'react-native';
+import { useCallback, useEffect, useState, createRef } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, Text, View, StyleSheet, Image, TouchableOpacity, Alert, FlatList, RefreshControl } from 'react-native';
 
-import {t, tr} from '../translate/i18n';
-import {EmContext} from '../contexts/EmContext';
+import { t, tr } from '../translate/i18n';
 import Dump from '../components/Dump';
-import FastImage from 'react-native-fast-image';
-import gs from '../assets/GlobalStyle';
-import {delay, randomNumber, shorten} from '../helpers/common';
 
-import {devCart, useCartStore, isCartItemComplete} from '../store/useCartStore';
+import { useCartStore, isCartItemComplete } from '../store/useCartStore';
 import CartItem from '../components/cart/CartItem';
 import Colors from '../assets/Colors';
 import CartManuelItemModal from '../components/cart/CartManuelItemModal';
-import {getToken, getUser} from '../helpers/auth';
+import { getToken, getUser } from '../helpers/auth';
 import ai from '../helpers/ai';
 import Loading from '../components/Loading';
-import RNPickerSelect from 'react-native-picker-select';
-import {useFocusEffect} from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import TeslimatSehirPicker from '../components/TeslimatSehirPicker';
 import { useExchangeRateStore } from '../store/useExchangeRateStore';
-import {
-  calculateConvertedPrice,
-  parsePrice,
-  normalizeCurrency,
-} from '../helpers/currencyHelper';
+import { calculateConvertedPrice, parsePrice, normalizeCurrency, } from '../helpers/currencyHelper';
+import { cleanProductTitle } from '../helpers/storeHelper';
 
-export default function CartPage({navigation, route}) {
+export default function CartPage({ navigation, route }) {
   const insets = useSafeAreaInsets();
   // Ana sepet bileşeni
-  const {
-    items,
-    addItem,
-    removeItem,
-    checkItem,
-    updateItem,
-    updateAll,
-    increaseCount,
-    decreaseCount,
-    clearCart,
-    updateField,
-    updateOption,
-  } = useCartStore();
+  const { items, addItem, removeItem, checkItem, updateAll, increaseCount, decreaseCount, clearCart, updateField, updateOption } = useCartStore();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedValue, setSelectedValue] = useState(null);
   const [teslimatSehirs, setTeslimatSehirs] = useState([]);
   const [teslimatSehirID, setTeslimatSehirID] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -141,7 +105,7 @@ export default function CartPage({navigation, route}) {
     let postData = new FormData();
     const checkedLen = (items ? items.filter(item => item.checked === true).length : 0) || 0;
 
-    if(checkedLen === 0){
+    if (checkedLen === 0) {
       Alert.alert(t('Lütfen en az bir ürünü seçin'));
       setIsSubmitting(false);
       return;
@@ -155,7 +119,7 @@ export default function CartPage({navigation, route}) {
 
     if (incompleteItems.length > 0) {
       const incompleteNames = incompleteItems
-        .map(i => i.title || i.url)
+        .map(i => cleanProductTitle(i.title, i.url))
         .slice(0, 3)
         .join('\n• ');
 
@@ -190,7 +154,7 @@ export default function CartPage({navigation, route}) {
       );
 
       // fill post data with both new schema fields and backwards compatibility fields
-      postData.append('cart[' + i + '][ad]', item.title);
+      postData.append('cart[' + i + '][ad]', cleanProductTitle(item.title, item.url));
       postData.append('cart[' + i + '][link]', item.url);
       postData.append('cart[' + i + '][sayi]', item.count);
       postData.append('cart[' + i + '][size]', item.size ? item.size : '');
@@ -284,7 +248,7 @@ export default function CartPage({navigation, route}) {
         Alert.alert(tr('Sipariş Alındı'));
         setTimeout(function () {
           let d = +new Date();
-          navigation.navigate('Orders', {refetch: d});
+          navigation.navigate('Orders', { refetch: d });
         }, 1000);
       }
     } else {
@@ -309,7 +273,7 @@ export default function CartPage({navigation, route}) {
       borderBottomWidth: 3,
       borderBottomColor: '#dad8d8',
     },
-    noItemsContainer: {flex: 1, justifyContent: 'center', alignItems: 'center'},
+    noItemsContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     btnContainer: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -417,7 +381,7 @@ export default function CartPage({navigation, route}) {
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
             }
             data={items}
-            renderItem={({item}) => (
+            renderItem={({ item }) => (
               <CartItem
                 item={item}
                 onRemove={removeItem}
@@ -438,9 +402,9 @@ export default function CartPage({navigation, route}) {
         <View style={styles.noItemsContainer}>
           <Image
             source={require('../assets/img/cart.png')}
-            style={{width: 100, height: 100, marginBottom: 20}}
+            style={{ width: 100, height: 100, marginBottom: 20 }}
           />
-          <Text style={{fontSize: 20, color: '#888'}}>
+          <Text style={{ fontSize: 20, color: '#888' }}>
             {t('Sepetinizde hiç ürün yok')}
           </Text>
         </View>
@@ -459,8 +423,8 @@ export default function CartPage({navigation, route}) {
       {!loading && (
         <>
           <View style={styles.infoContainer}>
-            <View style={{flexDirection: 'column', alignItems: 'flex-start'}}>
-              <Text style={{fontSize: 14, color: '#888'}}>
+            <View style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+              <Text style={{ fontSize: 14, color: '#888' }}>
                 {
                   totalItems > 0 ? totalItems + ' ' + t('Ürün') : ''
                 }
@@ -481,7 +445,7 @@ export default function CartPage({navigation, route}) {
                 onPress={() => {
                   deliveryRef.current.togglePicker(true);
                 }}>*/}
-               {/* <Text
+              {/* <Text
                   style={{
                     color: '#333',
                     marginEnd: 10,

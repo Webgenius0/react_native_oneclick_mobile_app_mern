@@ -20,7 +20,7 @@ import React from 'react';
 import Dump from '../Dump';
 import { useExchangeRateStore } from '../../store/useExchangeRateStore';
 import { normalizeCurrency } from '../../helpers/currencyHelper';
-import { getStoreName } from '../../helpers/storeHelper';
+import { cleanProductTitle, getStoreName } from '../../helpers/storeHelper';
 
 const CartItem = ({
   item,
@@ -107,7 +107,12 @@ const CartItem = ({
                     </View>
                   )}
                   <TouchableOpacity onPress={() => openUrl(item.url)}>
-                    <Text style={styles.url}>{item.title || item.url}</Text>
+                    <Text
+                      numberOfLines={2}
+                      ellipsizeMode="tail"
+                      style={styles.url}>
+                      {cleanProductTitle(item.title, item.url)}
+                    </Text>
                   </TouchableOpacity>
                   {Boolean(item?.price) ? (
                     <View style={styles.priceContainer}>
@@ -476,6 +481,7 @@ const styles = StyleSheet.create({
   url: {
     marginBottom: 5,
     color: '#000',
+    flexShrink: 1,
   },
   priceContainer: {
     flexDirection: 'row',

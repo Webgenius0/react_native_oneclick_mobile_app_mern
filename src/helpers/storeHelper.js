@@ -183,3 +183,216 @@ export const isProductUrl = url => {
 
   return false;
 };
+
+export const getFallbackTitleFromUrl = (url, fallback = '') => {
+  if (fallback && typeof fallback === 'string') {
+    const cleanFallback = fallback.trim();
+    if (
+      cleanFallback &&
+      cleanFallback !== '-' &&
+      cleanFallback.toLowerCase() !== 'product' &&
+      cleanFallback.toLowerCase() !== 'oneclick'
+    ) {
+      return cleanFallback;
+    }
+  }
+  if (!url || typeof url !== 'string') {
+    return '';
+  }
+  try {
+    const pathOnly = url
+      .split('?')[0]
+      .split('#')[0]
+      .replace(/^[a-z]+:\/\/[^/]+/i, '');
+    const segments = pathOnly.split('/').filter(Boolean);
+    let asinCandidate = '';
+    for (let i = segments.length - 1; i >= 0; i--) {
+      const seg = segments[i] || '';
+      const slug = seg
+        .replace(/\.(html?|php|asp)$/i, '')
+        .replace(/-p-?\d+.*$/i, '')
+        .replace(/-p0*[0-9a-z]{6,}.*$/i, '');
+
+      // Skip empty, tiny, routing, domain, or tracking parameters (e.g. ref=mh_s9_acsd_al_cv2_3_t)
+      if (
+        !slug ||
+        slug.length <= 3 ||
+        /^(dp|gp|product|products|d|item|items|goods|p|category|categories|collection|collections|brand|brands|search|filter)$/i.test(slug) ||
+        /^ref[=_\s0-9a-z-]/i.test(slug) ||
+        slug.toLowerCase().includes('ref=') ||
+        /^(ref|refid|session-id|keywords|qid|sr|sprefix|crid|tag)$/i.test(slug) ||
+        /\.(com|net|org|tr|ae|sa|co|de|fr|uk|es|it|ru|cn)$/i.test(slug)
+      ) {
+        continue;
+      }
+
+      if (/^[a-z0-9]{8,12}$/i.test(slug)) {
+        if (!asinCandidate) asinCandidate = slug;
+        continue;
+      }
+      const decoded = decodeURIComponent(slug)
+        .replace(/[-_+]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (decoded.length > 3 && !/^\d+$/.test(decoded)) {
+        // Skip tracking artifacts in decoded text
+        if (/^ref[=_\s-]/i.test(decoded)) {
+          continue;
+        }
+        const hasMixedCase = /[a-z]/.test(decoded) && /[A-Z]/.test(decoded);
+        if (hasMixedCase) {
+          return decoded;
+        }
+        return decoded
+          .split(' ')
+          .map(w => {
+            if (/^iphone$/i.test(w)) return 'iPhone';
+            if (/^ipad$/i.test(w)) return 'iPad';
+            if (/^ipod$/i.test(w)) return 'iPod';
+            return w.length > 0 ? w.charAt(0).toUpperCase() + w.slice(1) : '';
+          })
+          .join(' ');
+      }
+    }
+    if (asinCandidate) {
+      return asinCandidate;
+    }
+  } catch (_e) {}
+  return '';
+};
+
+export const cleanProductTitle = (rawTitle, url = '') => {
+  let title = rawTitle && typeof rawTitle === 'string' ? rawTitle : '';
+
+  // If title is an HTTP/HTTPS URL, derive product title from URL
+  if (/^https?:\/\//i.test(title.trim())) {
+    const fromUrl = getFallbackTitleFromUrl(title);
+    if (fromUrl) {
+      return fromUrl;
+    }
+    title = '';
+  }
+
+  // Reject tracking parameter artifacts disguised as titles (e.g. "Ref=mh S9 Acsd Al Cv2 3 T")
+  if (
+    /^ref[=_\s-]/i.test(title.trim()) ||
+    title.trim().toLowerCase().startsWith('ref=') ||
+    /product summary|key product information/i.test(title)
+  ) {
+    title = '';
+  }
+
+  if (title) {
+    // 1. Normalize line breaks and tabs
+    title = title.replace(/\r\n|\r|\n|\t/g, ' ').replace(/\s+/g, ' ').trim();
+
+    // 2. Decode HTML entities
+    title = title
+      .replace(/&amp;/gi, '&')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;|&apos;/gi, "'")
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&nbsp;/gi, ' ');
+
+    // 3. Remove store prefixes (e.g. "Amazon.com: ", "Amazon.com.tr : ", "Trendyol: ", "Hepsiburada: ")
+    title = title.replace(
+      /^(?:Amazon(?:\.[a-z.]+)?|Trendyol|Hepsiburada(?:\.com)?|Shein|Zara|Noon|AliExpress|eBay|Walmart(?:\.com)?|Nike(?:\.com)?|Apple|Asos|Mango|H&M)\s*[:|–—-]\s*/gi,
+      '',
+    );
+
+    // 4. Remove Amazon byline / brand prefix if captured (e.g. "Visit the Apple Store", "Brand: Apple")
+    title = title.replace(
+      /^(?:Visit the\s+[^\n\r]+?\s+Store|Brand:\s*[^:\n\r]+?)\s+/gi,
+      '',
+    );
+
+    // 5. Remove store and domain suffixes
+    title = title
+      // Trendyol suffixes
+      .replace(/\s*Fiyatı,?\s*Yorumları\s*-\s*Trendyol.*$/gi, '')
+      .replace(/\s*Fiyatı\s*-\s*Trendyol.*$/gi, '')
+      .replace(/\s*-\s*Trendyol.*$/gi, '')
+      .replace(/\s*\|\s*Trendyol.*$/gi, '')
+      // Hepsiburada suffixes
+      .replace(/\s*Fiyatı\s*-\s*Hepsiburada.*$/gi, '')
+      .replace(/\s*-\s*Hepsiburada.*$/gi, '')
+      .replace(/\s*\|\s*Hepsiburada.*$/gi, '')
+      // Amazon domain suffixes
+      .replace(/\s*[:|–—-]\s*Amazon\.[a-z.]+(\s*:.*)?$/gi, '')
+      .replace(/\s*[:|–—-]\s*Amazon$/gi, '')
+      .replace(/\s*\|\s*Amazon.*$/gi, '')
+      // Shein suffixes
+      .replace(/\s*\|\s*SHEIN(?:\s+[A-Z]{2,3})?.*$/gi, '')
+      .replace(/\s*-\s*SHEIN(?:\s+[A-Z]{2,3})?.*$/gi, '')
+      // Zara suffixes
+      .replace(/\s*\|\s*ZARA(?:\s+[^|–—-]+)?$/gi, '')
+      .replace(/\s*-\s*ZARA(?:\s+[^|–—-]+)?$/gi, '')
+      // H&M suffixes
+      .replace(/\s*\|\s*H&M(?:\s+[A-Z]{2,3})?.*$/gi, '')
+      .replace(/\s*-\s*H&M(?:\s+[A-Z]{2,3})?.*$/gi, '')
+      // Noon suffixes
+      .replace(/\s*\|\s*noon.*$/gi, '')
+      .replace(/\s*-\s*noon.*$/gi, '')
+      // AliExpress suffixes
+      .replace(/\s*-\s*AliExpress(?:\s+\d+)?.*$/gi, '')
+      .replace(/\s*\|\s*AliExpress.*$/gi, '')
+      // eBay suffixes
+      .replace(/\s*\|\s*eBay.*$/gi, '')
+      .replace(/\s*-\s*eBay.*$/gi, '')
+      // Nike suffixes
+      .replace(/\s*\.?\s*Nike\.com.*$/gi, '')
+      .replace(/\s*\|\s*Nike.*$/gi, '')
+      // Walmart suffixes
+      .replace(/\s*-\s*Walmart\.com.*$/gi, '')
+      .replace(/\s*\|\s*Walmart.*$/gi, '')
+      // Generic domain suffixes like "| sitename.com" or "- sitename.com"
+      .replace(
+        /\s*[:|–—-]\s*[a-z0-9-]+\.(?:com|org|net|tr|ae|sa|co\.uk|de|fr|es|it|ru|cn)(?:\.[a-z]+)?\s*$/gi,
+        '',
+      );
+
+    // 6. Remove Amazon category breadcrumbs from document.title
+    title = title.replace(
+      /\s*:\s*(?:Electronics|Cell Phones & Accessories|Clothing, Shoes & Jewelry|Home & Kitchen|Beauty & Personal Care|Health & Household|Sports & Outdoors|Toys & Games|Automotive|Tools & Home Improvement|Office Products|Pet Supplies|Baby Products|Grocery & Gourmet Food|Moda|Elektronik|Ev & Yaşam|Mutfak|Kişisel Bakım|Spor & Outdoor|Oto & Yapı Market|Kitap|Oyuncak|Bebek|Computers? & Accessories|Video Games|Musical Instruments|Books|Luggage & Travel Gear|Industrial & Scientific)\s*$/gi,
+      '',
+    );
+
+    // 7. Remove trailing rating / review star text if captured from noisy container
+    title = title.replace(/\s*\d+(?:\.\d+)?\s*(?:out of 5 stars|stars|yıldız).*$/gi, '');
+    title = title.replace(
+      /\s*\(\s*\d+(?:,\d+)*\s*(?:ratings?|reviews?|değerlendirme|yorum)\s*\).*$/gi,
+      '',
+    );
+
+    // 8. Clean leading and trailing punctuation & quotes
+    while (/^[\s:|–—•·"'/\-]+|[\s:|–—•·"'/\-]+$/.test(title)) {
+      title = title.replace(/^[\s:|–—•·"'/\-]+|[\s:|–—•·"'/\-]+$/g, '').trim();
+    }
+
+    // 9. Normalize spaces again
+    title = title.replace(/\s+/g, ' ').trim();
+  }
+
+  // If title is empty or generic placeholder, try URL fallback
+  const isGeneric =
+    !title ||
+    title.toLowerCase() === 'product' ||
+    title.toLowerCase() === 'oneclick' ||
+    title === '-' ||
+    title.toLowerCase() === 'undefined' ||
+    title.toLowerCase() === 'null' ||
+    /^ref[=_\s-]/i.test(title.trim()) ||
+    title.trim().toLowerCase().startsWith('ref=') ||
+    /product summary|key product information/i.test(title);
+
+  if (isGeneric && url) {
+    const fromUrl = getFallbackTitleFromUrl(url);
+    if (fromUrl) {
+      return fromUrl;
+    }
+  }
+
+  return title;
+};
+

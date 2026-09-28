@@ -1,4 +1,6 @@
 import {Platform} from 'react-native';
+import {cleanProductTitle, getFallbackTitleFromUrl} from './storeHelper';
+export {cleanProductTitle, getFallbackTitleFromUrl};
 
 export const isTrendyol = page_url => {
   if (!page_url || typeof page_url !== 'string') return false;
@@ -124,32 +126,70 @@ export const getMetaTagImage = page_url => {
         var imgUrl = '';
 
         // 1. Primary DOM Product Selectors (Mobile/Desktop galleries)
-        var imgEl = document.querySelector(
-          '#landingImage, #main-image, #imgBlkFront, img.a-dynamic-image, [data-a-image-name="landingImage"], ' +
-          '#main-image-container img, #imageBlock img, #canvasImage, #ebooks-img-canvas img, .a-carousel-card img, ' +
-          'div[data-action="main-image-click"] img, div#media-canvas img, img[data-a-hires], ' +
-          'img[src*="media-amazon.com/images/I/"], img[src*="images-amazon.com/images/I/"], ' +
-          '.product-slide-item img, img[src*="cdn.dsmcdn.com/mnresize"], ' +
-          'img[data-src*="cdn.dsmcdn.com/mnresize"], .product-image-gallery-viewport img, ' +
-          'img[src*="media/images"], img[data-src*="media/images"], .detail-section-img, .base-product-image img, ' +
-          '.gallery-container img, img.product-intro__head-main-img, .crop-image-container img, ' +
-          '[data-test-id="product-image"] img, img.product-image'
-        );
-        if (imgEl) {
-          var candDom = parseImageUrl(imgEl.getAttribute('data-a-hires')) ||
-                         parseImageUrl(imgEl.getAttribute('data-old-hires')) ||
-                         parseImageUrl(imgEl.getAttribute('data-src')) ||
-                         parseImageUrl(imgEl.getAttribute('data-original')) ||
-                         parseImageUrl(imgEl.getAttribute('data-a-dynamic-image')) ||
-                         parseImageUrl(imgEl.currentSrc) ||
-                         parseImageUrl(imgEl.src) ||
-                         parseImageUrl(imgEl.getAttribute('src')) || '';
-          if (candDom) {
-            imgUrl = candDom;
+        var imgSelectors = [
+          '#landingImage',
+          '#main-image',
+          '#imgBlkFront',
+          'img.a-dynamic-image',
+          '[data-a-image-name="landingImage"]',
+          '#main-image-container img',
+          '#imageBlock img',
+          '#canvasImage',
+          '#ebooks-img-canvas img',
+          'div[data-action="main-image-click"] img',
+          'div#media-canvas img',
+          'img[data-a-hires]',
+          'img[src*="media-amazon.com/images/I/"]',
+          'img[src*="images-amazon.com/images/I/"]',
+          '.product-slide-item img',
+          'img[src*="cdn.dsmcdn.com/mnresize"]',
+          'img[data-src*="cdn.dsmcdn.com/mnresize"]',
+          '.product-image-gallery-viewport img',
+          'img[src*="media/images"]',
+          'img[data-src*="media/images"]',
+          '.detail-section-img',
+          '.base-product-image img',
+          '.gallery-container img',
+          'img.product-intro__head-main-img',
+          'img[src*="ltwebstatic.com"]',
+          'img[data-src*="ltwebstatic.com"]',
+          '.crop-image-container img',
+          '[data-test-id="product-image"] img',
+          '.a-carousel-card img',
+          'img.product-image'
+        ];
+        for (var sIdx = 0; sIdx < imgSelectors.length; sIdx++) {
+          var candidateEls = document.querySelectorAll(imgSelectors[sIdx]);
+          for (var cIdx = 0; cIdx < candidateEls.length; cIdx++) {
+            var cEl = candidateEls[cIdx];
+            var candDom = parseImageUrl(cEl.getAttribute('data-a-hires')) ||
+                          parseImageUrl(cEl.getAttribute('data-old-hires')) ||
+                          parseImageUrl(cEl.getAttribute('data-src')) ||
+                          parseImageUrl(cEl.getAttribute('data-original')) ||
+                          parseImageUrl(cEl.getAttribute('data-a-dynamic-image')) ||
+                          parseImageUrl(cEl.currentSrc) ||
+                          parseImageUrl(cEl.src) ||
+                          parseImageUrl(cEl.getAttribute('src')) || '';
+            if (candDom && isValidImg(candDom)) {
+              imgUrl = candDom;
+              break;
+            }
+          }
+          if (imgUrl) break;
+        }
+
+        // 2. Fallback to Meta tags
+        if (!imgUrl) {
+          var metaImg = document.querySelector('meta[property="og:image"], meta[name="twitter:image"], meta[itemprop="image"], link[rel="image_src"]');
+          if (metaImg) {
+            var candMeta = parseImageUrl(metaImg.content || metaImg.href || metaImg.getAttribute('content') || '');
+            if (candMeta && isValidImg(candMeta)) {
+              imgUrl = candMeta;
+            }
           }
         }
 
-        // 2. Check JSON-LD schema if DOM selector didn't find item image
+        // 3. Check JSON-LD schema if DOM selector didn't find item image
         if (!imgUrl) {
           var jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
           for (var i = 0; i < jsonLdScripts.length; i++) {
@@ -163,7 +203,7 @@ export const getMetaTagImage = page_url => {
                   var cand = Array.isArray(rawImg) ? rawImg[0] : rawImg;
                   if (typeof cand === 'object' && cand.url) cand = cand.url;
                   var parsedImg = parseImageUrl(cand);
-                  if (parsedImg) {
+                  if (parsedImg && isValidImg(parsedImg)) {
                     imgUrl = parsedImg;
                     break;
                   }
@@ -171,17 +211,6 @@ export const getMetaTagImage = page_url => {
               }
             } catch(e) {}
             if (imgUrl) break;
-          }
-        }
-
-        // 3. Fallback to Meta tags
-        if (!imgUrl) {
-          var metaImg = document.querySelector('meta[property="og:image"], meta[name="twitter:image"], meta[itemprop="image"], link[rel="image_src"]');
-          if (metaImg) {
-            var val = parseImageUrl(metaImg.content || metaImg.href || '');
-            if (val) {
-              imgUrl = val;
-            }
           }
         }
 
@@ -211,43 +240,151 @@ export const getMetaTagTitle = page_url => {
 
     var cleanTitle = function(raw) {
       if (!raw || typeof raw !== 'string') return '';
-      return raw
-        .replace(/\\s*Fiyatı,\\s*Yorumları\\s*-\\s*Trendyol/gi, '')
-        .replace(/\\s*[:|-]\\s*Amazon\\.[a-z.]+(\\s*:.*)?$/gi, '')
-        .replace(/\\s*:\\s*Amazon\\.[a-z.]+/gi, '')
-        .replace(/\\s*-\\s*Amazon\\.[a-z.]+/gi, '')
-        .replace(/\\s*\\|\\s*Shein/gi, '')
-        .replace(/\\s*-\\s*Trendyol/gi, '')
-        .trim();
+      var str = raw.replace(/\\r\\n|\\r|\\n|\\t/g, ' ').replace(/\\s+/g, ' ').trim();
+      str = str
+        .replace(/&amp;/gi, '&')
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;|&apos;/gi, "'")
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>')
+        .replace(/&nbsp;/gi, ' ');
+      str = str.replace(/^(?:Amazon(?:\\.[a-z.]+)?|Trendyol|Hepsiburada(?:\\.com)?|Shein|Zara|Noon|AliExpress|eBay|Walmart(?:\\.com)?|Nike(?:\\.com)?|Apple|Asos|Mango|H&M)\\s*[:|–—\\-]\\s*/gi, '');
+      str = str.replace(/^(?:Visit the\\s+[^\\n\\r]+?\\s+Store|Brand:\\s*[^:\\n\\r]+?)\\s+/gi, '');
+      str = str
+        .replace(/\\s*Fiyatı,?\\s*Yorumları\\s*-\\s*Trendyol.*$/gi, '')
+        .replace(/\\s*Fiyatı\\s*-\\s*Trendyol.*$/gi, '')
+        .replace(/\\s*-\\s*Trendyol.*$/gi, '')
+        .replace(/\\s*\\|\\s*Trendyol.*$/gi, '')
+        .replace(/\\s*Fiyatı\\s*-\\s*Hepsiburada.*$/gi, '')
+        .replace(/\\s*-\\s*Hepsiburada.*$/gi, '')
+        .replace(/\\s*\\|\\s*Hepsiburada.*$/gi, '')
+        .replace(/\\s*[:|–—\\-]\\s*Amazon\\.[a-z.]+(\\s*:.*)?$/gi, '')
+        .replace(/\\s*[:|–—\\-]\\s*Amazon$/gi, '')
+        .replace(/\\s*\\|\\s*Amazon.*$/gi, '')
+        .replace(/\\s*\\|\\s*SHEIN(?:\\s+[A-Z]{2,3})?.*$/gi, '')
+        .replace(/\\s*-\\s*SHEIN(?:\\s+[A-Z]{2,3})?.*$/gi, '')
+        .replace(/\\s*\\|\\s*ZARA(?:\\s+[^|–—\\-]+)?$/gi, '')
+        .replace(/\\s*-\\s*ZARA(?:\\s+[^|–—\\-]+)?$/gi, '')
+        .replace(/\\s*\\|\\s*H&M(?:\\s+[A-Z]{2,3})?.*$/gi, '')
+        .replace(/\\s*-\\s*H&M(?:\\s+[A-Z]{2,3})?.*$/gi, '')
+        .replace(/\\s*\\|\\s*noon.*$/gi, '')
+        .replace(/\\s*-\\s*noon.*$/gi, '')
+        .replace(/\\s*-\\s*AliExpress(?:\\s+\\d+)?.*$/gi, '')
+        .replace(/\\s*\\|\\s*AliExpress.*$/gi, '')
+        .replace(/\\s*\\|\\s*eBay.*$/gi, '')
+        .replace(/\\s*-\\s*eBay.*$/gi, '')
+        .replace(/\\s*\\.?\\s*Nike\\.com.*$/gi, '')
+        .replace(/\\s*\\|\\s*Nike.*$/gi, '')
+        .replace(/\\s*-\\s*Walmart\\.com.*$/gi, '')
+        .replace(/\\s*\\|\\s*Walmart.*$/gi, '')
+        .replace(/\\s*[:|–—\\-]\\s*[a-z0-9-]+\\.(?:com|org|net|tr|ae|sa|co\\.uk|de|fr|es|it|ru|cn)(?:\\.[a-z]+)?\\s*$/gi, '');
+      str = str.replace(/\\s*:\\s*(?:Electronics|Cell Phones & Accessories|Clothing, Shoes & Jewelry|Home & Kitchen|Beauty & Personal Care|Health & Household|Sports & Outdoors|Toys & Games|Automotive|Tools & Home Improvement|Office Products|Pet Supplies|Baby Products|Grocery & Gourmet Food|Moda|Elektronik|Ev & Yaşam|Mutfak|Kişisel Bakım|Spor & Outdoor|Oto & Yapı Market|Kitap|Oyuncak|Bebek|Computers? & Accessories|Video Games|Musical Instruments|Books|Luggage & Travel Gear|Industrial & Scientific)\\s*$/gi, '');
+      str = str.replace(/\\s*\\d+(?:\\.\\d+)?\\s*(?:out of 5 stars|stars|yıldız).*$/gi, '');
+      str = str.replace(/\\s*\\(\\s*\\d+(?:,\\d+)*\\s*(?:ratings?|reviews?|değerlendirme|yorum)\\s*\\).*$/gi, '');
+      str = str.replace(/^[\\s:|–—•·\"'\\-]+|[\\s:|–—•·\"'\\-]+$/g, '').trim();
+      if (/^ref[=_\s-]/i.test(str) || str.toLowerCase().indexOf('ref=') === 0 || /product summary|key product information/i.test(str)) return '';
+      return str.replace(/\\s+/g, ' ').trim();
     };
 
     var checkTitle = function() {
       attempts++;
       try {
         var title = '';
-        var titleEl = document.querySelector('#productTitle, #title, #title_feature_div span, #title_feature_div, [data-feature-name="title"], h1#title, h1.pr-new-br span, [data-automation-id="product-title"], .product-title, .pdp-title, .goods-detail-info__name, .product-intro__head-name, .product-intro__title, .goods-title');
-        if (titleEl && titleEl.textContent && titleEl.textContent.trim()) {
-          title = cleanTitle(titleEl.textContent.trim());
-        }
 
+        // Priority 1: JSON-LD Product schema
+        try {
+          var ldScripts = document.querySelectorAll('script[type="application/ld+json"]');
+          for (var j = 0; j < ldScripts.length; j++) {
+            var ldObj = JSON.parse(ldScripts[j].textContent);
+            var ldItems = Array.isArray(ldObj) ? ldObj : [ldObj];
+            for (var k = 0; k < ldItems.length; k++) {
+              var item = ldItems[k];
+              if (!item) continue;
+              if (item['@type'] === 'Product' && item.name && typeof item.name === 'string') {
+                var cName = cleanTitle(item.name);
+                if (cName && cName.length > 2) { title = cName; break; }
+              }
+              if (Array.isArray(item['@graph'])) {
+                for (var g = 0; g < item['@graph'].length; g++) {
+                  var gItem = item['@graph'][g];
+                  if (gItem && gItem['@type'] === 'Product' && gItem.name && typeof gItem.name === 'string') {
+                    var cgName = cleanTitle(gItem.name);
+                    if (cgName && cgName.length > 2) { title = cgName; break; }
+                  }
+                }
+              }
+            }
+            if (title) break;
+          }
+        } catch (_ldErr) {}
+
+        // Priority 2: High-specificity product title DOM selectors in strict priority order
         if (!title) {
-          var h1 = document.querySelector('h1');
-          if (h1 && h1.textContent && h1.textContent.trim()) {
-            title = cleanTitle(h1.textContent.trim());
+          var prioritySelectors = [
+            '#title_feature_div #productTitle',
+            '#title #productTitle',
+            '#productTitle',
+            'h1.pr-new-br span',
+            'h1.pr-new-br',
+            '[data-automation-id="product-title"]',
+            '.goods-detail-info__name',
+            '.product-intro__head-name',
+            '.product-intro__title',
+            '.goods-title',
+            'h1[data-test-id="product-title"]',
+            'h1[itemprop="name"]',
+            'h1#title',
+            '[data-feature-name="title"] h1',
+            '[data-feature-name="title"] #productTitle',
+            '.product-title',
+            '.pdp-title',
+            '.product-detail__title',
+            '.product__title',
+            '#title h1',
+            'h1'
+          ];
+
+          for (var p = 0; p < prioritySelectors.length; p++) {
+            var el = document.querySelector(prioritySelectors[p]);
+            if (el) {
+              var elClass = String(el.className || '');
+              if (/\\b(a-offscreen|a-screen-reader|sr-only)\\b/i.test(elClass) ||
+                  (el.offsetParent === null && window.getComputedStyle && window.getComputedStyle(el).position !== 'fixed')) {
+                continue;
+              }
+              var rawText = (el.textContent || '').trim();
+              if (rawText && rawText.length > 1) {
+                var cleaned = cleanTitle(rawText);
+                if (cleaned && cleaned.length > 2 &&
+                    !/^(product|oneclick|-)$/i.test(cleaned) &&
+                    !/product summary|key product information/i.test(cleaned)) {
+                  title = cleaned;
+                  break;
+                }
+              }
+            }
           }
         }
 
+        // Priority 3: OpenGraph / Twitter meta tags
         if (!title) {
           var metaTag = document.querySelector('meta[property="og:title"], meta[name="twitter:title"], meta[itemprop="name"]');
           if (metaTag && metaTag.content && metaTag.content.trim()) {
-            title = cleanTitle(metaTag.content.trim());
+            var metaCleaned = cleanTitle(metaTag.content.trim());
+            if (metaCleaned && metaCleaned.length > 2 && !/product summary|key product information/i.test(metaCleaned)) {
+              title = metaCleaned;
+            }
           }
         }
 
+        // Priority 4: Document title
         if (!title && attempts > 4) {
           var docTitle = document.title || '';
           if (docTitle && docTitle.trim()) {
-            title = cleanTitle(docTitle.trim());
+            var docCleaned = cleanTitle(docTitle.trim());
+            if (docCleaned && docCleaned.length > 2 && !/product summary|key product information/i.test(docCleaned)) {
+              title = docCleaned;
+            }
           }
         }
 
@@ -1530,36 +1667,146 @@ export const getProductSnapshotBridge = page_url => {
       try {
         var cleanTitle = function(raw) {
           if (!raw || typeof raw !== 'string') return '';
-          return raw
-            .replace(/\\s*Fiyatı,\\s*Yorumları\\s*-\\s*Trendyol/gi, '')
-            .replace(/\\s*[:|-]\\s*Amazon\\.[a-z.]+(\\s*:.*)?$/gi, '')
-            .replace(/\\s*:\\s*Amazon\\.[a-z.]+/gi, '')
-            .replace(/\\s*-\\s*Amazon\\.[a-z.]+/gi, '')
-            .replace(/\\s*\\|\\s*Shein/gi, '')
-            .replace(/\\s*-\\s*Trendyol/gi, '')
-            .trim();
+          var str = raw.replace(/\\r\\n|\\r|\\n|\\t/g, ' ').replace(/\\s+/g, ' ').trim();
+          str = str
+            .replace(/&amp;/gi, '&')
+            .replace(/&quot;/gi, '"')
+            .replace(/&#39;|&apos;/gi, "'")
+            .replace(/&lt;/gi, '<')
+            .replace(/&gt;/gi, '>')
+            .replace(/&nbsp;/gi, ' ');
+          str = str.replace(/^(?:Amazon(?:\\.[a-z.]+)?|Trendyol|Hepsiburada(?:\\.com)?|Shein|Zara|Noon|AliExpress|eBay|Walmart(?:\\.com)?|Nike(?:\\.com)?|Apple|Asos|Mango|H&M)\\s*[:|–—\\-]\\s*/gi, '');
+          str = str.replace(/^(?:Visit the\\s+[^\\n\\r]+?\\s+Store|Brand:\\s*[^:\\n\\r]+?)\\s+/gi, '');
+          str = str
+            .replace(/\\s*Fiyatı,?\\s*Yorumları\\s*-\\s*Trendyol.*$/gi, '')
+            .replace(/\\s*Fiyatı\\s*-\\s*Trendyol.*$/gi, '')
+            .replace(/\\s*-\\s*Trendyol.*$/gi, '')
+            .replace(/\\s*\\|\\s*Trendyol.*$/gi, '')
+            .replace(/\\s*Fiyatı\\s*-\\s*Hepsiburada.*$/gi, '')
+            .replace(/\\s*-\\s*Hepsiburada.*$/gi, '')
+            .replace(/\\s*\\|\\s*Hepsiburada.*$/gi, '')
+            .replace(/\\s*[:|–—\\-]\\s*Amazon\\.[a-z.]+(\\s*:.*)?$/gi, '')
+            .replace(/\\s*[:|–—\\-]\\s*Amazon$/gi, '')
+            .replace(/\\s*\\|\\s*Amazon.*$/gi, '')
+            .replace(/\\s*\\|\\s*SHEIN(?:\\s+[A-Z]{2,3})?.*$/gi, '')
+            .replace(/\\s*-\\s*SHEIN(?:\\s+[A-Z]{2,3})?.*$/gi, '')
+            .replace(/\\s*\\|\\s*ZARA(?:\\s+[^|–—\\-]+)?$/gi, '')
+            .replace(/\\s*-\\s*ZARA(?:\\s+[^|–—\\-]+)?$/gi, '')
+            .replace(/\\s*\\|\\s*H&M(?:\\s+[A-Z]{2,3})?.*$/gi, '')
+            .replace(/\\s*-\\s*H&M(?:\\s+[A-Z]{2,3})?.*$/gi, '')
+            .replace(/\\s*\\|\\s*noon.*$/gi, '')
+            .replace(/\\s*-\\s*noon.*$/gi, '')
+            .replace(/\\s*-\\s*AliExpress(?:\\s+\\d+)?.*$/gi, '')
+            .replace(/\\s*\\|\\s*AliExpress.*$/gi, '')
+            .replace(/\\s*\\|\\s*eBay.*$/gi, '')
+            .replace(/\\s*-\\s*eBay.*$/gi, '')
+            .replace(/\\s*\\.?\\s*Nike\\.com.*$/gi, '')
+            .replace(/\\s*\\|\\s*Nike.*$/gi, '')
+            .replace(/\\s*-\\s*Walmart\\.com.*$/gi, '')
+            .replace(/\\s*\\|\\s*Walmart.*$/gi, '')
+            .replace(/\\s*[:|–—\\-]\\s*[a-z0-9-]+\\.(?:com|org|net|tr|ae|sa|co\\.uk|de|fr|es|it|ru|cn)(?:\\.[a-z]+)?\\s*$/gi, '');
+          str = str.replace(/\\s*:\\s*(?:Electronics|Cell Phones & Accessories|Clothing, Shoes & Jewelry|Home & Kitchen|Beauty & Personal Care|Health & Household|Sports & Outdoors|Toys & Games|Automotive|Tools & Home Improvement|Office Products|Pet Supplies|Baby Products|Grocery & Gourmet Food|Moda|Elektronik|Ev & Yaşam|Mutfak|Kişisel Bakım|Spor & Outdoor|Oto & Yapı Market|Kitap|Oyuncak|Bebek|Computers? & Accessories|Video Games|Musical Instruments|Books|Luggage & Travel Gear|Industrial & Scientific)\\s*$/gi, '');
+          str = str.replace(/\\s*\\d+(?:\\.\\d+)?\\s*(?:out of 5 stars|stars|yıldız).*$/gi, '');
+          str = str.replace(/\\s*\\(\\s*\\d+(?:,\\d+)*\\s*(?:ratings?|reviews?|değerlendirme|yorum)\\s*\\).*$/gi, '');
+          str = str.replace(/^[\\s:|–—•·\"'\\-]+|[\\s:|–—•·\"'\\-]+$/g, '').trim();
+          if (/^ref[=_\s-]/i.test(str) || str.toLowerCase().indexOf('ref=') === 0 || /product summary|key product information/i.test(str)) return '';
+          return str.replace(/\\s+/g, ' ').trim();
         };
 
-        var titleEl = document.querySelector('#productTitle, #title, #title_feature_div span, #title_feature_div, [data-feature-name="title"], h1#title, h1.pr-new-br span, [data-automation-id="product-title"], .product-title, .pdp-title, .goods-detail-info__name, .product-intro__head-name, .product-intro__title, .goods-title');
-        if (titleEl && titleEl.textContent && titleEl.textContent.trim()) {
-          snapshot.title = cleanTitle(titleEl.textContent.trim());
-        }
+        // Priority 1: JSON-LD Product schema
+        try {
+          var ldScripts = document.querySelectorAll('script[type="application/ld+json"]');
+          for (var j = 0; j < ldScripts.length; j++) {
+            var ldObj = JSON.parse(ldScripts[j].textContent);
+            var ldItems = Array.isArray(ldObj) ? ldObj : [ldObj];
+            for (var k = 0; k < ldItems.length; k++) {
+              var item = ldItems[k];
+              if (!item) continue;
+              if (item['@type'] === 'Product' && item.name && typeof item.name === 'string') {
+                var cName = cleanTitle(item.name);
+                if (cName && cName.length > 2) { snapshot.title = cName; break; }
+              }
+              if (Array.isArray(item['@graph'])) {
+                for (var g = 0; g < item['@graph'].length; g++) {
+                  var gItem = item['@graph'][g];
+                  if (gItem && gItem['@type'] === 'Product' && gItem.name && typeof gItem.name === 'string') {
+                    var cgName = cleanTitle(gItem.name);
+                    if (cgName && cgName.length > 2) { snapshot.title = cgName; break; }
+                  }
+                }
+              }
+            }
+            if (snapshot.title) break;
+          }
+        } catch (_ldErr) {}
+
+        // Priority 2: High-specificity product title DOM selectors in strict priority order
         if (!snapshot.title) {
-          var h1 = document.querySelector('h1');
-          if (h1 && h1.textContent && h1.textContent.trim()) {
-            snapshot.title = cleanTitle(h1.textContent.trim());
+          var prioritySelectors = [
+            '#title_feature_div #productTitle',
+            '#title #productTitle',
+            '#productTitle',
+            'h1.pr-new-br span',
+            'h1.pr-new-br',
+            '[data-automation-id="product-title"]',
+            '.goods-detail-info__name',
+            '.product-intro__head-name',
+            '.product-intro__title',
+            '.goods-title',
+            'h1[data-test-id="product-title"]',
+            'h1[itemprop="name"]',
+            'h1#title',
+            '[data-feature-name="title"] h1',
+            '[data-feature-name="title"] #productTitle',
+            '.product-title',
+            '.pdp-title',
+            '.product-detail__title',
+            '.product__title',
+            '#title h1',
+            'h1'
+          ];
+
+          for (var p = 0; p < prioritySelectors.length; p++) {
+            var el = document.querySelector(prioritySelectors[p]);
+            if (el) {
+              var elClass = String(el.className || '');
+              if (/\\b(a-offscreen|a-screen-reader|sr-only)\\b/i.test(elClass) ||
+                  (el.offsetParent === null && window.getComputedStyle && window.getComputedStyle(el).position !== 'fixed')) {
+                continue;
+              }
+              var rawText = (el.textContent || '').trim();
+              if (rawText && rawText.length > 1) {
+                var cleaned = cleanTitle(rawText);
+                if (cleaned && cleaned.length > 2 &&
+                    !/^(product|oneclick|-)$/i.test(cleaned) &&
+                    !/product summary|key product information/i.test(cleaned)) {
+                  snapshot.title = cleaned;
+                  break;
+                }
+              }
+            }
           }
         }
+
+        // Priority 3: OpenGraph / Twitter meta tags
         if (!snapshot.title) {
           var metaTag = document.querySelector('meta[property="og:title"], meta[name="twitter:title"], meta[itemprop="name"]');
           if (metaTag && metaTag.content && metaTag.content.trim()) {
-            snapshot.title = cleanTitle(metaTag.content.trim());
+            var metaCleaned = cleanTitle(metaTag.content.trim());
+            if (metaCleaned && metaCleaned.length > 2 && !/product summary|key product information/i.test(metaCleaned)) {
+              snapshot.title = metaCleaned;
+            }
           }
         }
+
+        // Priority 4: Document title
         if (!snapshot.title) {
           var docTitle = document.title || '';
           if (docTitle && docTitle.trim()) {
-            snapshot.title = cleanTitle(docTitle.trim());
+            var docCleaned = cleanTitle(docTitle.trim());
+            if (docCleaned && docCleaned.length > 2 && !/product summary|key product information/i.test(docCleaned)) {
+              snapshot.title = docCleaned;
+            }
           }
         }
       } catch(e) {}
@@ -1606,32 +1853,89 @@ export const getProductSnapshotBridge = page_url => {
           return isValidImg(val) ? val : '';
         };
 
-        var imgEl = document.querySelector(
-          '#landingImage, #main-image, #imgBlkFront, img.a-dynamic-image, [data-a-image-name="landingImage"], ' +
-          '#main-image-container img, #imageBlock img, #canvasImage, #ebooks-img-canvas img, .a-carousel-card img, ' +
-          'div[data-action="main-image-click"] img, div#media-canvas img, img[data-a-hires], ' +
-          'img[src*="media-amazon.com/images/I/"], img[src*="images-amazon.com/images/I/"], ' +
-          '.product-slide-item img, img[src*="cdn.dsmcdn.com/mnresize"], ' +
-          'img[data-src*="cdn.dsmcdn.com/mnresize"], .product-image-gallery-viewport img, ' +
-          'img[src*="media/images"], img[data-src*="media/images"], .detail-section-img, .base-product-image img, ' +
-          '.gallery-container img, img.product-intro__head-main-img, img[src*="ltwebstatic.com"], img[data-src*="ltwebstatic.com"], ' +
-          '.crop-image-container img, [data-test-id="product-image"] img, img.product-image'
-        );
-        if (imgEl) {
-          snapshot.image = parseImageUrl(imgEl.getAttribute('data-a-hires')) ||
-                           parseImageUrl(imgEl.getAttribute('data-old-hires')) ||
-                           parseImageUrl(imgEl.getAttribute('data-src')) ||
-                           parseImageUrl(imgEl.getAttribute('data-original')) ||
-                           parseImageUrl(imgEl.getAttribute('data-a-dynamic-image')) ||
-                           parseImageUrl(imgEl.currentSrc) ||
-                           parseImageUrl(imgEl.src) ||
-                           parseImageUrl(imgEl.getAttribute('src')) || '';
+        var imgSelectors = [
+          '#landingImage',
+          '#main-image',
+          '#imgBlkFront',
+          'img.a-dynamic-image',
+          '[data-a-image-name="landingImage"]',
+          '#main-image-container img',
+          '#imageBlock img',
+          '#canvasImage',
+          '#ebooks-img-canvas img',
+          'div[data-action="main-image-click"] img',
+          'div#media-canvas img',
+          'img[data-a-hires]',
+          'img[src*="media-amazon.com/images/I/"]',
+          'img[src*="images-amazon.com/images/I/"]',
+          '.product-slide-item img',
+          'img[src*="cdn.dsmcdn.com/mnresize"]',
+          'img[data-src*="cdn.dsmcdn.com/mnresize"]',
+          '.product-image-gallery-viewport img',
+          'img[src*="media/images"]',
+          'img[data-src*="media/images"]',
+          '.detail-section-img',
+          '.base-product-image img',
+          '.gallery-container img',
+          'img.product-intro__head-main-img',
+          'img[src*="ltwebstatic.com"]',
+          'img[data-src*="ltwebstatic.com"]',
+          '.crop-image-container img',
+          '[data-test-id="product-image"] img',
+          '.a-carousel-card img',
+          'img.product-image'
+        ];
+        for (var sIdx = 0; sIdx < imgSelectors.length; sIdx++) {
+          var candidateEls = document.querySelectorAll(imgSelectors[sIdx]);
+          for (var cIdx = 0; cIdx < candidateEls.length; cIdx++) {
+            var cEl = candidateEls[cIdx];
+            var candDom = parseImageUrl(cEl.getAttribute('data-a-hires')) ||
+                          parseImageUrl(cEl.getAttribute('data-old-hires')) ||
+                          parseImageUrl(cEl.getAttribute('data-src')) ||
+                          parseImageUrl(cEl.getAttribute('data-original')) ||
+                          parseImageUrl(cEl.getAttribute('data-a-dynamic-image')) ||
+                          parseImageUrl(cEl.currentSrc) ||
+                          parseImageUrl(cEl.src) ||
+                          parseImageUrl(cEl.getAttribute('src')) || '';
+            if (candDom && isValidImg(candDom)) {
+              snapshot.image = candDom;
+              break;
+            }
+          }
+          if (snapshot.image) break;
         }
 
         if (!snapshot.image) {
           var metaImg = document.querySelector('meta[property="og:image"], meta[name="twitter:image"], meta[itemprop="image"], link[rel="image_src"]');
           if (metaImg) {
-            snapshot.image = parseImageUrl(metaImg.content || metaImg.href || '');
+            var candMeta = parseImageUrl(metaImg.content || metaImg.href || metaImg.getAttribute('content') || '');
+            if (candMeta && isValidImg(candMeta)) {
+              snapshot.image = candMeta;
+            }
+          }
+        }
+
+        if (!snapshot.image) {
+          var jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
+          for (var i = 0; i < jsonLdScripts.length; i++) {
+            try {
+              var data = JSON.parse(jsonLdScripts[i].textContent);
+              var items = Array.isArray(data) ? data : [data];
+              for (var j = 0; j < items.length; j++) {
+                var item = items[j];
+                var rawImg = item && (item.image || (item['@graph'] && Array.isArray(item['@graph']) && item['@graph'].find(function(g) { return g.image; }) ? item['@graph'].find(function(g) { return g.image; }).image : null));
+                if (rawImg) {
+                  var cand = Array.isArray(rawImg) ? rawImg[0] : rawImg;
+                  if (typeof cand === 'object' && cand.url) cand = cand.url;
+                  var parsedImg = parseImageUrl(cand);
+                  if (parsedImg && isValidImg(parsedImg)) {
+                    snapshot.image = parsedImg;
+                    break;
+                  }
+                }
+              }
+            } catch(e) {}
+            if (snapshot.image) break;
           }
         }
       } catch(e) {}
@@ -1894,7 +2198,7 @@ export const getProductSnapshotBridge = page_url => {
 };
 
 export const removeExtraTitle = title => {
-  return title.replace(' Fiyatı, Yorumları - Trendyol', '');
+  return cleanProductTitle(title);
 };
 
 export const userAgent = () => {
