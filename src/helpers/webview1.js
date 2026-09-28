@@ -84,14 +84,11 @@ export const getMetaTagImage = page_url => {
       if (!url || typeof url !== 'string') return false;
       var str = url.trim().toLowerCase();
       if (!str || str.length < 5) return false;
-      if (str.indexOf('data:image/gif') === 0 ||
-          str.indexOf('data:image/svg') === 0 ||
-          str.indexOf('blank.gif') > -1 ||
-          str.indexOf('transparent.png') > -1 ||
-          str.indexOf('logo') > -1 ||
-          str.indexOf('favicon') > -1) {
-        return false;
-      }
+      if (str.indexOf('data:') === 0) return false;
+      if (str.indexOf('.svg') > -1 || str.indexOf('/svgicons/') > -1 || str.indexOf('/icons/') > -1 || str.indexOf('/icon_') > -1 || str.indexOf('icon-') > -1) return false;
+      if (str.indexOf('blank.gif') > -1 || str.indexOf('transparent.png') > -1 || str.indexOf('spacer.gif') > -1) return false;
+      if (str.indexOf('logo') > -1 || str.indexOf('favicon') > -1) return false;
+      if (str.indexOf('http://') !== 0 && str.indexOf('https://') !== 0) return false;
       return true;
     };
 
@@ -127,6 +124,7 @@ export const getMetaTagImage = page_url => {
 
         // 1. Primary DOM Product Selectors (Mobile/Desktop galleries)
         var imgSelectors = [
+          // Amazon main images
           '#landingImage',
           '#main-image',
           '#imgBlkFront',
@@ -141,19 +139,40 @@ export const getMetaTagImage = page_url => {
           'img[data-a-hires]',
           'img[src*="media-amazon.com/images/I/"]',
           'img[src*="images-amazon.com/images/I/"]',
+
+          // Trendyol product images
           '.product-slide-item img',
           'img[src*="cdn.dsmcdn.com/mnresize"]',
           'img[data-src*="cdn.dsmcdn.com/mnresize"]',
+          'img[src*="cdn.dsmcdn.com/ty"]',
+          'img[data-src*="cdn.dsmcdn.com/ty"]',
           '.product-image-gallery-viewport img',
-          'img[src*="media/images"]',
-          'img[data-src*="media/images"]',
+
+          // Shein specific product images (avoid SVG icons)
+          'img.crop-image-container__img',
+          '.crop-image-container img',
+          '.product-intro__head-main img',
+          'img.product-intro__head-main-img',
+          '.goods-detail-gallery img',
+          '.detail-gallery img',
+          '.swiper-slide-active img',
+          'img[data-before-crop-src]',
+          'img[src*="ltwebstatic.com/images"]',
+          'img[data-src*="ltwebstatic.com/images"]',
+          'img[src*="_thumbnail_"]',
+          'img[data-src*="_thumbnail_"]',
+
+          // Zara / H&M / Noon / Other stores
+          'img[src*="static.zara.net/photos"]',
+          'img[data-src*="static.zara.net/photos"]',
+          '.media-image img',
+          'img[src*="lp2.hm.com"]',
+          'img[src*="f.nooncdn.com/p/"]',
+          'img[data-src*="f.nooncdn.com/p/"]',
+          '[data-qa="div-gallery"] img',
           '.detail-section-img',
           '.base-product-image img',
           '.gallery-container img',
-          'img.product-intro__head-main-img',
-          'img[src*="ltwebstatic.com"]',
-          'img[data-src*="ltwebstatic.com"]',
-          '.crop-image-container img',
           '[data-test-id="product-image"] img',
           '.a-carousel-card img',
           'img.product-image'
@@ -164,8 +183,11 @@ export const getMetaTagImage = page_url => {
             var cEl = candidateEls[cIdx];
             var candDom = parseImageUrl(cEl.getAttribute('data-a-hires')) ||
                           parseImageUrl(cEl.getAttribute('data-old-hires')) ||
+                          parseImageUrl(cEl.getAttribute('data-before-crop-src')) ||
                           parseImageUrl(cEl.getAttribute('data-src')) ||
+                          parseImageUrl(cEl.getAttribute('data-lazy-src')) ||
                           parseImageUrl(cEl.getAttribute('data-original')) ||
+                          parseImageUrl(cEl.getAttribute('data-origin-src')) ||
                           parseImageUrl(cEl.getAttribute('data-a-dynamic-image')) ||
                           parseImageUrl(cEl.currentSrc) ||
                           parseImageUrl(cEl.src) ||
@@ -187,6 +209,26 @@ export const getMetaTagImage = page_url => {
               imgUrl = candMeta;
             }
           }
+        }
+
+        // 2b. Fallback to Shein / Store application state
+        if (!imgUrl) {
+          try {
+            var shImgData = window.productIntroData || window.gbProductIntroData;
+            if (shImgData && shImgData.detail) {
+              var dtImg = (shImgData.detail.goods_imgs && shImgData.detail.goods_imgs.main_image && shImgData.detail.goods_imgs.main_image.origin_image) ||
+                          shImgData.detail.original_img ||
+                          shImgData.detail.goods_img;
+              if (dtImg) {
+                var pDt = parseImageUrl(dtImg);
+                if (pDt && isValidImg(pDt)) imgUrl = pDt;
+              }
+            }
+            if (!imgUrl && window.goodsInfo && window.goodsInfo.original_img) {
+              var pGi = parseImageUrl(window.goodsInfo.original_img);
+              if (pGi && isValidImg(pGi)) imgUrl = pGi;
+            }
+          } catch(_eShImg) {}
         }
 
         // 3. Check JSON-LD schema if DOM selector didn't find item image
@@ -460,13 +502,17 @@ export const getMetaTagPriceAndCurrency = page_url => {
         var parsePriceAndCurrency = function(rawText) {
           if (!rawText || typeof rawText !== 'string') return { price: '', currency: '' };
           var t = rawText.replace(/\\s+/g, ' ').trim();
+          // Convert Arabic-Indic digits ٠-٩ to 0-9
+          t = t.replace(/[٠-٩]/g, function(d) { return String.fromCharCode(d.charCodeAt(0) - 1632 + 48); });
           var detectedCurr = '';
-          if (/(?:^|[^a-zA-Z])AED(?:$|[^a-zA-Z])/i.test(t)) detectedCurr = 'AED';
-          else if (/(?:^|[^a-zA-Z])SAR(?:$|[^a-zA-Z])/i.test(t)) detectedCurr = 'SAR';
-          else if (/(?:^|[^a-zA-Z])(TL|TRY)(?:$|[^a-zA-Z])|₺/i.test(t)) detectedCurr = 'TL';
-          else if (/(?:^|[^a-zA-Z])USD(?:$|[^a-zA-Z])|\\$|US\\$/i.test(t)) detectedCurr = 'USD';
-          else if (/(?:^|[^a-zA-Z])EUR(?:$|[^a-zA-Z])|€/i.test(t)) detectedCurr = 'EUR';
-          else if (/(?:^|[^a-zA-Z])GBP(?:$|[^a-zA-Z])|£/i.test(t)) detectedCurr = 'GBP';
+          if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:AED|د\.?إ|درهم)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'AED';
+          else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:SAR|ر\.?س|ريال)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'SAR';
+          else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:KWD|د\.?ك)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'KWD';
+          else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:QAR|ر\.?ق)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'QAR';
+          else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:TL|TRY)(?:$|[^a-zA-Z\u0600-\u06FF])|₺/i.test(t)) detectedCurr = 'TL';
+          else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:USD|US\\$)(?:$|[^a-zA-Z\u0600-\u06FF])|\\$/i.test(t)) detectedCurr = 'USD';
+          else if (/(?:^|[^a-zA-Z\u0600-\u06FF])EUR(?:$|[^a-zA-Z\u0600-\u06FF])|€/i.test(t)) detectedCurr = 'EUR';
+          else if (/(?:^|[^a-zA-Z\u0600-\u06FF])GBP(?:$|[^a-zA-Z\u0600-\u06FF])|£/i.test(t)) detectedCurr = 'GBP';
 
           // Strip discount percentages e.g. '-30%', '%25', '30% off', 'Save 20%'
           t = t.replace(/[-–]?[ \\t]*[0-9]+(?:\\.[0-9]+)?[ \\t]*%[ \\t]*(?:off|indirim|discount|saving|savings)?/gi, '');
@@ -512,12 +558,28 @@ export const getMetaTagPriceAndCurrency = page_url => {
           '.a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
           '.reinventPricePriceToPayMargin .a-offscreen',
 
-          // Shein Discounted Prices
+          // Shein Mobile & Desktop Discounted / Current Prices
+          '.product-intro__head-price',
+          '.product-intro__price',
           '.product-intro__price-new',
+          '[class*="product-intro__head-price"]',
+          '[class*="product-intro__price"]',
+          '[class*="from-price"]',
+          '[class*="goods-detail-price"]',
+          '[class*="discount-price"]',
+          '[class*="sale-price"]',
+          '[class*="current-price"]',
+          '[class*="currentPrice"]',
+          '[class*="now-price"]',
+          '[class*="priceNow"]',
+          '[class*="normal-price"]',
           '.goods-detail-price .discount-price',
           '.product-price-info .discount-price',
           '.goods-detail-price .price',
           '.goods-price',
+          '[data-test-id*="price"]',
+          '[aria-label*="Price" i]',
+          '[aria-label*="price" i]',
 
           // Hepsiburada / Noon Current Prices
           '[data-test-id="price-current-price"]',
@@ -599,14 +661,49 @@ export const getMetaTagPriceAndCurrency = page_url => {
           try {
             var shData = window.productIntroData || window.gbProductIntroData;
             if (shData && shData.detail) {
-              var sp = (shData.detail.currentSku && shData.detail.currentSku.sku_sale_price) || shData.detail.salePrice;
+              var dt = shData.detail;
+              var sp = (dt.currentSku && dt.currentSku.sku_sale_price) || dt.salePrice || dt.sale_price || dt.retailPrice || dt.originalPrice;
               if (sp) {
-                if (sp.amount) price = String(sp.amount).trim();
-                else if (sp.usdAmount) price = String(sp.usdAmount).trim();
-                if (sp.currency && !currency) currency = String(sp.currency).trim();
+                if (typeof sp === 'object') {
+                  if (sp.amount) price = String(sp.amount).trim();
+                  else if (sp.usdAmount) price = String(sp.usdAmount).trim();
+                  else if (sp.amountWithSymbol) {
+                    var pRes = parsePriceAndCurrency(sp.amountWithSymbol);
+                    if (pRes.price) { price = pRes.price; if (pRes.currency && !currency) currency = pRes.currency; }
+                  }
+                  if (sp.currency && !currency) currency = String(sp.currency).trim();
+                } else if (typeof sp === 'number' || typeof sp === 'string') {
+                  var pRes2 = parsePriceAndCurrency(String(sp));
+                  if (pRes2.price) { price = pRes2.price; if (pRes2.currency && !currency) currency = pRes2.currency; }
+                }
+              }
+            }
+            if (!price && window.goodsInfo) {
+              var gP = window.goodsInfo.sale_price || window.goodsInfo.retail_price;
+              if (gP) {
+                var pRes3 = parsePriceAndCurrency(String(gP));
+                if (pRes3.price) { price = pRes3.price; if (pRes3.currency && !currency) currency = pRes3.currency; }
               }
             }
           } catch(_eSh) {}
+        }
+
+        // 2b-1. OpenGraph / Product Meta Price
+        if (!price) {
+          try {
+            var metaPrice = document.querySelector('meta[property="product:price:amount"], meta[property="og:price:amount"], meta[itemprop="price"], meta[name="twitter:data1"]');
+            if (metaPrice) {
+              var mpVal = metaPrice.getAttribute('content') || metaPrice.content || '';
+              var pResMeta = parsePriceAndCurrency(mpVal);
+              if (pResMeta.price) {
+                price = pResMeta.price;
+                var metaCurr = document.querySelector('meta[property="product:price:currency"], meta[property="og:price:currency"], meta[itemprop="priceCurrency"]');
+                if (metaCurr && !currency) {
+                  currency = (metaCurr.getAttribute('content') || metaCurr.content || '').trim();
+                }
+              }
+            }
+          } catch(_eMp) {}
         }
 
         // 2b. JSON-LD schema price check (Amazon, Shopify, etc.)
@@ -1817,14 +1914,11 @@ export const getProductSnapshotBridge = page_url => {
           if (!url || typeof url !== 'string') return false;
           var str = url.trim().toLowerCase();
           if (!str || str.length < 5) return false;
-          if (str.indexOf('data:image/gif') === 0 ||
-              str.indexOf('data:image/svg') === 0 ||
-              str.indexOf('blank.gif') > -1 ||
-              str.indexOf('transparent.png') > -1 ||
-              str.indexOf('logo') > -1 ||
-              str.indexOf('favicon') > -1) {
-            return false;
-          }
+          if (str.indexOf('data:') === 0) return false;
+          if (str.indexOf('.svg') > -1 || str.indexOf('/svgicons/') > -1 || str.indexOf('/icons/') > -1 || str.indexOf('/icon_') > -1 || str.indexOf('icon-') > -1) return false;
+          if (str.indexOf('blank.gif') > -1 || str.indexOf('transparent.png') > -1 || str.indexOf('spacer.gif') > -1) return false;
+          if (str.indexOf('logo') > -1 || str.indexOf('favicon') > -1) return false;
+          if (str.indexOf('http://') !== 0 && str.indexOf('https://') !== 0) return false;
           return true;
         };
 
@@ -1854,6 +1948,7 @@ export const getProductSnapshotBridge = page_url => {
         };
 
         var imgSelectors = [
+          // Amazon main images
           '#landingImage',
           '#main-image',
           '#imgBlkFront',
@@ -1868,19 +1963,40 @@ export const getProductSnapshotBridge = page_url => {
           'img[data-a-hires]',
           'img[src*="media-amazon.com/images/I/"]',
           'img[src*="images-amazon.com/images/I/"]',
+
+          // Trendyol product images
           '.product-slide-item img',
           'img[src*="cdn.dsmcdn.com/mnresize"]',
           'img[data-src*="cdn.dsmcdn.com/mnresize"]',
+          'img[src*="cdn.dsmcdn.com/ty"]',
+          'img[data-src*="cdn.dsmcdn.com/ty"]',
           '.product-image-gallery-viewport img',
-          'img[src*="media/images"]',
-          'img[data-src*="media/images"]',
+
+          // Shein specific product images (avoid SVG icons)
+          'img.crop-image-container__img',
+          '.crop-image-container img',
+          '.product-intro__head-main img',
+          'img.product-intro__head-main-img',
+          '.goods-detail-gallery img',
+          '.detail-gallery img',
+          '.swiper-slide-active img',
+          'img[data-before-crop-src]',
+          'img[src*="ltwebstatic.com/images"]',
+          'img[data-src*="ltwebstatic.com/images"]',
+          'img[src*="_thumbnail_"]',
+          'img[data-src*="_thumbnail_"]',
+
+          // Zara / H&M / Noon / Other stores
+          'img[src*="static.zara.net/photos"]',
+          'img[data-src*="static.zara.net/photos"]',
+          '.media-image img',
+          'img[src*="lp2.hm.com"]',
+          'img[src*="f.nooncdn.com/p/"]',
+          'img[data-src*="f.nooncdn.com/p/"]',
+          '[data-qa="div-gallery"] img',
           '.detail-section-img',
           '.base-product-image img',
           '.gallery-container img',
-          'img.product-intro__head-main-img',
-          'img[src*="ltwebstatic.com"]',
-          'img[data-src*="ltwebstatic.com"]',
-          '.crop-image-container img',
           '[data-test-id="product-image"] img',
           '.a-carousel-card img',
           'img.product-image'
@@ -1891,8 +2007,11 @@ export const getProductSnapshotBridge = page_url => {
             var cEl = candidateEls[cIdx];
             var candDom = parseImageUrl(cEl.getAttribute('data-a-hires')) ||
                           parseImageUrl(cEl.getAttribute('data-old-hires')) ||
+                          parseImageUrl(cEl.getAttribute('data-before-crop-src')) ||
                           parseImageUrl(cEl.getAttribute('data-src')) ||
+                          parseImageUrl(cEl.getAttribute('data-lazy-src')) ||
                           parseImageUrl(cEl.getAttribute('data-original')) ||
+                          parseImageUrl(cEl.getAttribute('data-origin-src')) ||
                           parseImageUrl(cEl.getAttribute('data-a-dynamic-image')) ||
                           parseImageUrl(cEl.currentSrc) ||
                           parseImageUrl(cEl.src) ||
@@ -1913,6 +2032,26 @@ export const getProductSnapshotBridge = page_url => {
               snapshot.image = candMeta;
             }
           }
+        }
+
+        // Shein / Store application state image fallback
+        if (!snapshot.image) {
+          try {
+            var shImgData = window.productIntroData || window.gbProductIntroData;
+            if (shImgData && shImgData.detail) {
+              var dtImg = (shImgData.detail.goods_imgs && shImgData.detail.goods_imgs.main_image && shImgData.detail.goods_imgs.main_image.origin_image) ||
+                          shImgData.detail.original_img ||
+                          shImgData.detail.goods_img;
+              if (dtImg) {
+                var pDt = parseImageUrl(dtImg);
+                if (pDt && isValidImg(pDt)) snapshot.image = pDt;
+              }
+            }
+            if (!snapshot.image && window.goodsInfo && window.goodsInfo.original_img) {
+              var pGi = parseImageUrl(window.goodsInfo.original_img);
+              if (pGi && isValidImg(pGi)) snapshot.image = pGi;
+            }
+          } catch(_eShImg) {}
         }
 
         if (!snapshot.image) {
@@ -1981,19 +2120,23 @@ export const getProductSnapshotBridge = page_url => {
 
         var parsePriceAndCurrency = function(rawText) {
           if (!rawText || typeof rawText !== 'string') return { price: '', currency: '' };
-          var t = rawText.replace(/\\s+/g, ' ').trim();
+          var t = rawText.replace(/\s+/g, ' ').trim();
+          // Convert Arabic-Indic digits ٠-٩ to 0-9
+          t = t.replace(/[٠-٩]/g, function(d) { return String.fromCharCode(d.charCodeAt(0) - 1632 + 48); });
           var detectedCurr = '';
-          if (/(?:^|[^a-zA-Z])AED(?:$|[^a-zA-Z])/i.test(t)) detectedCurr = 'AED';
-          else if (/(?:^|[^a-zA-Z])SAR(?:$|[^a-zA-Z])/i.test(t)) detectedCurr = 'SAR';
-          else if (/(?:^|[^a-zA-Z])(TL|TRY)(?:$|[^a-zA-Z])|₺/i.test(t)) detectedCurr = 'TL';
-          else if (/(?:^|[^a-zA-Z])USD(?:$|[^a-zA-Z])|\\$|US\\$/i.test(t)) detectedCurr = 'USD';
-          else if (/(?:^|[^a-zA-Z])EUR(?:$|[^a-zA-Z])|€/i.test(t)) detectedCurr = 'EUR';
-          else if (/(?:^|[^a-zA-Z])GBP(?:$|[^a-zA-Z])|£/i.test(t)) detectedCurr = 'GBP';
+          if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:AED|د\.?إ|درهم)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'AED';
+          else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:SAR|ر\.?س|ريال)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'SAR';
+          else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:KWD|د\.?ك)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'KWD';
+          else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:QAR|ر\.?ق)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'QAR';
+          else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:TL|TRY)(?:$|[^a-zA-Z\u0600-\u06FF])|₺/i.test(t)) detectedCurr = 'TL';
+          else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:USD|US\$)(?:$|[^a-zA-Z\u0600-\u06FF])|\$/i.test(t)) detectedCurr = 'USD';
+          else if (/(?:^|[^a-zA-Z\u0600-\u06FF])EUR(?:$|[^a-zA-Z\u0600-\u06FF])|€/i.test(t)) detectedCurr = 'EUR';
+          else if (/(?:^|[^a-zA-Z\u0600-\u06FF])GBP(?:$|[^a-zA-Z\u0600-\u06FF])|£/i.test(t)) detectedCurr = 'GBP';
 
-          t = t.replace(/[-–]?[ \\t]*[0-9]+(?:\\.[0-9]+)?[ \\t]*%[ \\t]*(?:off|indirim|discount|saving|savings)?/gi, '');
-          t = t.replace(/%[ \\t]*[0-9]+(?:\\.[0-9]+)?/gi, '');
-          t = t.replace(/(?:save|off|indirim)[ \\t]+[0-9]+(?:\\.[0-9]+)?%?/gi, '');
-          t = t.replace(/(?:save|tasarruf|indirim|saving|savings)\\s*[$€£₺]?\\s*[0-9]+(?:[.,][0-9]{1,2})?/gi, '');
+          t = t.replace(/[-–]?[ \t]*[0-9]+(?:\.[0-9]+)?[ \t]*%[ \t]*(?:off|indirim|discount|saving|savings)?/gi, '');
+          t = t.replace(/%[ \t]*[0-9]+(?:\.[0-9]+)?/gi, '');
+          t = t.replace(/(?:save|off|indirim)[ \t]+[0-9]+(?:\.[0-9]+)?%?/gi, '');
+          t = t.replace(/(?:save|tasarruf|indirim|saving|savings)\s*[$€£₺]?\s*[0-9]+(?:[.,][0-9]{1,2})?/gi, '');
 
           var matches = t.match(/([0-9]{1,3}(?:[., ][0-9]{3})+(?:[.,][0-9]{1,2})(?![0-9])|[0-9]{1,3}(?:[., ][0-9]{3})+(?![0-9])|[0-9]+(?:[.,][0-9]{1,2})(?![0-9])|[0-9]+)/g);
           if (!matches || matches.length === 0) return { price: '', currency: detectedCurr };
@@ -2032,12 +2175,28 @@ export const getProductSnapshotBridge = page_url => {
           '.a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
           '.reinventPricePriceToPayMargin .a-offscreen',
 
-          // Shein Discounted Prices
+          // Shein Mobile & Desktop Discounted / Current Prices
+          '.product-intro__head-price',
+          '.product-intro__price',
           '.product-intro__price-new',
+          '[class*="product-intro__head-price"]',
+          '[class*="product-intro__price"]',
+          '[class*="from-price"]',
+          '[class*="goods-detail-price"]',
+          '[class*="discount-price"]',
+          '[class*="sale-price"]',
+          '[class*="current-price"]',
+          '[class*="currentPrice"]',
+          '[class*="now-price"]',
+          '[class*="priceNow"]',
+          '[class*="normal-price"]',
           '.goods-detail-price .discount-price',
           '.product-price-info .discount-price',
           '.goods-detail-price .price',
           '.goods-price',
+          '[data-test-id*="price"]',
+          '[aria-label*="Price" i]',
+          '[aria-label*="price" i]',
 
           // Hepsiburada / Noon Current Prices
           '[data-test-id="price-current-price"]',
@@ -2068,7 +2227,7 @@ export const getProductSnapshotBridge = page_url => {
             var currEl = elList[ei];
             if (isStruckOrOldPriceElement(currEl)) continue;
             var raw = getCleanElementPriceText(currEl);
-            if (raw && /\\d/.test(raw)) {
+            if (raw && /\d/.test(raw)) {
               var parsed = parsePriceAndCurrency(raw);
               if (parsed.price) {
                 snapshot.price = parsed.price;
@@ -2117,11 +2276,37 @@ export const getProductSnapshotBridge = page_url => {
           try {
             var shD = window.productIntroData || window.gbProductIntroData;
             if (shD && shD.detail) {
-              var sp = (shD.detail.currentSku && shD.detail.currentSku.sku_sale_price) || shD.detail.salePrice;
+              var dtSnap = shD.detail;
+              var sp = (dtSnap.currentSku && dtSnap.currentSku.sku_sale_price) || dtSnap.salePrice || dtSnap.sale_price || dtSnap.retailPrice || dtSnap.originalPrice;
               if (sp) {
-                if (sp.amount) snapshot.price = String(sp.amount).trim();
-                else if (sp.usdAmount) snapshot.price = String(sp.usdAmount).trim();
-                if (sp.currency && !snapshot.currency) snapshot.currency = String(sp.currency).trim();
+                if (typeof sp === 'object') {
+                  if (sp.amount) snapshot.price = String(sp.amount).trim();
+                  else if (sp.usdAmount) snapshot.price = String(sp.usdAmount).trim();
+                  else if (sp.amountWithSymbol) {
+                    var pResSnap = parsePriceAndCurrency(sp.amountWithSymbol);
+                    if (pResSnap.price) {
+                      snapshot.price = pResSnap.price;
+                      if (pResSnap.currency && !snapshot.currency) snapshot.currency = pResSnap.currency;
+                    }
+                  }
+                  if (sp.currency && !snapshot.currency) snapshot.currency = String(sp.currency).trim();
+                } else if (typeof sp === 'number' || typeof sp === 'string') {
+                  var pResSnap2 = parsePriceAndCurrency(String(sp));
+                  if (pResSnap2.price) {
+                    snapshot.price = pResSnap2.price;
+                    if (pResSnap2.currency && !snapshot.currency) snapshot.currency = pResSnap2.currency;
+                  }
+                }
+              }
+            }
+            if (!snapshot.price && window.goodsInfo) {
+              var gPSnap = window.goodsInfo.sale_price || window.goodsInfo.retail_price;
+              if (gPSnap) {
+                var pResSnap3 = parsePriceAndCurrency(String(gPSnap));
+                if (pResSnap3.price) {
+                  snapshot.price = pResSnap3.price;
+                  if (pResSnap3.currency && !snapshot.currency) snapshot.currency = pResSnap3.currency;
+                }
               }
             }
           } catch(_eSh) {}
