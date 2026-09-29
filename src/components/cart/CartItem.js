@@ -19,6 +19,7 @@ import CheckBox from '@react-native-community/checkbox';
 import React from 'react';
 import Dump from '../Dump';
 import { useExchangeRateStore } from '../../store/useExchangeRateStore';
+import { useSheinPriceStore } from '../../store/useSheinPriceStore';
 import { normalizeCurrency } from '../../helpers/currencyHelper';
 import { cleanProductTitle, getStoreName } from '../../helpers/storeHelper';
 
@@ -35,6 +36,12 @@ const CartItem = ({
   const targetId = item.id || item.url;
   const convertedUsd = useExchangeRateStore(state =>
     state.convertPrice(item?.price, item?.currency),
+  );
+  const sheinPriceUsd = useSheinPriceStore(state => state.basePriceUsd);
+  const isShein = Boolean(
+    (item?.store && String(item.store).toLowerCase().includes('shein')) ||
+    (item?.url && String(item.url).toLowerCase().includes('shein.com')) ||
+    String(getStoreName(item?.url, item?.store || '')).toLowerCase() === 'shein',
   );
 
   const changeItem = (field, value) => {
@@ -124,6 +131,11 @@ const CartItem = ({
                       {convertedUsd !== null && normalizeCurrency(item?.currency, item?.price) !== 'USD' && (
                         <Text style={styles.convertedPriceText}>
                           {` (~$${convertedUsd.toFixed(2)} USD)`}
+                        </Text>
+                      )}
+                      {isShein && sheinPriceUsd !== null && sheinPriceUsd !== undefined && (
+                        <Text style={styles.sheinPriceText}>
+                          {` (+ $${Number(sheinPriceUsd).toFixed(2)} USD)`}
                         </Text>
                       )}
                     </View>
@@ -498,6 +510,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#2e7d32',
+  },
+  sheinPriceText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#F15927',
+    marginLeft: 3,
   },
   pendingPriceText: {
     fontSize: 13,

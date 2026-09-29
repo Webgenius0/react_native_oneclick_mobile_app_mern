@@ -2,6 +2,19 @@ import {Platform} from 'react-native';
 import {cleanProductTitle, getFallbackTitleFromUrl} from './storeHelper';
 export {cleanProductTitle, getFallbackTitleFromUrl};
 
+// SHEIN's CDN now serves product images as .avif URLs. The Android image stack
+// (Glide via FastImage / Fresco via RN Image) cannot decode AVIF on API < 31,
+// while the same path with a .jpg extension returns an identical, decodable
+// image from the same CDN. Rewrite .avif to .jpg for SHEIN CDN hosts so the
+// cart image loads on every supported Android version.
+export const normalizeProductImageUrl = url => {
+  if (!url || typeof url !== 'string') return url;
+  const trimmed = url.trim();
+  if (trimmed.toLowerCase().indexOf('ltwebstatic.com') === -1) return url;
+  if (!/\.avif(?:[?#]|$)/i.test(trimmed)) return url;
+  return trimmed.replace(/\.avif(?=[?#]|$)/i, '.jpg');
+};
+
 export const isTrendyol = page_url => {
   if (!page_url || typeof page_url !== 'string') return false;
   return page_url.indexOf('trendyol.') > -1 || page_url.indexOf('trendyol.com') > -1;

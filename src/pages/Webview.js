@@ -12,7 +12,7 @@ import AddToCart from '../components/webview/AddToCart';
 import { useScriptServiceStore } from '../store/useScriptServiceStore';
 import { useWebviewStore } from '../store/useWebviewStore';
 import { userAgent } from '../helpers/webview';
-import { injectedJavascript } from '../helpers/webview1';
+import { injectedJavascript, normalizeProductImageUrl } from '../helpers/webview1';
 import { cleanProductTitle, getFallbackTitleFromUrl, getStoreName, isProductUrl } from '../helpers/storeHelper';
 import { isPlaceholderValue } from '../helpers/variantUtils';
 import { t } from '../translate/i18n';
@@ -2284,7 +2284,7 @@ export default function Webview({ route, navigation }) {
       } else if (titleRef.current && /product summary|key product information/i.test(titleRef.current)) {
         titleRef.current = '';
       }
-      if (freshSnapshot.image) imageRef.current = freshSnapshot.image;
+      if (freshSnapshot.image) imageRef.current = normalizeProductImageUrl(freshSnapshot.image);
       if (freshSnapshot.price) priceRef.current = freshSnapshot.price;
       if (freshSnapshot.currency) currencyRef.current = freshSnapshot.currency;
     } else if (titleRef.current && /product summary|key product information/i.test(titleRef.current)) {
@@ -2427,7 +2427,7 @@ export default function Webview({ route, navigation }) {
       ? 'USD'
       : (isUaeUrl ? 'AED' : (isSaUrl ? 'SAR' : 'TL'));
 
-    const resolvedImage = finalImage || freshSnapshot?.image || imageRef.current || '';
+    const resolvedImage = normalizeProductImageUrl(finalImage || freshSnapshot?.image || imageRef.current || '');
     let resolvedPrice = freshSnapshot?.price || priceRef.current || '';
     let resolvedCurrency = freshSnapshot?.currency || currencyRef.current || fallbackCurrency;
     if (resolvedCurrency === 'TL' && (isSheinUrl || isAmazonUsUrl)) {
@@ -2535,7 +2535,7 @@ export default function Webview({ route, navigation }) {
           case 'productDetailsSnapshot': {
             if (message.data && typeof message.data === 'object') {
               if (message.data.title) titleRef.current = cleanProductTitle(String(message.data.title).trim(), currentUrlRef.current);
-              if (message.data.image) imageRef.current = String(message.data.image).trim();
+              if (message.data.image) imageRef.current = normalizeProductImageUrl(String(message.data.image).trim());
               if (message.data.price) priceRef.current = String(message.data.price).trim();
               if (message.data.currency) currencyRef.current = String(message.data.currency).trim();
               if (typeof pendingSnapshotResolveRef.current === 'function') {
@@ -2548,7 +2548,7 @@ export default function Webview({ route, navigation }) {
           }
           case 'image':
             if (message.data && typeof message.data === 'string') {
-              imageRef.current = message.data.trim();
+              imageRef.current = normalizeProductImageUrl(message.data.trim());
             }
             return;
           case 'title':

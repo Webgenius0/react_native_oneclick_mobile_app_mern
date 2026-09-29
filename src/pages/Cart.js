@@ -15,6 +15,7 @@ import Loading from '../components/Loading';
 import { useFocusEffect } from '@react-navigation/native';
 import TeslimatSehirPicker from '../components/TeslimatSehirPicker';
 import { useExchangeRateStore } from '../store/useExchangeRateStore';
+import { useSheinPriceStore } from '../store/useSheinPriceStore';
 import { calculateConvertedPrice, parsePrice, normalizeCurrency, } from '../helpers/currencyHelper';
 import { cleanProductTitle } from '../helpers/storeHelper';
 
@@ -32,10 +33,12 @@ export default function CartPage({ navigation, route }) {
   const deliveryRef = createRef();
 
   const { rates, inverseRates, fetchRates } = useExchangeRateStore();
+  const { fetchSheinPrice } = useSheinPriceStore();
 
   useEffect(() => {
     fetchRates();
-  }, [fetchRates]);
+    fetchSheinPrice();
+  }, [fetchRates, fetchSheinPrice]);
 
   const checkedItems = items ? items.filter(item => item.checked === true) : [];
   const totalItems = items.reduce((sum, item) => sum + item.count, 0);
@@ -96,11 +99,11 @@ export default function CartPage({ navigation, route }) {
       return;
     }
 
-    if (teslimatSehirID === null || teslimatSehirID === 0) {
+    /* if (teslimatSehirID === null || teslimatSehirID === 0) {
       Alert.alert(t('Lütfen teslimat şehri seçin'));
       setIsSubmitting(false);
       return;
-    }
+    } */
 
     let postData = new FormData();
     const checkedLen = (items ? items.filter(item => item.checked === true).length : 0) || 0;
@@ -301,7 +304,7 @@ export default function CartPage({ navigation, route }) {
     btn: {
       backgroundColor: '#FF5D5D',
       padding: 10,
-      width: '32%',
+      width: '48%',
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
@@ -456,15 +459,14 @@ export default function CartPage({ navigation, route }) {
                   }}>
                   {t('Teslimat Şehri')}
                 </Text>*/}
-              {/*</TouchableOpacity>*/}
-              <TeslimatSehirPicker
+              {/* <TeslimatSehirPicker
                 refProps={deliveryRef}
                 teslimatSehirID={teslimatSehirID}
                 setTeslimatSehirID={setTeslimatSehirID}
                 teslimatSehirs={teslimatSehirs}
                 changeText={false}
                 label={true}
-              />
+              /> */}
 
               {/*<RNPickerSelect
                 ref={deliveryRef}
@@ -513,12 +515,6 @@ export default function CartPage({ navigation, route }) {
               style={[styles.btn, styles.btnTemizle]}
               onPress={clearCart}>
               <Text style={styles.btnText}>{t('Sepeti Temizle')}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.btn, styles.btnUrunEkle]}
-              onPress={addItemPress}>
-              <Text style={styles.btnText}>{t('Ürün Ekle')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
