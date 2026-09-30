@@ -1,6 +1,7 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { HeaderBackButton } from '@react-navigation/elements';
 import { navigationRef } from './src/services/RootNavigation.js';
 
 import { useContext, useEffect, useState } from 'react';
@@ -407,10 +408,9 @@ export default function AppNavigator() {
         screenOptions={{
           headerShown: true,
           headerBackTitle: tr('Geri'),
+          headerTintColor: ctx.color,
           headerStyle: {
             backgroundColor: ctx.bgColor,
-            color: ctx.color,
-            headerTintColor: ctx.color,
           },
         }}>
         <Stack.Screen
@@ -477,18 +477,44 @@ export default function AppNavigator() {
         <Stack.Screen
           name="Profile"
           component={Profile}
-          options={{
+          options={({ navigation }) => ({
             title: tr('Profil'),
             headerTitleStyle: headerTitleStyle,
-          }}
+            headerLeft: props => (
+              <HeaderBackButton
+                {...props}
+                tintColor={ctx.color}
+                onPress={() => {
+                  if (navigation.canGoBack()) {
+                    navigation.goBack();
+                  } else {
+                    navigation.navigate('AuthAfter');
+                  }
+                }}
+              />
+            ),
+          })}
         />
         <Stack.Screen
           name="Notifications"
           component={Notifications}
-          options={{
+          options={({ navigation }) => ({
             title: tr('Bildirimler'),
             headerTitleStyle: headerTitleStyle,
-          }}
+            headerLeft: props => (
+              <HeaderBackButton
+                {...props}
+                tintColor={ctx.color}
+                onPress={() => {
+                  if (navigation.canGoBack()) {
+                    navigation.goBack();
+                  } else {
+                    navigation.navigate('AuthAfter');
+                  }
+                }}
+              />
+            ),
+          })}
         />
         <Stack.Screen
           name="OrderDetail"

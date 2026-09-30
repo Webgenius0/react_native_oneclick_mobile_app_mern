@@ -1,5 +1,6 @@
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { useContext, useEffect, useState } from "react";
+import { BackHandler, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useCallback, useContext, useEffect, useLayoutEffect, useState } from "react";
+import { HeaderBackButton } from "@react-navigation/elements";
 import Dump from "../components/Dump";
 import { storageDelete, storageGet, storageSet } from "../helpers/storage";
 import GlobalStyle from "../assets/GlobalStyle";
@@ -19,14 +20,43 @@ import {
 } from "../helpers/notificationV2";
 
 export default function({ route, navigation }) {
+  const { ctx, setCtx, methods } = useContext(EmContext);
+
+  const handleBack = useCallback(() => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate("AuthAfter");
+    }
+  }, [navigation]);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerLeft: props => (
+        <HeaderBackButton
+          {...props}
+          tintColor={ctx.color}
+          onPress={handleBack}
+        />
+      ),
+    });
+  }, [navigation, ctx.color, handleBack]);
+
+  useEffect(() => {
+    const onBackPress = () => {
+      handleBack();
+      return true;
+    };
+
+    const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    return () => sub.remove();
+  }, [handleBack]);
 
   const [state, setState] = useState({
     ss: [],
     loading: false,
     token: "not loaded",
   });
-
-  const { ctx, setCtx, methods } = useContext(EmContext);
 
 
   const init = async () => {

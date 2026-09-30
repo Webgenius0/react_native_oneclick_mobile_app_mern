@@ -185,7 +185,7 @@
         "Lütfen teslimat şehri seçin": "Lütfen teslimat şehri seçin",
         "Lütfen en az bir ürünü seçin": "Lütfen en az bir ürünü seçin",
         "Komisyon": "Komisyon",
-        "Toplam Tutar": "Toplam Tutar",
+        "Toplam Tutar": "Toplam Tutar"
     },
     "en": {
         "Müşteri Kodu": "Customer Code",
@@ -353,7 +353,7 @@
         "Ürün": "Product",
         "Sepeti Temizle": "Clear Cart",
         "Ürün Ekle": "Add Product",
-        "Sepeti Onayla": "Confirm Cart",
+        "Sepeti Onayla": "Payment Cart",
         "Uyarı": "Warning",
         "Lüften gerekli alanları doldurunuz": "Please fill in the required fields",
         "waafi_info":"Please enter your number as \nZaad O63xxxxx \nEvc 061xxxx \nSahal O90xxxxxx \nLater Reply to outgoing messages.",
@@ -374,7 +374,7 @@
         "Lütfen teslimat şehri seçin": "Please select the delivery city",
         "Lütfen en az bir ürünü seçin": "Please select at least one product",
         "Komisyon": "Commission",
-        "Toplam Tutar": "Total Amount",
+        "Toplam Tutar": "Total Amount"
     },
     "som": {
         "Müşteri Kodu": "Lambarka Macmiilka",
@@ -563,6 +563,6 @@
         "Lütfen teslimat şehri seçin": "Fadlan dooro magaalo gaarsiinta",
         "Lütfen en az bir ürünü seçin": "Fadlan dooro ugu yaraan alaabta mid",
         "Komisyon": "Komishanka",
-        "Toplam Tutar": "Wadarta lacagta",
+        "Toplam Tutar": "Wadarta lacagta"
     }
 }
