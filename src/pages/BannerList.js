@@ -1,4 +1,4 @@
-import { Text, View, StyleSheet, TouchableOpacity, Dimensions, ScrollView, SafeAreaView } from "react-native";
+import { Text, View, StyleSheet, TouchableOpacity, Dimensions, ScrollView, SafeAreaView, ActivityIndicator, RefreshControl } from "react-native";
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import { useCallback, useContext, useEffect, useState } from "react";
 import { getToken, getUser } from "../helpers/auth";
@@ -11,6 +11,7 @@ import AuthHeader from "../components/AuthHeader";
 import { useFocusEffect } from "@react-navigation/native";
 import CustomSlider from "../components/CustomSlider";
 import GlobalStyle from "../assets/GlobalStyle";
+import Colors from "../assets/Colors";
 import { tr } from "../translate/i18n";
 import Dump from "../components/Dump";
 import { storageGet, storageSet } from "../helpers/storage";
@@ -42,6 +43,7 @@ export default function({ route, navigation }) {
     kur: "",
     firstLoad: false,
     loading: true,
+    hasError: false,
     token: "",
     storageAllKeys: {},
   });
@@ -63,7 +65,6 @@ export default function({ route, navigation }) {
     await methods.fetchAllNotifications();
   };
 
-
   const resetStorage = async () => {
     await storageSet("notifications", []);
     await storageSet("lastNotifID", null);
@@ -71,54 +72,44 @@ export default function({ route, navigation }) {
     let lastNotifID = await storageGet("lastNotifID");
 
     // setCtx({ ...ctx, notifications: localNotifications, lastNotifID: lastNotifID });
+  };
 
+  const fetchData = async () => {
+    try {
+      setSubLoading(true);
+      console.log("BannerList fetchData:home ulkeID", ulkeID);
+      const c = await ai.post("home", {
+        ulkeID: ulkeID,
+      });
+      let ns = { ...state };
+      if (c?.data?.error === false) {
+        ns = {
+          ...ns,
+          banners: c.data.banners || [],
+          sliders: c.data.sliders || [],
+          banners_orta: c.data.banners_orta || [],
+          stories: c.data.stories || [],
+          ulkes: c.data.ulkes || [],
+          kur: c.data?.kur ?? "",
+          hasError: false,
+        };
+      } else {
+        ns = { ...ns, banners: [], sliders: [], stories: [], hasError: true };
+      }
+
+      ns.loading = false;
+      setState(ns);
+    } catch (error) {
+      console.log("BannerList fetchData error:", error?.message);
+      setState(prev => ({ ...prev, loading: false, hasError: true }));
+    } finally {
+      setSubLoading(false);
+    }
   };
 
   useFocusEffect(
     useCallback(() => {
-      const fetchData = async () => {
-        try {
-          setSubLoading(true);
-          console.log("BannerList fetchData:home ulkeID", ulkeID);
-          const c = await ai.post("home", {
-            ulkeID: ulkeID
-          });
-          let ns = { ...state };
-          if (c?.data?.error === false) {
-            ns = {
-              ...ns,
-              banners: c.data.banners || [],
-              sliders: c.data.sliders || [],
-              banners_orta: c.data.banners_orta || [],
-              stories: c.data.stories || [],
-              ulkes: c.data.ulkes || [],
-              kur: c.data?.kur ?? "",
-            };
-          } else {
-            ns = { ...ns, banners: [], sliders: [], stories: [] };
-          }
-
-          ns.loading = false;
-          setState(ns);
-        } catch (error) {
-          console.log("BannerList fetchData error:", error?.message);
-          setState(prev => ({ ...prev, loading: false }));
-        } finally {
-          setSubLoading(false);
-        }
-      };
-
       fetchData();
-
-
-      // resetStorage();
-      /*
-       if(methods.notificationTimeOut()){
-
-         fetchNotif();
-       }
-       */
-
     }, [ulkeID]),
   );
 
@@ -157,6 +148,37 @@ export default function({ route, navigation }) {
       backgroundColor: ctx.bgColor,
       paddingTop: insets.top,
     },
+    errorContainer: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 30,
+      paddingVertical: 60,
+    },
+    errorTitle: {
+      fontSize: 18,
+      fontWeight: "bold",
+      marginBottom: 8,
+      textAlign: "center",
+    },
+    errorSubtitle: {
+      fontSize: 14,
+      opacity: 0.7,
+      marginBottom: 20,
+      textAlign: "center",
+      lineHeight: 20,
+    },
+    retryButton: {
+      backgroundColor: Colors.primary,
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      borderRadius: 8,
+    },
+    retryButtonText: {
+      color: "#FFF",
+      fontSize: 15,
+      fontWeight: "600",
+    },
   });
 
 
@@ -170,15 +192,12 @@ export default function({ route, navigation }) {
         <View>
           <StoryList stories={state.stories} navigation={navigation} />
         </View>
-        {/*<Text>Home</Text>*/}
 
-        {/*<View>
-        <Dump ctx={ctx} />
-      </View>*/}
         {
           state.loading ? (
             <View style={styles.loadingContainer}>
-              <View><Text>{tr("Yükleniyor")}...</Text></View>
+              <ActivityIndicator size="large" color={Colors.primary} />
+              <Text style={{ marginTop: 12, color: ctx.color }}>{tr("Yükleniyor")}...</Text>
             </View>
           ) : null
         }
@@ -211,8 +230,42 @@ export default function({ route, navigation }) {
           setUlkeID={setUlkeID} />
 
         {
-          state.loading === false && !subLoading && !HOME_PASIF && (
-            <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
+          !state.loading && !subLoading && state.hasError && state.banners.length === 0 && state.sliders.length === 0 && (
+            <ScrollView
+              contentContainerStyle={styles.errorContainer}
+              refreshControl={
+                <RefreshControl
+                  refreshing={subLoading}
+                  onRefresh={fetchData}
+                  colors={[Colors.primary]}
+                />
+              }>
+              <Text style={[styles.errorTitle, { color: ctx.color }]}>
+                {tr("Bağlantı Hatası")}
+              </Text>
+              <Text style={[styles.errorSubtitle, { color: ctx.color }]}>
+                {tr("İnternet bağlantınızı kontrol edin veya tekrar deneyin.")}
+              </Text>
+              <TouchableOpacity
+                style={styles.retryButton}
+                onPress={fetchData}>
+                <Text style={styles.retryButtonText}>{tr("Tekrar Dene")}</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          )
+        }
+
+        {
+          state.loading === false && !subLoading && !HOME_PASIF && (state.banners.length > 0 || state.sliders.length > 0 || state.banners_orta.length > 0) && (
+            <ScrollView
+              contentContainerStyle={{ paddingBottom: 100 }}
+              refreshControl={
+                <RefreshControl
+                  refreshing={subLoading}
+                  onRefresh={fetchData}
+                  colors={[Colors.primary]}
+                />
+              }>
               {
                 <>
                   {

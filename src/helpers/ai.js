@@ -8,6 +8,7 @@ const ai = axios.create();
 const aiLog = false;
 const aiErrorLog = true;
 ai.defaults.baseURL = API_URL;
+ai.defaults.timeout = 10000;
 ai.defaults.headers.common['Accept'] = 'application/json, text/plain, */*';
 ai.defaults.headers.post['Content-Type'] = 'application/json';
 
