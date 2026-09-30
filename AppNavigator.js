@@ -407,7 +407,7 @@ export default function AppNavigator() {
         initialRouteName={initialRouteName}
         screenOptions={{
           headerShown: true,
-          headerBackTitle: tr('Geri'),
+          headerBackTitleVisible: false,
           headerTintColor: ctx.color,
           headerStyle: {
             backgroundColor: ctx.bgColor,
@@ -483,6 +483,8 @@ export default function AppNavigator() {
             headerLeft: props => (
               <HeaderBackButton
                 {...props}
+                labelVisible={false}
+                backTitleVisible={false}
                 tintColor={ctx.color}
                 onPress={() => {
                   if (navigation.canGoBack()) {
@@ -504,6 +506,8 @@ export default function AppNavigator() {
             headerLeft: props => (
               <HeaderBackButton
                 {...props}
+                labelVisible={false}
+                backTitleVisible={false}
                 tintColor={ctx.color}
                 onPress={() => {
                   if (navigation.canGoBack()) {

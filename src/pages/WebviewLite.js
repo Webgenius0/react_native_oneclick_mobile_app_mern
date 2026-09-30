@@ -53,6 +53,8 @@ export default function WebviewLite({ route, navigation }) {
       headerLeft: props => (
         <HeaderBackButton
           {...props}
+          labelVisible={false}
+          backTitleVisible={false}
           onPress={() => {
             if (webView.current.canGoBack) {
               webView.current.goBack();

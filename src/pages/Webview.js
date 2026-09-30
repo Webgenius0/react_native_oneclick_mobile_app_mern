@@ -996,7 +996,14 @@ export default function Webview({ route, navigation }) {
   }, [navigation]);
 
   const renderHeaderLeft = useCallback(
-    props => <HeaderBackButton {...props} onPress={handleHeaderBack} />,
+    props => (
+      <HeaderBackButton
+        {...props}
+        labelVisible={false}
+        backTitleVisible={false}
+        onPress={handleHeaderBack}
+      />
+    ),
     [handleHeaderBack],
   );
 
@@ -2720,17 +2727,13 @@ export default function Webview({ route, navigation }) {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      title: __DEV__
-        ? SCRIPT_STATUS_TITLES[injectStatus] || SCRIPT_STATUS_TITLES.idle
-        : route?.params?.ad || '-',
+      title: route?.params?.ad || '',
       headerLeft: renderHeaderLeft,
-      headerRight: __DEV__ ? renderHeaderRight : undefined,
+      headerRight: undefined,
     });
   }, [
-    injectStatus,
     navigation,
     renderHeaderLeft,
-    renderHeaderRight,
     route?.params?.ad,
   ]);
 

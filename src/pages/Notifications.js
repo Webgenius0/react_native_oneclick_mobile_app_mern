@@ -35,6 +35,8 @@ export default function({ route, navigation }) {
       headerLeft: props => (
         <HeaderBackButton
           {...props}
+          labelVisible={false}
+          backTitleVisible={false}
           tintColor={ctx.color}
           onPress={handleBack}
         />

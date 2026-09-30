@@ -202,6 +202,8 @@ const HomeNew = memo(({ route, navigation }) => {
    const headerLeftButton = useMemo(() => props => (
      <HeaderBackButton
        {...props}
+       labelVisible={false}
+       backTitleVisible={false}
        onPress={() => {
          if (canGoBack && webViewRef.current) {
            webViewRef.current.goBack();
