@@ -16,8 +16,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import TeslimatSehirPicker from '../components/TeslimatSehirPicker';
 import { useExchangeRateStore } from '../store/useExchangeRateStore';
 import { useSheinPriceStore } from '../store/useSheinPriceStore';
-import { calculateConvertedPrice, parsePrice, normalizeCurrency, } from '../helpers/currencyHelper';
-import { cleanProductTitle } from '../helpers/storeHelper';
+import { calculateConvertedPrice, parsePrice, normalizeCurrency } from '../helpers/currencyHelper';
+import { cleanProductTitle, getStoreName } from '../helpers/storeHelper';
 
 export default function CartPage({ navigation, route }) {
   const insets = useSafeAreaInsets();
@@ -40,6 +40,8 @@ export default function CartPage({ navigation, route }) {
     fetchSheinPrice();
   }, [fetchRates, fetchSheinPrice]);
 
+  const sheinBasePriceUsd =
+    useSheinPriceStore(state => state.basePriceUsd) ?? 0.3;
   const checkedItems = items ? items.filter(item => item.checked === true) : [];
   const totalItems = items.reduce((sum, item) => sum + item.count, 0);
   const totalUsd = checkedItems.reduce((sum, item) => {
@@ -49,8 +51,14 @@ export default function CartPage({ navigation, route }) {
       rates,
       inverseRates,
     );
+    const isShein = Boolean(
+      (item?.store && String(item.store).toLowerCase().includes('shein')) ||
+      (item?.url && String(item.url).toLowerCase().includes('shein.com')) ||
+      String(getStoreName(item?.url, item?.store || '')).toLowerCase() === 'shein',
+    );
+    const sheinFee = isShein ? sheinBasePriceUsd : 0;
     if (unitUsd !== null && unitUsd > 0) {
-      return sum + unitUsd * (item.count || 1);
+      return sum + (unitUsd + sheinFee) * (item.count || 1);
     }
     return sum;
   }, 0);

@@ -12,6 +12,7 @@ import { tr } from './src/translate/i18n';
 import { DEV_REDIRECT_STORE, FIREBASE_ENABLED, MOBIL_SCRIPT } from './config';
 import { useScriptServiceStore } from './src/store/useScriptServiceStore';
 import { useExchangeRateStore } from './src/store/useExchangeRateStore';
+import { useSheinPriceStore } from './src/store/useSheinPriceStore';
 
 // @ts-ignore
 const App = () => {
@@ -114,6 +115,7 @@ const App = () => {
     loadTheme(ctx, setCtx);
     fetchAllNotifications(ctx, setCtx);
     useExchangeRateStore.getState().fetchRates();
+    useSheinPriceStore.getState().fetchSheinPrice();
 
     // Handle shared links
     try {
