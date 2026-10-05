@@ -1,6 +1,6 @@
-import {create} from 'zustand';
+import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {createJSONStorage, persist} from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 
 const devCart = [
   {
@@ -14,8 +14,8 @@ const devCart = [
   },
 ];
 
-import {generateItemKey} from '../helpers/variantUtils';
-import {cleanProductTitle} from '../helpers/storeHelper';
+import { generateItemKey } from '../helpers/variantUtils';
+import { cleanProductTitle } from '../helpers/storeHelper';
 
 export const normalizeCartItem = item => {
   if (!item) {
@@ -381,11 +381,11 @@ const useCartStore = create(
           items: Array.isArray(items) ? items.map(normalizeCartItem) : [],
         })),
 
-      clearCart: () => set({items: []}),
+      clearCart: () => set({ items: [] }),
       dumpItems: () => console.log('items', get().items),
 
       translateActive: false,
-      setTranslateActive: translateActive => set({translateActive}),
+      setTranslateActive: translateActive => set({ translateActive }),
     }),
     {
       name: 'cart-storage', // Unique name for the storage
@@ -399,4 +399,4 @@ const useCartStore = create(
   ),
 );
 
-export {useCartStore, devCart};
+export { useCartStore, devCart };

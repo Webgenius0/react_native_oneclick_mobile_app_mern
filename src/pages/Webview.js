@@ -102,8 +102,7 @@ const isSheinUrl = url => {
   return host === 'shein.com' || host.endsWith('.shein.com');
 };
 
-const shouldProbeBeforeInject = url =>
-  Platform.OS === 'android' && isSheinUrl(url);
+const shouldProbeBeforeInject = url => isSheinUrl(url);
 
 const isDifferentProduct = (urlA, urlB) => {
   if (!urlA || !urlB) {
@@ -133,7 +132,7 @@ const isDifferentProduct = (urlA, urlB) => {
     if (gpA && gpB && gpA[1] === gpB[1]) {
       return false;
     }
-  } catch (_e) {}
+  } catch (_e) { }
   return true;
 };
 
@@ -180,7 +179,7 @@ const buildSheinReadinessProbe = (targetUrl, attempt, total) => {
         var productPage = href.indexOf('-p-') > -1;
         var productPageReady = productPage && (text.length > 350 || !!document.querySelector('meta[property="og:title"]') || !!productImage);
         var listPageReady = !!productLink || !!productNode || (!!productImage && text.length > 500);
-        var isReady = document.readyState === 'complete' && (productPageReady || listPageReady);
+        var isReady = (document.readyState === 'complete' || document.readyState === 'interactive') && (productPageReady || listPageReady);
 
         postStatus(isReady ? ${JSON.stringify(readyMessage)} : ${JSON.stringify(
     deferMessage,
@@ -1147,7 +1146,7 @@ export default function Webview({ route, navigation }) {
               ) return true;
               var cls = String(el.className || '');
               if (
-                /\\b(selected|active|is-selected|is-active|current|swatchSelect|a-button-selected|chosen|sp-itm-selected)\\b/i.test(cls) ||
+                /(^|[\s.;-])(selected|active|is-selected|is-active|current|swatchSelect|a-button-selected|chosen|sp-itm-selected)($|[\s.;-])/i.test(cls) ||
                 cls.indexOf('--active') > -1 ||
                 cls.indexOf('--selected') > -1
               ) return true;
@@ -1251,7 +1250,7 @@ export default function Webview({ route, navigation }) {
                 var el = document.querySelector(prioritySelectors[p]);
                 if (el) {
                   var elClass = String(el.className || '');
-                  if (/\\b(a-offscreen|a-screen-reader|sr-only)\\b/i.test(elClass) ||
+                  if (/(^|[\s.;-])(a-offscreen|a-screen-reader|sr-only)($|[\s.;-])/i.test(elClass) ||
                       (el.offsetParent === null && window.getComputedStyle && window.getComputedStyle(el).position !== 'fixed')) {
                     continue;
                   }
@@ -1422,9 +1421,9 @@ export default function Webview({ route, navigation }) {
                 if (el.tagName === 'DEL' || el.tagName === 'S' || el.tagName === 'STRIKE') return true;
                 if (el.getAttribute && el.getAttribute('data-a-strike') === 'true') return true;
                 var cls = String(el.className || '');
-                if (/\b(bsc-strikethrough-price|prc-org|prc-box-org|prc-slg|a-text-price|basisPrice|line-through|crossed)\b/i.test(cls)) return true;
-                if (/\b(original-price|originalPrice|orig-price|old-price|oldPrice|oldprice|was-price|wasPrice|price-was|del-price|head-price-del|market-price|retail-price)\b/i.test(cls)) return true;
-                if (el.closest && el.closest('del, s, strike, [data-a-strike="true"], .bsc-strikethrough-price, .a-text-price, .basisPrice, .prc-org, .prc-box-org, [class*="original-price"], [class*="old-price"], [class*="was-price"], [class*="head-price-del"], [class*="strikethrough"], [class*="del-price"]')) {
+                if (/(^|[\s.;-])(bsc-strikethrough-price|prc-org|prc-box-org|prc-slg|a-text-price|basisPrice|line-through|crossed)($|[\s.;-])/i.test(cls)) return true;
+                if (/(^|[\s.;-])(original-price|originalPrice|orig-price|old-price|oldPrice|oldprice|was-price|wasPrice|price-was|del-price|head-price-del|market-price|retail-price|productPrice__del|product-price__del)($|[\s.;-])/i.test(cls)) return true;
+                if (el.closest && el.closest('del, s, strike, [data-a-strike="true"], .bsc-strikethrough-price, .a-text-price, .basisPrice, .prc-org, .prc-box-org, [class*="original-price"], [class*="old-price"], [class*="was-price"], [class*="head-price-del"], [class*="strikethrough"], [class*="del-price"], [class*="productPrice__del"], [class*="product-price__del"]')) {
                   return true;
                 }
               } catch(_e) {}
@@ -1435,7 +1434,7 @@ export default function Webview({ route, navigation }) {
               if (!el) return '';
               if (isStruckOrOldPriceElement(el)) return '';
               if (el.tagName === 'META') return el.getAttribute('content') || el.content || '';
-              if (el.getAttribute && el.getAttribute('content') && /^\d/.test(el.getAttribute('content'))) {
+              if (el.getAttribute && el.getAttribute('content') && /^[0-9]/.test(el.getAttribute('content'))) {
                 return el.getAttribute('content');
               }
               try {
@@ -1446,6 +1445,7 @@ export default function Webview({ route, navigation }) {
                   '[class*="original-price"], [class*="originalPrice"], [class*="orig-price"], ' +
                   '[class*="old-price"], [class*="oldPrice"], [class*="oldprice"], ' +
                   '[class*="was-price"], [class*="wasPrice"], [class*="price-was"], ' +
+                  '[class*="productPrice__del"], [class*="product-price__del"], ' +
                   '[class*="strike"], [class*="line-through"], [class*="crossed"]'
                 );
                 for (var oi = 0; oi < oldNodes.length; oi++) {
@@ -1459,7 +1459,7 @@ export default function Webview({ route, navigation }) {
 
             var parsePriceAndCurrency = function(rawText) {
               if (!rawText || typeof rawText !== 'string') return { price: '', currency: '' };
-              var t = rawText.replace(/\s+/g, ' ').trim();
+              var t = rawText.replace(/[ \t\r\n]+/g, ' ').trim();
               // Convert Arabic-Indic digits ٠-٩ to 0-9
               t = t.replace(/[٠-٩]/g, function(d) { return String.fromCharCode(d.charCodeAt(0) - 1632 + 48); });
               var detectedCurr = '';
@@ -1490,12 +1490,36 @@ export default function Webview({ route, navigation }) {
             // 3a. Prioritized DOM Discount / Current Price extraction (gives live on-screen discounted prices)
             var candidatePriceSelectors = [
               // Shein Mobile & Desktop Live Discount / Selling Prices
+              '.floor-price',
+              '[class*="floor-price"]',
+              '[class*="floorPrice"]',
+              '.productPrice',
+              '[class*="productPrice__main"]',
+              '[class*="productPriceContainer"]',
+              '[class*="productPrice"]',
+              '[class*="product-price" i]',
+              '[class*="productprice" i]',
               '.bsc-main-price',
               '[class*="bsc-main-price"]',
               '.product-intro__head-price-text',
               '.product-intro__head-price',
               '.product-intro__price-new',
               '.product-intro__price',
+              '[class*="product-intro__head-price"]',
+              '[class*="product-intro__price"]',
+              '[class*="selling-price" i]',
+              '[class*="sellingPrice" i]',
+              '[class*="real-price" i]',
+              '[class*="realPrice" i]',
+              '[class*="shein-price" i]',
+              '[class*="goods-price" i]',
+              '[class*="goodsPrice" i]',
+              '[class*="goods-detail-price" i]',
+              '[class*="goodsDetailPrice" i]',
+              '[data-price]',
+              '[data-sku-price]',
+              '[aria-label*="price" i]',
+              '[aria-label*="Price" i]',
               '[itemprop="price"]',
               'span[itemprop="price"]',
 
@@ -1571,7 +1595,7 @@ export default function Webview({ route, navigation }) {
                 var currEl = elList[ei];
                 if (isStruckOrOldPriceElement(currEl)) continue;
                 var raw = getCleanElementPriceText(currEl);
-                if (raw && /\d/.test(raw)) {
+                if (raw && /[0-9]/.test(raw)) {
                   var parsed = parsePriceAndCurrency(raw);
                   if (parsed.price) {
                     price = parsed.price;
@@ -1622,20 +1646,42 @@ export default function Webview({ route, navigation }) {
                   if (!currency && window.gbCommonInfo.currency) {
                     currency = String(window.gbCommonInfo.currency).trim();
                   }
-                  if (!price && window.gbCommonInfo.contextForSSR && window.gbCommonInfo.contextForSSR.googleSEO && window.gbCommonInfo.contextForSSR.googleSEO.goodsDetailSchema) {
-                    var shSchema = window.gbCommonInfo.contextForSSR.googleSEO.goodsDetailSchema;
-                    if (shSchema.offers) {
-                      var off = shSchema.offers;
-                      var pOff = off.price || off.lowPrice || '';
-                      if (pOff) price = String(pOff).trim();
-                      if (!currency && off.priceCurrency) currency = String(off.priceCurrency).trim();
+                  var ssr = window.gbCommonInfo.contextForSSR;
+                  if (ssr) {
+                    if (!currency && ssr.currency) currency = String(ssr.currency).trim();
+                    if (!price && ssr.googleSEO && ssr.googleSEO.goodsDetailSchema && ssr.googleSEO.goodsDetailSchema.offers) {
+                      var shSchema = ssr.googleSEO.goodsDetailSchema;
+                      if (shSchema.offers) {
+                        var off = shSchema.offers;
+                        var pOff = off.price || off.lowPrice || '';
+                        if (pOff) price = String(pOff).trim();
+                        if (!currency && off.priceCurrency) currency = String(off.priceCurrency).trim();
+                      }
+                    }
+                    if (!price && ssr.detail) {
+                      var dtSsr = ssr.detail;
+                      var spSsr = (dtSsr.currentSku && (dtSsr.currentSku.sku_sale_price || dtSsr.currentSku.salePrice || dtSsr.currentSku.price)) || dtSsr.salePrice || dtSsr.sale_price || dtSsr.retailPrice || dtSsr.originalPrice;
+                      if (spSsr) {
+                        if (typeof spSsr === 'object') {
+                          if (spSsr.amount) price = String(spSsr.amount).trim();
+                          else if (spSsr.usdAmount) price = String(spSsr.usdAmount).trim();
+                          else if (spSsr.amountWithSymbol) {
+                            var pResSsr = parsePriceAndCurrency(spSsr.amountWithSymbol);
+                            if (pResSsr.price) { price = pResSsr.price; if (pResSsr.currency && !currency) currency = pResSsr.currency; }
+                          }
+                          if (spSsr.currency && !currency) currency = String(spSsr.currency).trim();
+                        } else if (typeof spSsr === 'number' || typeof spSsr === 'string') {
+                          var pResSsr2 = parsePriceAndCurrency(String(spSsr));
+                          if (pResSsr2.price) { price = pResSsr2.price; if (pResSsr2.currency && !currency) currency = pResSsr2.currency; }
+                        }
+                      }
                     }
                   }
                 }
                 var shData = window.productIntroData || window.gbProductIntroData;
                 if (shData && shData.detail) {
                   var dt = shData.detail;
-                  var sp = (dt.currentSku && dt.currentSku.sku_sale_price) || dt.salePrice || dt.sale_price || dt.retailPrice || dt.originalPrice;
+                  var sp = (dt.currentSku && (dt.currentSku.sku_sale_price || dt.currentSku.salePrice || dt.currentSku.price)) || dt.salePrice || dt.sale_price || dt.retailPrice || dt.originalPrice;
                   if (sp) {
                     if (typeof sp === 'object') {
                       if (sp.amount) price = String(sp.amount).trim();
@@ -1708,7 +1754,7 @@ export default function Webview({ route, navigation }) {
               var metaPrice = document.querySelector('meta[property="og:price:amount"], meta[property="product:price:amount"], meta[itemprop="price"], meta[name="twitter:data1"], [itemprop="price"]');
               if (metaPrice) {
                 var rawMeta = metaPrice.getAttribute('content') || metaPrice.getAttribute('value') || metaPrice.textContent || '';
-                if (rawMeta && /\d/.test(rawMeta)) {
+                if (rawMeta && /[0-9]/.test(rawMeta)) {
                   var parsedMeta = parsePriceAndCurrency(rawMeta);
                   if (parsedMeta.price) price = parsedMeta.price;
                   if (parsedMeta.currency && !currency) currency = parsedMeta.currency;
@@ -2034,7 +2080,7 @@ export default function Webview({ route, navigation }) {
 
                 var optPrice = '';
                 var pEl = itemEl.querySelector('.twisterSwatchPrice, [class*="SwatchPrice"], [class*="swatch-price"], .a-color-secondary, .twister-price, .a-size-mini');
-                if (pEl && pEl.textContent && /\\d/.test(pEl.textContent)) {
+                if (pEl && pEl.textContent && /[0-9]/.test(pEl.textContent)) {
                   var pMatches = pEl.textContent.match(/([0-9]{1,3}(?:[., ][0-9]{3})+(?:[.,][0-9]{1,2})|[0-9]+(?:[.,][0-9]{1,2})|[0-9]+)/);
                   if (pMatches) optPrice = pMatches[0];
                 }
@@ -2268,217 +2314,217 @@ export default function Webview({ route, navigation }) {
         })();
       `);
 
-      const [resolvedOpts, resolvedSnapshot] = await Promise.all([
-        Promise.race([
-          optionPromise,
-          new Promise(resolve => setTimeout(() => resolve(null), 3500)),
-        ]),
-        Promise.race([
-          snapshotPromise,
-          new Promise(resolve => setTimeout(() => resolve(null), 3500)),
-        ]),
-      ]);
+        const [resolvedOpts, resolvedSnapshot] = await Promise.all([
+          Promise.race([
+            optionPromise,
+            new Promise(resolve => setTimeout(() => resolve(null), 3500)),
+          ]),
+          Promise.race([
+            snapshotPromise,
+            new Promise(resolve => setTimeout(() => resolve(null), 3500)),
+          ]),
+        ]);
 
-      freshOpts = resolvedOpts;
-      freshSnapshot = resolvedSnapshot;
-      pendingOptionsResolveRef.current = null;
-      pendingSnapshotResolveRef.current = null;
-    }
+        freshOpts = resolvedOpts;
+        freshSnapshot = resolvedSnapshot;
+        pendingOptionsResolveRef.current = null;
+        pendingSnapshotResolveRef.current = null;
+      }
 
-    if (freshSnapshot) {
-      if (freshSnapshot.title && !/product summary|key product information/i.test(freshSnapshot.title)) {
-        titleRef.current = freshSnapshot.title;
+      if (freshSnapshot) {
+        if (freshSnapshot.title && !/product summary|key product information/i.test(freshSnapshot.title)) {
+          titleRef.current = freshSnapshot.title;
+        } else if (titleRef.current && /product summary|key product information/i.test(titleRef.current)) {
+          titleRef.current = '';
+        }
+        if (freshSnapshot.image) imageRef.current = normalizeProductImageUrl(freshSnapshot.image);
+        if (freshSnapshot.price) priceRef.current = freshSnapshot.price;
+        if (freshSnapshot.currency) currencyRef.current = freshSnapshot.currency;
       } else if (titleRef.current && /product summary|key product information/i.test(titleRef.current)) {
         titleRef.current = '';
       }
-      if (freshSnapshot.image) imageRef.current = normalizeProductImageUrl(freshSnapshot.image);
-      if (freshSnapshot.price) priceRef.current = freshSnapshot.price;
-      if (freshSnapshot.currency) currencyRef.current = freshSnapshot.currency;
-    } else if (titleRef.current && /product summary|key product information/i.test(titleRef.current)) {
-      titleRef.current = '';
-    }
 
-    // --- Determine whether the current page is a product page ---
-    const snapshotIsProduct = freshSnapshot?.isProduct;
-    const urlIsProduct = isProductUrl(currentUrlRef.current);
-    // Only block when BOTH signals agree this is NOT a product page
-    const pageIsProduct = snapshotIsProduct === true || urlIsProduct === true ||
-      (snapshotIsProduct === undefined && urlIsProduct === undefined);
+      // --- Determine whether the current page is a product page ---
+      const snapshotIsProduct = freshSnapshot?.isProduct;
+      const urlIsProduct = isProductUrl(currentUrlRef.current);
+      // Only block when BOTH signals agree this is NOT a product page
+      const pageIsProduct = snapshotIsProduct === true || urlIsProduct === true ||
+        (snapshotIsProduct === undefined && urlIsProduct === undefined);
 
-    if (!pageIsProduct) {
-      Alert.alert(
-        t('Uyarı') || 'Uyarı',
-        t('gecersizUrunSayfasi') ||
+      if (!pageIsProduct) {
+        Alert.alert(
+          t('Uyarı') || 'Uyarı',
+          t('gecersizUrunSayfasi') ||
           'Sadece ürün detay sayfaları sepete eklenebilir. Lütfen bir ürün sayfasına gidip tekrar deneyiniz.',
-        [{ text: t('Tamam') || 'Tamam' }],
-      );
-      return;
-    }
-
-    // --- Validate product data ---
-    const rawTitleCandidate = titleRef.current && !/product summary|key product information/i.test(titleRef.current)
-      ? titleRef.current
-      : '';
-    const finalTitle = rawTitleCandidate || getFallbackTitleFromUrl(currentUrlRef.current, '');
-    const finalImage = (imageRef.current || '').trim();
-
-    // Only block for truly generic / site-level titles (no product name at all)
-    const isGenericTitle = (title) => {
-      if (!title || typeof title !== 'string') return true;
-      const clean = title.trim().toLowerCase();
-      if (!clean || clean === 'product' || clean === 'oneclick' || clean === '-' || /product summary|key product information/i.test(clean)) return true;
-      // Pure store homepage titles (no product name mixed in)
-      const genericPatterns = [
-        /^trendyol\s*[-–|:]?\s*(fashion|home|electronics|beauty|online al[ıi][sş]veri[sş]|en uygun fiyat)/i,
-        /^amazon\s*[-–|.]?\s*(com|ae|sa|de|co\.uk)?\s*[-–|:]?\s*(online shopping|spend less|smile more|low prices)?\s*$/i,
-        /^shein\s*[-–|:]?\s*(online fashion|women'?s? clothing|affordable)/i,
-        /^hepsiburada\s*[-–|:]?/i,
-        /^noon\s*[-–|:]?\s*(online shopping)?\s*$/i,
-      ];
-      for (const pat of genericPatterns) {
-        if (pat.test(clean)) return true;
+          [{ text: t('Tamam') || 'Tamam' }],
+        );
+        return;
       }
-      return false;
-    };
 
-    if (isGenericTitle(finalTitle) && !finalImage) {
-      // Both title and image are missing/generic — likely not on a real product
-      Alert.alert(
-        t('Uyarı') || 'Uyarı',
-        t('gecersizUrunSayfasi') ||
+      // --- Validate product data ---
+      const rawTitleCandidate = titleRef.current && !/product summary|key product information/i.test(titleRef.current)
+        ? titleRef.current
+        : '';
+      const finalTitle = rawTitleCandidate || getFallbackTitleFromUrl(currentUrlRef.current, '');
+      const finalImage = (imageRef.current || '').trim();
+
+      // Only block for truly generic / site-level titles (no product name at all)
+      const isGenericTitle = (title) => {
+        if (!title || typeof title !== 'string') return true;
+        const clean = title.trim().toLowerCase();
+        if (!clean || clean === 'product' || clean === 'oneclick' || clean === '-' || /product summary|key product information/i.test(clean)) return true;
+        // Pure store homepage titles (no product name mixed in)
+        const genericPatterns = [
+          /^trendyol\s*[-–|:]?\s*(fashion|home|electronics|beauty|online al[ıi][sş]veri[sş]|en uygun fiyat)/i,
+          /^amazon\s*[-–|.]?\s*(com|ae|sa|de|co\.uk)?\s*[-–|:]?\s*(online shopping|spend less|smile more|low prices)?\s*$/i,
+          /^shein\s*[-–|:]?\s*(online fashion|women'?s? clothing|affordable)/i,
+          /^hepsiburada\s*[-–|:]?/i,
+          /^noon\s*[-–|:]?\s*(online shopping)?\s*$/i,
+        ];
+        for (const pat of genericPatterns) {
+          if (pat.test(clean)) return true;
+        }
+        return false;
+      };
+
+      if (isGenericTitle(finalTitle) && !finalImage) {
+        // Both title and image are missing/generic — likely not on a real product
+        Alert.alert(
+          t('Uyarı') || 'Uyarı',
+          t('gecersizUrunSayfasi') ||
           'Sadece ürün detay sayfaları sepete eklenebilir. Lütfen bir ürün sayfasına gidip tekrar deneyiniz.',
-        [{ text: t('Tamam') || 'Tamam' }],
+          [{ text: t('Tamam') || 'Tamam' }],
+        );
+        return;
+      }
+
+      const opts = freshOpts || optionsRef.current || {};
+      const finalOptions = (freshSnapshot && Array.isArray(freshSnapshot.options) && freshSnapshot.options.length > 0)
+        ? freshSnapshot.options
+        : (opts.options || []);
+
+      const hasSize = !!(
+        freshSnapshot?.hasSize ||
+        opts.hasSize ||
+        (freshSnapshot?.sizes && freshSnapshot.sizes.length > 0) ||
+        (opts.sizes && opts.sizes.length > 0)
       );
-      return;
-    }
+      const sizes = freshSnapshot?.sizes?.length ? freshSnapshot.sizes : (opts.sizes || []);
+      const selectedSize = freshSnapshot?.selectedSize || opts.selectedSize || '';
 
-    const opts = freshOpts || optionsRef.current || {};
-    const finalOptions = (freshSnapshot && Array.isArray(freshSnapshot.options) && freshSnapshot.options.length > 0)
-      ? freshSnapshot.options
-      : (opts.options || []);
+      const hasColor = !!(
+        freshSnapshot?.hasColor ||
+        opts.hasColor ||
+        (freshSnapshot?.colors && freshSnapshot.colors.length > 0) ||
+        (opts.colors && opts.colors.length > 0)
+      );
+      const colors = freshSnapshot?.colors?.length ? freshSnapshot.colors : (opts.colors || []);
+      const selectedColor = freshSnapshot?.selectedColor || opts.selectedColor || '';
 
-    const hasSize = !!(
-      freshSnapshot?.hasSize ||
-      opts.hasSize ||
-      (freshSnapshot?.sizes && freshSnapshot.sizes.length > 0) ||
-      (opts.sizes && opts.sizes.length > 0)
-    );
-    const sizes = freshSnapshot?.sizes?.length ? freshSnapshot.sizes : (opts.sizes || []);
-    const selectedSize = freshSnapshot?.selectedSize || opts.selectedSize || '';
+      // Enforce selection of product variants (e.g. Size, Color, Weight/Volume)
+      const missingOptions = [];
 
-    const hasColor = !!(
-      freshSnapshot?.hasColor ||
-      opts.hasColor ||
-      (freshSnapshot?.colors && freshSnapshot.colors.length > 0) ||
-      (opts.colors && opts.colors.length > 0)
-    );
-    const colors = freshSnapshot?.colors?.length ? freshSnapshot.colors : (opts.colors || []);
-    const selectedColor = freshSnapshot?.selectedColor || opts.selectedColor || '';
-
-    // Enforce selection of product variants (e.g. Size, Color, Weight/Volume)
-    const missingOptions = [];
-
-    if (Array.isArray(finalOptions) && finalOptions.length > 0) {
-      finalOptions.forEach(opt => {
-        if (opt && Array.isArray(opt.values) && opt.values.length > 1) {
-          const sel = (opt.selected || '').trim();
-          if (!sel || isPlaceholderValue(sel)) {
-            const optName = opt.name || 'Option';
-            if (!missingOptions.includes(optName)) {
-              missingOptions.push(optName);
+      if (Array.isArray(finalOptions) && finalOptions.length > 0) {
+        finalOptions.forEach(opt => {
+          if (opt && Array.isArray(opt.values) && opt.values.length > 1) {
+            const sel = (opt.selected || '').trim();
+            if (!sel || isPlaceholderValue(sel)) {
+              const optName = opt.name || 'Option';
+              if (!missingOptions.includes(optName)) {
+                missingOptions.push(optName);
+              }
             }
           }
+        });
+      }
+
+      if (hasSize && sizes.length > 1 && (!selectedSize || isPlaceholderValue(selectedSize))) {
+        if (!missingOptions.includes('Size')) {
+          missingOptions.push('Size');
         }
+      }
+
+      if (hasColor && colors.length > 1 && (!selectedColor || isPlaceholderValue(selectedColor))) {
+        if (!missingOptions.includes('Color')) {
+          missingOptions.push('Color');
+        }
+      }
+
+      if (missingOptions.length > 0) {
+        const translatedNames = missingOptions.map(name => {
+          const lower = (name || '').toLowerCase();
+          if (lower.includes('size') || lower.includes('beden')) return t('Beden') || 'Size';
+          if (lower.includes('color') || lower.includes('renk')) return t('Renk') || 'Color';
+          if (lower.includes('weight') || lower.includes('ağırlık')) return t('Ağırlık') || 'Weight';
+          if (lower.includes('volume') || lower.includes('hacim')) return t('Hacim / Kapasite') || 'Volume';
+          if (lower.includes('variant') || lower.includes('varyant') || lower.includes('option')) return t('Varyant') || 'Variant';
+          return name;
+        }).join(', ');
+
+        const alertMsg = t('lutfenSecimYapin', { options: translatedNames }) ||
+          `Lütfen sepete eklemeden önce ürün seçeneklerini (${translatedNames}) seçiniz.`;
+
+        Alert.alert(t('Uyarı') || 'Uyarı', alertMsg, [
+          { text: t('Tamam') || 'Tamam' }
+        ]);
+        return;
+      }
+
+      const finalStore = getStoreName(currentUrlRef.current, freshSnapshot?.store || route?.params?.ad);
+
+      const isShein = isSheinUrl(currentUrlRef.current);
+      const isAmazonUsUrl = currentUrlRef.current.includes('amazon.com');
+      const isUaeUrl = currentUrlRef.current.includes('amazon.ae') || currentUrlRef.current.includes('noon.com');
+      const isSaUrl = currentUrlRef.current.includes('amazon.sa');
+      const fallbackCurrency = (isShein || isAmazonUsUrl)
+        ? 'USD'
+        : (isUaeUrl ? 'AED' : (isSaUrl ? 'SAR' : 'TL'));
+
+      const resolvedImage = normalizeProductImageUrl(finalImage || freshSnapshot?.image || imageRef.current || '');
+      let resolvedPrice = freshSnapshot?.price || priceRef.current || '';
+      let resolvedCurrency = freshSnapshot?.currency || currencyRef.current || fallbackCurrency;
+      if (resolvedCurrency === 'TL' && (isShein || isAmazonUsUrl)) {
+        resolvedCurrency = 'USD';
+      }
+
+      // Sanitize options so that only the user-selected value is retained
+      const sanitizedOptions = finalOptions.map(opt => {
+        if (opt && opt.selected) {
+          return {
+            ...opt,
+            values: [opt.selected],
+          };
+        }
+        return opt;
       });
+
+      const sanitizedSizes = selectedSize ? [selectedSize] : sizes;
+      const sanitizedColors = selectedColor ? [selectedColor] : colors;
+
+      addItem({
+        title: cleanProductTitle(finalTitle, currentUrlRef.current),
+        url: currentUrlRef.current,
+        count: 1,
+        checked: true,
+        image: resolvedImage,
+        price: resolvedPrice,
+        currency: resolvedCurrency,
+        store: finalStore,
+        options: sanitizedOptions,
+        hasSize: hasSize,
+        sizes: sanitizedSizes,
+        size: selectedSize,
+        hasColor: hasColor,
+        colors: sanitizedColors,
+        color: selectedColor,
+      });
+
+      await delay(150);
+      navigation.navigate('Cart');
+    } finally {
+      isAddingRef.current = false;
     }
-
-    if (hasSize && sizes.length > 1 && (!selectedSize || isPlaceholderValue(selectedSize))) {
-      if (!missingOptions.includes('Size')) {
-        missingOptions.push('Size');
-      }
-    }
-
-    if (hasColor && colors.length > 1 && (!selectedColor || isPlaceholderValue(selectedColor))) {
-      if (!missingOptions.includes('Color')) {
-        missingOptions.push('Color');
-      }
-    }
-
-    if (missingOptions.length > 0) {
-      const translatedNames = missingOptions.map(name => {
-        const lower = (name || '').toLowerCase();
-        if (lower.includes('size') || lower.includes('beden')) return t('Beden') || 'Size';
-        if (lower.includes('color') || lower.includes('renk')) return t('Renk') || 'Color';
-        if (lower.includes('weight') || lower.includes('ağırlık')) return t('Ağırlık') || 'Weight';
-        if (lower.includes('volume') || lower.includes('hacim')) return t('Hacim / Kapasite') || 'Volume';
-        if (lower.includes('variant') || lower.includes('varyant') || lower.includes('option')) return t('Varyant') || 'Variant';
-        return name;
-      }).join(', ');
-
-      const alertMsg = t('lutfenSecimYapin', { options: translatedNames }) ||
-        `Lütfen sepete eklemeden önce ürün seçeneklerini (${translatedNames}) seçiniz.`;
-
-      Alert.alert(t('Uyarı') || 'Uyarı', alertMsg, [
-        { text: t('Tamam') || 'Tamam' }
-      ]);
-      return;
-    }
-
-    const finalStore = getStoreName(currentUrlRef.current, freshSnapshot?.store || route?.params?.ad);
-
-    const isSheinUrl = currentUrlRef.current.includes('shein.com');
-    const isAmazonUsUrl = currentUrlRef.current.includes('amazon.com');
-    const isUaeUrl = currentUrlRef.current.includes('amazon.ae') || currentUrlRef.current.includes('noon.com');
-    const isSaUrl = currentUrlRef.current.includes('amazon.sa');
-    const fallbackCurrency = (isSheinUrl || isAmazonUsUrl)
-      ? 'USD'
-      : (isUaeUrl ? 'AED' : (isSaUrl ? 'SAR' : 'TL'));
-
-    const resolvedImage = normalizeProductImageUrl(finalImage || freshSnapshot?.image || imageRef.current || '');
-    let resolvedPrice = freshSnapshot?.price || priceRef.current || '';
-    let resolvedCurrency = freshSnapshot?.currency || currencyRef.current || fallbackCurrency;
-    if (resolvedCurrency === 'TL' && (isSheinUrl || isAmazonUsUrl)) {
-      resolvedCurrency = 'USD';
-    }
-
-    // Sanitize options so that only the user-selected value is retained
-    const sanitizedOptions = finalOptions.map(opt => {
-      if (opt && opt.selected) {
-        return {
-          ...opt,
-          values: [opt.selected],
-        };
-      }
-      return opt;
-    });
-
-    const sanitizedSizes = selectedSize ? [selectedSize] : sizes;
-    const sanitizedColors = selectedColor ? [selectedColor] : colors;
-
-    addItem({
-      title: cleanProductTitle(finalTitle, currentUrlRef.current),
-      url: currentUrlRef.current,
-      count: 1,
-      checked: true,
-      image: resolvedImage,
-      price: resolvedPrice,
-      currency: resolvedCurrency,
-      store: finalStore,
-      options: sanitizedOptions,
-      hasSize: hasSize,
-      sizes: sanitizedSizes,
-      size: selectedSize,
-      hasColor: hasColor,
-      colors: sanitizedColors,
-      color: selectedColor,
-    });
-
-    await delay(150);
-    navigation.navigate('Cart');
-  } finally {
-    isAddingRef.current = false;
-  }
-}, [addItem, navigation, route?.params?.ad]);
+  }, [addItem, navigation, route?.params?.ad]);
 
   const onMessage = useCallback(
     ({ nativeEvent }) => {

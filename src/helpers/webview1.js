@@ -1,6 +1,6 @@
-import {Platform} from 'react-native';
-import {cleanProductTitle, getFallbackTitleFromUrl} from './storeHelper';
-export {cleanProductTitle, getFallbackTitleFromUrl};
+import { Platform } from 'react-native';
+import { cleanProductTitle, getFallbackTitleFromUrl } from './storeHelper';
+export { cleanProductTitle, getFallbackTitleFromUrl };
 
 // SHEIN's CDN now serves product images as .avif URLs. The Android image stack
 // (Glide via FastImage / Fresco via RN Image) cannot decode AVIF on API < 31,
@@ -403,7 +403,7 @@ export const getMetaTagTitle = page_url => {
             var el = document.querySelector(prioritySelectors[p]);
             if (el) {
               var elClass = String(el.className || '');
-              if (/\\b(a-offscreen|a-screen-reader|sr-only)\\b/i.test(elClass) ||
+              if (/(^|[\s.;-])(a-offscreen|a-screen-reader|sr-only)($|[\s.;-])/i.test(elClass) ||
                   (el.offsetParent === null && window.getComputedStyle && window.getComputedStyle(el).position !== 'fixed')) {
                 continue;
               }
@@ -481,9 +481,9 @@ export const getMetaTagPriceAndCurrency = page_url => {
             if (el.tagName === 'DEL' || el.tagName === 'S' || el.tagName === 'STRIKE') return true;
             if (el.getAttribute && el.getAttribute('data-a-strike') === 'true') return true;
             var cls = String(el.className || '');
-            if (/\b(bsc-strikethrough-price|prc-org|prc-box-org|prc-slg|a-text-price|basisPrice|line-through|crossed)\b/i.test(cls)) return true;
-            if (/\b(original-price|originalPrice|orig-price|old-price|oldPrice|oldprice|was-price|wasPrice|price-was|del-price|head-price-del|market-price|retail-price)\b/i.test(cls)) return true;
-            if (el.closest && el.closest('del, s, strike, [data-a-strike="true"], .bsc-strikethrough-price, .a-text-price, .basisPrice, .prc-org, .prc-box-org, [class*="original-price"], [class*="old-price"], [class*="was-price"], [class*="head-price-del"], [class*="strikethrough"], [class*="del-price"]')) {
+            if (/(^|[\s.;-])(bsc-strikethrough-price|prc-org|prc-box-org|prc-slg|a-text-price|basisPrice|line-through|crossed)($|[\s.;-])/i.test(cls)) return true;
+            if (/(^|[\s.;-])(original-price|originalPrice|orig-price|old-price|oldPrice|oldprice|was-price|wasPrice|price-was|del-price|head-price-del|market-price|retail-price|productPrice__del|product-price__del)($|[\s.;-])/i.test(cls)) return true;
+            if (el.closest && el.closest('del, s, strike, [data-a-strike="true"], .bsc-strikethrough-price, .a-text-price, .basisPrice, .prc-org, .prc-box-org, [class*="original-price"], [class*="old-price"], [class*="was-price"], [class*="head-price-del"], [class*="strikethrough"], [class*="del-price"], [class*="productPrice__del"], [class*="product-price__del"]')) {
               return true;
             }
           } catch(_e) {}
@@ -494,7 +494,7 @@ export const getMetaTagPriceAndCurrency = page_url => {
           if (!el) return '';
           if (isStruckOrOldPriceElement(el)) return '';
           if (el.tagName === 'META') return el.getAttribute('content') || el.content || '';
-          if (el.getAttribute && el.getAttribute('content') && /^\d/.test(el.getAttribute('content'))) {
+          if (el.getAttribute && el.getAttribute('content') && /^[0-9]/.test(el.getAttribute('content'))) {
             return el.getAttribute('content');
           }
           try {
@@ -549,12 +549,36 @@ export const getMetaTagPriceAndCurrency = page_url => {
         // 1. Prioritized DOM Discount / Current Price extraction (gives live on-screen discounted prices)
         var candidatePriceSelectors = [
           // Shein Mobile & Desktop Live Discount / Selling Prices
+          '.floor-price',
+          '[class*="floor-price"]',
+          '[class*="floorPrice"]',
+          '.productPrice',
+          '[class*="productPrice__main"]',
+          '[class*="productPriceContainer"]',
+          '[class*="productPrice"]',
+          '[class*="product-price" i]',
+          '[class*="productprice" i]',
           '.bsc-main-price',
           '[class*="bsc-main-price"]',
           '.product-intro__head-price-text',
           '.product-intro__head-price',
           '.product-intro__price-new',
           '.product-intro__price',
+          '[class*="product-intro__head-price"]',
+          '[class*="product-intro__price"]',
+          '[class*="selling-price" i]',
+          '[class*="sellingPrice" i]',
+          '[class*="real-price" i]',
+          '[class*="realPrice" i]',
+          '[class*="shein-price" i]',
+          '[class*="goods-price" i]',
+          '[class*="goodsPrice" i]',
+          '[class*="goods-detail-price" i]',
+          '[class*="goodsDetailPrice" i]',
+          '[data-price]',
+          '[data-sku-price]',
+          '[aria-label*="price" i]',
+          '[aria-label*="Price" i]',
           '[itemprop="price"]',
           'span[itemprop="price"]',
 
@@ -631,7 +655,7 @@ export const getMetaTagPriceAndCurrency = page_url => {
             var currEl = elList[ei];
             if (isStruckOrOldPriceElement(currEl)) continue;
             var raw = getCleanElementPriceText(currEl);
-            if (raw && /\\d/.test(raw)) {
+            if (raw && /[0-9]/.test(raw)) {
               var parsed = parsePriceAndCurrency(raw);
               if (parsed.price) {
                 price = parsed.price;
@@ -683,20 +707,42 @@ export const getMetaTagPriceAndCurrency = page_url => {
               if (!currency && window.gbCommonInfo.currency) {
                 currency = String(window.gbCommonInfo.currency).trim();
               }
-              if (!price && window.gbCommonInfo.contextForSSR && window.gbCommonInfo.contextForSSR.googleSEO && window.gbCommonInfo.contextForSSR.googleSEO.goodsDetailSchema) {
-                var shSchema = window.gbCommonInfo.contextForSSR.googleSEO.goodsDetailSchema;
-                if (shSchema.offers) {
-                  var off = shSchema.offers;
-                  var pOff = off.price || off.lowPrice || '';
-                  if (pOff) price = String(pOff).trim();
-                  if (!currency && off.priceCurrency) currency = String(off.priceCurrency).trim();
+              var ssr = window.gbCommonInfo.contextForSSR;
+              if (ssr) {
+                if (!currency && ssr.currency) currency = String(ssr.currency).trim();
+                if (!price && ssr.googleSEO && ssr.googleSEO.goodsDetailSchema && ssr.googleSEO.goodsDetailSchema.offers) {
+                  var shSchema = ssr.googleSEO.goodsDetailSchema;
+                  if (shSchema.offers) {
+                    var off = shSchema.offers;
+                    var pOff = off.price || off.lowPrice || '';
+                    if (pOff) price = String(pOff).trim();
+                    if (!currency && off.priceCurrency) currency = String(off.priceCurrency).trim();
+                  }
+                }
+                if (!price && ssr.detail) {
+                  var dtSsr = ssr.detail;
+                  var spSsr = (dtSsr.currentSku && (dtSsr.currentSku.sku_sale_price || dtSsr.currentSku.salePrice || dtSsr.currentSku.price)) || dtSsr.salePrice || dtSsr.sale_price || dtSsr.retailPrice || dtSsr.originalPrice;
+                  if (spSsr) {
+                    if (typeof spSsr === 'object') {
+                      if (spSsr.amount) price = String(spSsr.amount).trim();
+                      else if (spSsr.usdAmount) price = String(spSsr.usdAmount).trim();
+                      else if (spSsr.amountWithSymbol) {
+                        var pResSsr = parsePriceAndCurrency(spSsr.amountWithSymbol);
+                        if (pResSsr.price) { price = pResSsr.price; if (pResSsr.currency && !currency) currency = pResSsr.currency; }
+                      }
+                      if (spSsr.currency && !currency) currency = String(spSsr.currency).trim();
+                    } else if (typeof spSsr === 'number' || typeof spSsr === 'string') {
+                      var pResSsr2 = parsePriceAndCurrency(String(spSsr));
+                      if (pResSsr2.price) { price = pResSsr2.price; if (pResSsr2.currency && !currency) currency = pResSsr2.currency; }
+                    }
+                  }
                 }
               }
             }
             var shData = window.productIntroData || window.gbProductIntroData;
             if (shData && shData.detail) {
               var dt = shData.detail;
-              var sp = (dt.currentSku && dt.currentSku.sku_sale_price) || dt.salePrice || dt.sale_price || dt.retailPrice || dt.originalPrice;
+              var sp = (dt.currentSku && (dt.currentSku.sku_sale_price || dt.currentSku.salePrice || dt.currentSku.price)) || dt.salePrice || dt.sale_price || dt.retailPrice || dt.originalPrice;
               if (sp) {
                 if (typeof sp === 'object') {
                   if (sp.amount) price = String(sp.amount).trim();
@@ -968,7 +1014,7 @@ export const getProductOptionsBridge = page_url => {
       }
       var cls = String(el.className || '');
       if (
-        /\\b(selected|active|is-selected|is-active|current|swatchSelect|a-button-selected|chosen|sp-itm-selected)\\b/i.test(cls) ||
+        /(^|[\s.;-])(selected|active|is-selected|is-active|current|swatchSelect|a-button-selected|chosen|sp-itm-selected)($|[\s.;-])/i.test(cls) ||
         cls.indexOf('--active') > -1 ||
         cls.indexOf('--selected') > -1
       ) {
@@ -1313,7 +1359,7 @@ export const getProductOptionsBridge = page_url => {
               // Extract swatch price from swatch element if present
               var optPrice = '';
               var pEl = itemEl.querySelector('.twisterSwatchPrice, [class*="SwatchPrice"], [class*="swatch-price"], .a-color-secondary, .twister-price, .a-size-mini');
-              if (pEl && pEl.textContent && /\\d/.test(pEl.textContent)) {
+              if (pEl && pEl.textContent && /[0-9]/.test(pEl.textContent)) {
                 var pMatches = pEl.textContent.match(/([0-9]{1,3}(?:[., ][0-9]{3})+(?:[.,][0-9]{1,2})|[0-9]+(?:[.,][0-9]{1,2})|[0-9]+)/);
                 if (pMatches) optPrice = pMatches[0];
               }
@@ -1373,7 +1419,7 @@ export const getProductOptionsBridge = page_url => {
             var swPrice = swEl.getAttribute('data-price') || swEl.getAttribute('data-product-price') || '';
             if (!swPrice) {
               var swPEl = swEl.querySelector('[class*="price"], .price');
-              if (swPEl && swPEl.textContent && /\\d/.test(swPEl.textContent)) {
+              if (swPEl && swPEl.textContent && /[0-9]/.test(swPEl.textContent)) {
                 var swPMatch = swPEl.textContent.match(/([0-9]{1,3}(?:[., ][0-9]{3})+(?:[.,][0-9]{1,2})|[0-9]+(?:[.,][0-9]{1,2})|[0-9]+)/);
                 if (swPMatch) swPrice = swPMatch[0];
               }
@@ -2004,7 +2050,7 @@ export const getProductSnapshotBridge = page_url => {
             var el = document.querySelector(prioritySelectors[p]);
             if (el) {
               var elClass = String(el.className || '');
-              if (/\\b(a-offscreen|a-screen-reader|sr-only)\\b/i.test(elClass) ||
+              if (/(^|[\s.;-])(a-offscreen|a-screen-reader|sr-only)($|[\s.;-])/i.test(elClass) ||
                   (el.offsetParent === null && window.getComputedStyle && window.getComputedStyle(el).position !== 'fixed')) {
                 continue;
               }
@@ -2224,9 +2270,9 @@ export const getProductSnapshotBridge = page_url => {
             if (el.tagName === 'DEL' || el.tagName === 'S' || el.tagName === 'STRIKE') return true;
             if (el.getAttribute && el.getAttribute('data-a-strike') === 'true') return true;
             var cls = String(el.className || '');
-            if (/\\b(prc-org|prc-box-org|prc-slg|a-text-price|basisPrice|line-through|crossed)\\b/i.test(cls)) return true;
-            if (/\\b(original-price|originalPrice|orig-price|old-price|oldPrice|oldprice|was-price|wasPrice|price-was)\\b/i.test(cls)) return true;
-            if (el.closest && el.closest('del, s, strike, [data-a-strike="true"], .a-text-price, .basisPrice, .prc-org, .prc-box-org, [class*="original-price"], [class*="old-price"], [class*="was-price"]')) {
+            if (/(^|[\s.;-])(prc-org|prc-box-org|prc-slg|a-text-price|basisPrice|line-through|crossed)($|[\s.;-])/i.test(cls)) return true;
+            if (/(^|[\s.;-])(original-price|originalPrice|orig-price|old-price|oldPrice|oldprice|was-price|wasPrice|price-was|del-price|head-price-del|market-price|retail-price|productPrice__del|product-price__del)($|[\s.;-])/i.test(cls)) return true;
+            if (el.closest && el.closest('del, s, strike, [data-a-strike="true"], .a-text-price, .basisPrice, .prc-org, .prc-box-org, [class*="original-price"], [class*="old-price"], [class*="was-price"], [class*="head-price-del"], [class*="productPrice__del"], [class*="product-price__del"]')) {
               return true;
             }
           } catch(_e) {}
@@ -2313,11 +2359,33 @@ export const getProductSnapshotBridge = page_url => {
           '.reinventPricePriceToPayMargin .a-offscreen',
 
           // Shein Mobile & Desktop Discounted / Current Prices
+          '.floor-price',
+          '[class*="floor-price"]',
+          '[class*="floorPrice"]',
+          '.productPrice',
+          '[class*="productPrice__main"]',
+          '[class*="productPriceContainer"]',
+          '[class*="productPrice"]',
+          '[class*="product-price" i]',
+          '[class*="productprice" i]',
+          '.bsc-main-price',
+          '[class*="bsc-main-price"]',
           '.product-intro__head-price',
           '.product-intro__price',
           '.product-intro__price-new',
           '[class*="product-intro__head-price"]',
           '[class*="product-intro__price"]',
+          '[class*="selling-price" i]',
+          '[class*="sellingPrice" i]',
+          '[class*="real-price" i]',
+          '[class*="realPrice" i]',
+          '[class*="shein-price" i]',
+          '[class*="goods-price" i]',
+          '[class*="goodsPrice" i]',
+          '[class*="goods-detail-price" i]',
+          '[class*="goodsDetailPrice" i]',
+          '[data-price]',
+          '[data-sku-price]',
           '[class*="from-price"]',
           '[class*="goods-detail-price"]',
           '[class*="discount-price"]',
@@ -2364,7 +2432,7 @@ export const getProductSnapshotBridge = page_url => {
             var currEl = elList[ei];
             if (isStruckOrOldPriceElement(currEl)) continue;
             var raw = getCleanElementPriceText(currEl);
-            if (raw && /\d/.test(raw)) {
+            if (raw && /[0-9]/.test(raw)) {
               var parsed = parsePriceAndCurrency(raw);
               if (parsed.price) {
                 snapshot.price = parsed.price;
@@ -2411,10 +2479,43 @@ export const getProductSnapshotBridge = page_url => {
         // 3c. Shein App State (fallback)
         if (!snapshot.price) {
           try {
+            if (window.gbCommonInfo) {
+              if (!snapshot.currency && window.gbCommonInfo.currency) {
+                snapshot.currency = String(window.gbCommonInfo.currency).trim();
+              }
+              var ssrSnap = window.gbCommonInfo.contextForSSR;
+              if (ssrSnap) {
+                if (!snapshot.currency && ssrSnap.currency) snapshot.currency = String(ssrSnap.currency).trim();
+                if (!snapshot.price && ssrSnap.googleSEO && ssrSnap.googleSEO.goodsDetailSchema && ssrSnap.googleSEO.goodsDetailSchema.offers) {
+                  var offSnap = ssrSnap.googleSEO.goodsDetailSchema.offers;
+                  var pOffSnap = offSnap.price || offSnap.lowPrice || '';
+                  if (pOffSnap) snapshot.price = String(pOffSnap).trim();
+                  if (!snapshot.currency && offSnap.priceCurrency) snapshot.currency = String(offSnap.priceCurrency).trim();
+                }
+                if (!snapshot.price && ssrSnap.detail) {
+                  var dtSsrSnap = ssrSnap.detail;
+                  var spSsrSnap = (dtSsrSnap.currentSku && (dtSsrSnap.currentSku.sku_sale_price || dtSsrSnap.currentSku.salePrice || dtSsrSnap.currentSku.price)) || dtSsrSnap.salePrice || dtSsrSnap.sale_price || dtSsrSnap.retailPrice || dtSsrSnap.originalPrice;
+                  if (spSsrSnap) {
+                    if (typeof spSsrSnap === 'object') {
+                      if (spSsrSnap.amount) snapshot.price = String(spSsrSnap.amount).trim();
+                      else if (spSsrSnap.usdAmount) snapshot.price = String(spSsrSnap.usdAmount).trim();
+                      else if (spSsrSnap.amountWithSymbol) {
+                        var pResSnapSsr = parsePriceAndCurrency(spSsrSnap.amountWithSymbol);
+                        if (pResSnapSsr.price) { snapshot.price = pResSnapSsr.price; if (pResSnapSsr.currency && !snapshot.currency) snapshot.currency = pResSnapSsr.currency; }
+                      }
+                      if (spSsrSnap.currency && !snapshot.currency) snapshot.currency = String(spSsrSnap.currency).trim();
+                    } else if (typeof spSsrSnap === 'number' || typeof spSsrSnap === 'string') {
+                      var pResSnapSsr2 = parsePriceAndCurrency(String(spSsrSnap));
+                      if (pResSnapSsr2.price) { snapshot.price = pResSnapSsr2.price; if (pResSnapSsr2.currency && !snapshot.currency) snapshot.currency = pResSnapSsr2.currency; }
+                    }
+                  }
+                }
+              }
+            }
             var shD = window.productIntroData || window.gbProductIntroData;
             if (shD && shD.detail) {
               var dtSnap = shD.detail;
-              var sp = (dtSnap.currentSku && dtSnap.currentSku.sku_sale_price) || dtSnap.salePrice || dtSnap.sale_price || dtSnap.retailPrice || dtSnap.originalPrice;
+              var sp = (dtSnap.currentSku && (dtSnap.currentSku.sku_sale_price || dtSnap.currentSku.salePrice || dtSnap.currentSku.price)) || dtSnap.salePrice || dtSnap.sale_price || dtSnap.retailPrice || dtSnap.originalPrice;
               if (sp) {
                 if (typeof sp === 'object') {
                   if (sp.amount) snapshot.price = String(sp.amount).trim();
@@ -2478,7 +2579,7 @@ export const getProductSnapshotBridge = page_url => {
           var metaPrice = document.querySelector('meta[property="og:price:amount"], meta[property="product:price:amount"], meta[itemprop="price"], meta[name="twitter:data1"], [itemprop="price"]');
           if (metaPrice) {
             var rawMeta = metaPrice.getAttribute('content') || metaPrice.getAttribute('value') || metaPrice.textContent || '';
-            if (rawMeta && /\\d/.test(rawMeta)) {
+            if (rawMeta && /[0-9]/.test(rawMeta)) {
               var parsedMeta = parsePriceAndCurrency(rawMeta);
               if (parsedMeta.price) snapshot.price = parsedMeta.price;
               if (parsedMeta.currency && !snapshot.currency) snapshot.currency = parsedMeta.currency;

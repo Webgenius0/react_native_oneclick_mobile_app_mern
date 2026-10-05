@@ -113,4 +113,20 @@ describe('Exchange Rate & Currency Helpers', () => {
       expect(formatUsd(10.29)).toBe('$10.29 USD');
     });
   });
+
+  describe('Shein item price and fee calculation', () => {
+    it('correctly calculates total USD for Shein USD item including base fee', () => {
+      const unitUsd = calculateConvertedPrice('19.99', 'USD');
+      const sheinFee = 0.3; // from useSheinPriceStore basePriceUsd
+      expect(unitUsd).toBe(19.99);
+      expect(unitUsd + sheinFee).toBe(20.29);
+    });
+
+    it('correctly calculates total USD for Shein AED item including fee', () => {
+      const unitUsd = calculateConvertedPrice('50.00', 'AED', { AED: 0.272479 });
+      const sheinFee = 0.3;
+      expect(unitUsd).toBe(13.62);
+      expect(Number((unitUsd + sheinFee).toFixed(2))).toBe(13.92);
+    });
+  });
 });

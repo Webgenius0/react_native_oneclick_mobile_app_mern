@@ -75,7 +75,7 @@ export default function AppNavigator() {
   if (EXPRESS) {
     // authAfterInitialRouteName = 'Home';
   }
-  
+
   if (__DEV__) {
     // authAfterInitialRouteName = "Orders";
     // authAfterInitialRouteName = 'Cart';
@@ -217,13 +217,13 @@ export default function AppNavigator() {
 
               break;
             case 'Categories':
-/* 
-              return (<TurkeyIcon
-                width={width}
-                height={height}
-                size={size}
-                fill={fill}
-              />); */
+              /* 
+                            return (<TurkeyIcon
+                              width={width}
+                              height={height}
+                              size={size}
+                              fill={fill}
+                            />); */
               return (
                 <DotsIcon
                   width={width}
@@ -446,7 +446,7 @@ export default function AppNavigator() {
             headerShown: true,
           }}
         />
-     
+
         <Stack.Screen
           name="WebsiteSuggest"
           component={WebsiteSuggest}

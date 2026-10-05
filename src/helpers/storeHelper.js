@@ -179,7 +179,7 @@ export const isProductUrl = url => {
     ) {
       return true;
     }
-  } catch (_e) {}
+  } catch (_e) { }
 
   return false;
 };
@@ -257,7 +257,7 @@ export const getFallbackTitleFromUrl = (url, fallback = '') => {
     if (asinCandidate) {
       return asinCandidate;
     }
-  } catch (_e) {}
+  } catch (_e) { }
   return '';
 };
 
