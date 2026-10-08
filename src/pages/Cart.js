@@ -40,25 +40,25 @@ export default function CartPage({ navigation, route }) {
     fetchSheinPrice();
   }, [fetchRates, fetchSheinPrice]);
 
-  const sheinBasePriceUsd =
-    useSheinPriceStore(state => state.basePriceUsd) ?? 0.3;
+  const sheinPercent = useSheinPriceStore(state => state.percent) ?? 0;
   const checkedItems = items ? items.filter(item => item.checked === true) : [];
   const totalItems = items.reduce((sum, item) => sum + item.count, 0);
-  const totalUsd = checkedItems.reduce((sum, item) => {
-    const unitUsd = calculateConvertedPrice(
-      item.price,
-      item.currency,
-      rates,
-      inverseRates,
-    );
+  const safePercent = Number(sheinPercent) > 0 ? Number(sheinPercent) : 0;
+  const totalPrice = checkedItems.reduce((sum, item) => {
+    const basePrice = parsePrice(item?.price) || 0;
     const isShein = Boolean(
       (item?.store && String(item.store).toLowerCase().includes('shein')) ||
       (item?.url && String(item.url).toLowerCase().includes('shein.com')) ||
+      (item?.marketplace && String(item.marketplace).toLowerCase().includes('shein')) ||
       String(getStoreName(item?.url, item?.store || '')).toLowerCase() === 'shein',
     );
-    const sheinFee = isShein ? sheinBasePriceUsd : 0;
-    if (unitUsd !== null && unitUsd > 0) {
-      return sum + (unitUsd + sheinFee) * (item.count || 1);
+    const percentAmount = isShein && safePercent > 0
+      ? (basePrice * (safePercent / 100))
+      : 0;
+    const finalPrice = basePrice + percentAmount;
+    const count = Number(item?.count) > 0 ? Number(item.count) : 1;
+    if (finalPrice > 0) {
+      return sum + finalPrice * count;
     }
     return sum;
   }, 0);
@@ -176,24 +176,37 @@ export default function CartPage({ navigation, route }) {
       postData.append('cart[' + i + '][magaza]', storeName);
       postData.append('cart[' + i + '][marketplace]', storeName);
 
-      if (parsedPriceVal !== null) {
-        postData.append('cart[' + i + '][price]', parsedPriceVal);
-        postData.append('cart[' + i + '][original_price]', parsedPriceVal);
-        postData.append('cart[' + i + '][fiyat]', parsedPriceVal);
+      const isSheinItem = Boolean(
+        (item?.store && String(item.store).toLowerCase().includes('shein')) ||
+        (item?.url && String(item.url).toLowerCase().includes('shein.com')) ||
+        (item?.marketplace && String(item.marketplace).toLowerCase().includes('shein')) ||
+        String(getStoreName(item?.url, item?.store || '')).toLowerCase() === 'shein',
+      );
+      const percentAmount = isSheinItem && safePercent > 0 && parsedPriceVal !== null
+        ? (parsedPriceVal * (safePercent / 100))
+        : 0;
+      const finalPriceVal = parsedPriceVal !== null
+        ? parseFloat((parsedPriceVal + percentAmount).toFixed(2))
+        : null;
+
+      if (finalPriceVal !== null) {
+        postData.append('cart[' + i + '][price]', finalPriceVal);
+        postData.append('cart[' + i + '][original_price]', parsedPriceVal ?? finalPriceVal);
+        postData.append('cart[' + i + '][fiyat]', finalPriceVal);
       } else {
         postData.append('cart[' + i + '][fiyat]', item.price ? item.price : '');
       }
 
-      postData.append('cart[' + i + '][currency]', normalizedCurr);
-      postData.append('cart[' + i + '][original_currency]', normalizedCurr);
-      postData.append('cart[' + i + '][parabirim]', normalizedCurr);
+      postData.append('cart[' + i + '][currency]', 'AED');
+      postData.append('cart[' + i + '][original_currency]', 'AED');
+      postData.append('cart[' + i + '][parabirim]', 'AED');
 
-      if (convertedPriceVal !== null) {
-        postData.append('cart[' + i + '][converted_price]', convertedPriceVal);
-        postData.append('cart[' + i + '][price_usd]', convertedPriceVal);
-        postData.append('cart[' + i + '][fiyat_usd]', convertedPriceVal);
-        postData.append('cart[' + i + '][converted_currency]', 'USD');
-        postData.append('cart[' + i + '][target_currency]', 'USD');
+      if (finalPriceVal !== null) {
+        postData.append('cart[' + i + '][converted_price]', finalPriceVal);
+        postData.append('cart[' + i + '][price_usd]', finalPriceVal);
+        postData.append('cart[' + i + '][fiyat_usd]', finalPriceVal);
+        postData.append('cart[' + i + '][converted_currency]', 'AED');
+        postData.append('cart[' + i + '][target_currency]', 'AED');
       }
 
       let optionsStr = '';
@@ -440,9 +453,9 @@ export default function CartPage({ navigation, route }) {
                   totalItems > 0 ? totalItems + ' ' + t('Ürün') : ''
                 }
               </Text>
-              {totalUsd > 0 && (
+              {totalPrice > 0 && (
                 <Text style={styles.totalUsdText}>
-                  {`$${totalUsd.toFixed(2)} USD`}
+                  {`${totalPrice.toFixed(2)} AED`}
                 </Text>
               )}
             </View>

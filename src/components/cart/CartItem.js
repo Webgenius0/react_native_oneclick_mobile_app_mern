@@ -20,7 +20,7 @@ import React from 'react';
 import Dump from '../Dump';
 import { useExchangeRateStore } from '../../store/useExchangeRateStore';
 import { useSheinPriceStore } from '../../store/useSheinPriceStore';
-import { normalizeCurrency } from '../../helpers/currencyHelper';
+import { normalizeCurrency, parsePrice } from '../../helpers/currencyHelper';
 import { cleanProductTitle, getStoreName } from '../../helpers/storeHelper';
 
 const CartItem = ({
@@ -34,15 +34,21 @@ const CartItem = ({
   navigation,
 }) => {
   const targetId = item.id || item.url;
-  const convertedUsd = useExchangeRateStore(state =>
-    state.convertPrice(item?.price, item?.currency),
-  );
-  const sheinPriceUsd = useSheinPriceStore(state => state.basePriceUsd);
+  const sheinPercent = useSheinPriceStore(state => state.percent) ?? 0;
+  const safePercent = Number(sheinPercent) > 0 ? Number(sheinPercent) : 0;
   const isShein = Boolean(
     (item?.store && String(item.store).toLowerCase().includes('shein')) ||
     (item?.url && String(item.url).toLowerCase().includes('shein.com')) ||
+    (item?.marketplace && String(item.marketplace).toLowerCase().includes('shein')) ||
     String(getStoreName(item?.url, item?.store || '')).toLowerCase() === 'shein',
   );
+
+  const basePrice = parsePrice(item?.price) || 0;
+  const percentAmount = isShein && safePercent > 0
+    ? (basePrice * (safePercent / 100))
+    : 0;
+  const finalPrice = basePrice + percentAmount;
+  const displayPrice = finalPrice > 0 ? finalPrice.toFixed(2) : (item?.price || '');
 
   const changeItem = (field, value) => {
     onChange(targetId, field, value);
@@ -124,20 +130,8 @@ const CartItem = ({
                   {Boolean(item?.price) ? (
                     <View style={styles.priceContainer}>
                       <Text style={styles.priceText}>
-                        {String(item.price).toLowerCase().includes(String(item.currency || '').toLowerCase())
-                          ? item.price
-                          : `${item.price} ${item.currency || 'TL'}`}
+                        {`${displayPrice} AED`}
                       </Text>
-                      {convertedUsd !== null && normalizeCurrency(item?.currency, item?.price) !== 'USD' && (
-                        <Text style={styles.convertedPriceText}>
-                          {` (~$${convertedUsd.toFixed(2)} USD)`}
-                        </Text>
-                      )}
-                      {isShein && sheinPriceUsd !== null && sheinPriceUsd !== undefined && (
-                        <Text style={styles.sheinPriceText}>
-                          {` (+ $${Number(sheinPriceUsd).toFixed(2)} USD)`}
-                        </Text>
-                      )}
                     </View>
                   ) : (
                     <View style={styles.priceContainer}>

@@ -128,5 +128,13 @@ describe('Exchange Rate & Currency Helpers', () => {
       expect(unitUsd).toBe(13.62);
       expect(Number((unitUsd + sheinFee).toFixed(2))).toBe(13.92);
     });
+
+    it('correctly calculates Shein price with percentage markup in AED currency', () => {
+      const basePrice = 33.00;
+      const percent = 10; // 10%
+      const finalPrice = basePrice + (basePrice * percent / 100);
+      expect(finalPrice).toBe(36.30);
+      expect(`${finalPrice.toFixed(2)} AED`).toBe('36.30 AED');
+    });
   });
 });

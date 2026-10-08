@@ -8,12 +8,15 @@ export const useSheinPriceStore = create(
     (set, get) => ({
       sheinPrice: 1.101, // default currency is now AED per API v2.1
       currency: 'AED',
+      percent: 0,
+      sheinPercent: 0,
       priceAed: 1.101,
       basePriceAed: 1.101,
       basePriceUsd: 0.3,
       priceCents: 30,
       rates: {
         AED: 1.101,
+        UAE: 1.101,
         USD: 0.3,
         TRY: 10.2,
         SAR: 1.125,
@@ -54,11 +57,21 @@ export const useSheinPriceStore = create(
               data.price ?? (data.currency === 'USD' ? usdPrice : aedPrice),
             );
 
+            const parsePercent = val => {
+              if (val === null || val === undefined || val === '') return 0;
+              const num = typeof val === 'number' ? val : parseFloat(String(val).replace(/%/g, '').trim());
+              return isNaN(num) ? 0 : num;
+            };
+
+            const percent = parsePercent(data.percent);
+            const rawPrice = Number(data.price ?? 0);
+
             set({
+              percent: percent,
+              sheinPercent: percent,
+              price: rawPrice,
               sheinPrice: currentPrice,
-              currency:
-                data.currency ||
-                (targetCurrency ? String(targetCurrency).toUpperCase() : 'AED'),
+              currency: 'AED',
               priceAed: aedPrice,
               basePriceAed: aedPrice,
               basePriceUsd: usdPrice,
@@ -97,10 +110,20 @@ export const useSheinPriceStore = create(
               const currentPrice = Number(
                 data.price ?? (data.currency === 'USD' ? usdPrice : aedPrice),
               );
+              const parsePercent = val => {
+                if (val === null || val === undefined || val === '') return 0;
+                const num = typeof val === 'number' ? val : parseFloat(String(val).replace(/%/g, '').trim());
+                return isNaN(num) ? 0 : num;
+              };
+              const percent = parsePercent(data.percent);
+              const rawPrice = Number(data.price ?? 0);
 
               set({
+                percent: percent,
+                sheinPercent: percent,
+                price: rawPrice,
                 sheinPrice: currentPrice,
-                currency: data.currency || 'AED',
+                currency: 'AED',
                 priceAed: aedPrice,
                 basePriceAed: aedPrice,
                 basePriceUsd: usdPrice,
@@ -147,6 +170,9 @@ export const useSheinPriceStore = create(
       name: 'shein-price-storage',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: state => ({
+        percent: state.percent,
+        sheinPercent: state.sheinPercent,
+        price: state.price,
         sheinPrice: state.sheinPrice,
         currency: state.currency,
         priceAed: state.priceAed,

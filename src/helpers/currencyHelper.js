@@ -7,6 +7,7 @@ export const DEFAULT_RATES = {
   USD: 1.0,
   TRY: 0.029412,
   AED: 0.272479,
+  UAE: 0.272479,
   EUR: 1.08,
   GBP: 1.28,
   SAR: 0.266667,
@@ -15,6 +16,7 @@ export const DEFAULT_RATES = {
 export const DEFAULT_INVERSE_RATES = {
   USD: 1.0,
   AED: 3.67,
+  UAE: 3.67,
   TRY: 33.9997,
   EUR: 0.9259,
   GBP: 0.7813,
@@ -34,6 +36,9 @@ export const normalizeCurrency = (rawCurrency, rawPrice = '') => {
   // Explicit currency string matches
   if (c === 'TRY' || c === 'TL' || c.includes('₺') || c.includes('LIRA')) {
     return 'TRY';
+  }
+  if (c === 'UAE') {
+    return 'UAE';
   }
   if (c === 'AED' || c === 'DHS' || c === 'DH' || c.includes('DIRHAM')) {
     return 'AED';
@@ -69,6 +74,9 @@ export const normalizeCurrency = (rawCurrency, rawPrice = '') => {
   // If currency was not found in rawCurrency, look inside rawPrice for symbols/words
   if (p.includes('₺') || /\bTL\b/.test(p) || p.includes('TRY')) {
     return 'TRY';
+  }
+  if (p.includes('UAE')) {
+    return 'UAE';
   }
   if (p.includes('AED') || /\bDHS?\b/.test(p)) {
     return 'AED';

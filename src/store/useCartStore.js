@@ -176,7 +176,9 @@ export const normalizeCartItem = item => {
   let currency = item.currency ?? '';
   const itemUrl = item.url ? String(item.url) : '';
   if (!currency || (currency === 'TL' && (itemUrl.includes('shein.com') || itemUrl.includes('amazon.com')))) {
-    if (itemUrl.includes('shein.com') || itemUrl.includes('amazon.com')) {
+    if (itemUrl.includes('shein.com')) {
+      currency = 'AED';
+    } else if (itemUrl.includes('amazon.com')) {
       currency = 'USD';
     } else if (itemUrl.includes('amazon.ae') || itemUrl.includes('noon.com')) {
       currency = 'AED';
