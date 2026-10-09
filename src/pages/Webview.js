@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Alert, BackHandler, Linking, Platform, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, BackHandler, Linking, Platform, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { HeaderBackButton } from '@react-navigation/elements';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { WebView } from 'react-native-webview';
@@ -29,6 +29,32 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontSize: 14,
     fontWeight: '600',
+  },
+  addingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 998,
+  },
+  addingCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  addingText: {
+    marginTop: 10,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333333',
   },
 });
 
@@ -746,6 +772,15 @@ export default function Webview({ route, navigation }) {
   const [injectStatus, setInjectStatus] = useState(
     injectScript ? 'pending' : 'waiting',
   );
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      setIsAddingToCart(false);
+      isAddingRef.current = false;
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const webViewRef = useRef(null);
   const injectTimersRef = useRef([]);
@@ -1020,6 +1055,7 @@ export default function Webview({ route, navigation }) {
   const addChart = useCallback(async () => {
     if (isAddingRef.current) return;
     isAddingRef.current = true;
+    setIsAddingToCart(true);
 
     try {
       let freshOpts = null;
@@ -2314,16 +2350,28 @@ export default function Webview({ route, navigation }) {
         })();
       `);
 
-        const [resolvedOpts, resolvedSnapshot] = await Promise.all([
-          Promise.race([
-            optionPromise,
-            new Promise(resolve => setTimeout(() => resolve(null), 3500)),
-          ]),
-          Promise.race([
-            snapshotPromise,
-            new Promise(resolve => setTimeout(() => resolve(null), 3500)),
-          ]),
+        let resolvedSnapshot = null;
+        let resolvedOpts = null;
+
+        // Snapshot script runs immediately inside the webview and extracts full product details + options
+        resolvedSnapshot = await Promise.race([
+          snapshotPromise,
+          new Promise(resolve => setTimeout(() => resolve(null), 2000)),
         ]);
+
+        if (resolvedSnapshot) {
+          // If options have already resolved or arrive quickly within 300ms, capture them; otherwise proceed with snapshot
+          resolvedOpts = await Promise.race([
+            optionPromise,
+            new Promise(resolve => setTimeout(() => resolve(null), 300)),
+          ]);
+        } else {
+          // Fallback if snapshot didn't arrive fast
+          resolvedOpts = await Promise.race([
+            optionPromise,
+            new Promise(resolve => setTimeout(() => resolve(null), 800)),
+          ]);
+        }
 
         freshOpts = resolvedOpts;
         freshSnapshot = resolvedSnapshot;
@@ -2352,6 +2400,8 @@ export default function Webview({ route, navigation }) {
         (snapshotIsProduct === undefined && urlIsProduct === undefined);
 
       if (!pageIsProduct) {
+        setIsAddingToCart(false);
+        isAddingRef.current = false;
         Alert.alert(
           t('Uyarı') || 'Uyarı',
           t('gecersizUrunSayfasi') ||
@@ -2389,6 +2439,8 @@ export default function Webview({ route, navigation }) {
 
       if (isGenericTitle(finalTitle) && !finalImage) {
         // Both title and image are missing/generic — likely not on a real product
+        setIsAddingToCart(false);
+        isAddingRef.current = false;
         Alert.alert(
           t('Uyarı') || 'Uyarı',
           t('gecersizUrunSayfasi') ||
@@ -2464,6 +2516,8 @@ export default function Webview({ route, navigation }) {
         const alertMsg = t('lutfenSecimYapin', { options: translatedNames }) ||
           `Lütfen sepete eklemeden önce ürün seçeneklerini (${translatedNames}) seçiniz.`;
 
+        setIsAddingToCart(false);
+        isAddingRef.current = false;
         Alert.alert(t('Uyarı') || 'Uyarı', alertMsg, [
           { text: t('Tamam') || 'Tamam' }
         ]);
@@ -2521,8 +2575,11 @@ export default function Webview({ route, navigation }) {
 
       await delay(150);
       navigation.navigate('Cart');
+    } catch (err) {
+      console.log('addChart error:', err);
     } finally {
       isAddingRef.current = false;
+      setIsAddingToCart(false);
     }
   }, [addItem, navigation, route?.params?.ad]);
 
@@ -2862,7 +2919,15 @@ export default function Webview({ route, navigation }) {
           onNavigationStateChange={onNavigationStateChange}
           onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}
         />
-        <AddToCart addChart={addChart} />
+        <AddToCart addChart={addChart} loading={isAddingToCart} />
+        {isAddingToCart && (
+          <View style={styles.addingOverlay} pointerEvents="auto">
+            <View style={styles.addingCard}>
+              <ActivityIndicator size="large" color={Colors.primary || 'orange'} />
+              <Text style={styles.addingText}>{t('Yükleniyor') || 'Loading'}...</Text>
+            </View>
+          </View>
+        )}
       </View>
     </SafeAreaView>
   );
