@@ -26,6 +26,7 @@ ai.interceptors.request.use(
 
     if (token) {
       config.headers.Authorization = token;
+      config.headers.token = token;
 
       const method = (config.method || 'get').toLowerCase();
       if (method === 'post' || method === 'put' || method === 'patch' || method === 'delete') {

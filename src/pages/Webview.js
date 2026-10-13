@@ -2530,14 +2530,16 @@ export default function Webview({ route, navigation }) {
       const isAmazonUsUrl = currentUrlRef.current.includes('amazon.com');
       const isUaeUrl = currentUrlRef.current.includes('amazon.ae') || currentUrlRef.current.includes('noon.com');
       const isSaUrl = currentUrlRef.current.includes('amazon.sa');
-      const fallbackCurrency = (isShein || isAmazonUsUrl)
-        ? 'USD'
-        : (isUaeUrl ? 'AED' : (isSaUrl ? 'SAR' : 'TL'));
+      const fallbackCurrency = isShein
+        ? 'AED'
+        : (isAmazonUsUrl ? 'USD' : (isUaeUrl ? 'AED' : (isSaUrl ? 'SAR' : 'TL')));
 
       const resolvedImage = normalizeProductImageUrl(finalImage || freshSnapshot?.image || imageRef.current || '');
       let resolvedPrice = freshSnapshot?.price || priceRef.current || '';
       let resolvedCurrency = freshSnapshot?.currency || currencyRef.current || fallbackCurrency;
-      if (resolvedCurrency === 'TL' && (isShein || isAmazonUsUrl)) {
+      if (isShein) {
+        resolvedCurrency = 'AED';
+      } else if (resolvedCurrency === 'TL' && isAmazonUsUrl) {
         resolvedCurrency = 'USD';
       }
 

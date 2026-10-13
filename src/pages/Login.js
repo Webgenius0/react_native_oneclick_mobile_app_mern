@@ -70,9 +70,15 @@ export default function ({ navigation }) {
       const cleanKod = typeof kod === 'string' ? kod.trim() : kod;
       const cleanSifre = typeof sifre === 'string' ? sifre.trim() : sifre;
 
+      const activeDil = ctxDil || i18n.locale || (await storageGet('language')) || 'en';
+      await storageSet('language', activeDil);
+      i18n.locale = activeDil;
+      setCtxDil(activeDil);
+
       const res = await ai.post('login', {
         kod: cleanKod,
         sifre: cleanSifre,
+        dil: activeDil,
       });
 
       if (res && res.data && res.data.error === false) {
@@ -83,9 +89,18 @@ export default function ({ navigation }) {
         try {
           const fcmToken = await getFcmToken();
           console.log('fcmToken update --- ', fcmToken);
+          await ai.post('update-language', {
+            dil: activeDil,
+            fcmToken: fcmToken,
+          });
         } catch (fcmErr) {
-          console.log('fcm update error:', fcmErr?.message || fcmErr);
+          console.log('fcm / update-language error:', fcmErr?.message || fcmErr);
         }
+
+        // Ensure language is firmly set before navigating
+        await storageSet('language', activeDil);
+        i18n.locale = activeDil;
+        setCtxDil(activeDil);
 
         navigation.dispatch(
           CommonActions.reset({
@@ -194,6 +209,18 @@ export default function ({ navigation }) {
     lb('Login useEffect');
     userLoad();
     fetchSettings();
+    (async () => {
+      try {
+        const savedLang = await storageGet('language');
+        if (savedLang) {
+          i18n.locale = savedLang;
+          setCtxDil(savedLang);
+        }
+      } catch (e) {
+        console.log('Login init language error:', e);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const logoRatio = 963 / 741;
@@ -445,7 +472,6 @@ const styles = StyleSheet.create({
   },
 
   registerBtn: {
-    borderColor: Colors.btnColor,
     minWidth: 200,
     maxWidth: 220,
     // backgroundColor: Colors.btnColor,

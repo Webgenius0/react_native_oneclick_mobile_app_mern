@@ -8,7 +8,8 @@ import { appVersionCheck, IS_DEV } from './src/helpers/common';
 import Toast from 'react-native-toast-message';
 import { fetchAllNotifications } from './src/helpers/notificationV2';
 import { loadTheme } from './src/helpers/theme';
-import { tr } from './src/translate/i18n';
+import { i18n, tr } from './src/translate/i18n';
+import { storageGet } from './src/helpers/storage';
 import { DEV_REDIRECT_STORE, FIREBASE_ENABLED, MOBIL_SCRIPT } from './config';
 import { useScriptServiceStore } from './src/store/useScriptServiceStore';
 import { useExchangeRateStore } from './src/store/useExchangeRateStore';
@@ -16,8 +17,6 @@ import { useSheinPriceStore } from './src/store/useSheinPriceStore';
 
 // @ts-ignore
 const App = () => {
-  let intervalId = null;
-
   const [ctx, setCtx] = useState({
     token: null,
     user: null,
@@ -36,7 +35,7 @@ const App = () => {
   });
 
   const { setInjectScript } = useScriptServiceStore();
-  const [ctxDil, setCtxDil] = useState('tr'); // i18n.locale
+  const [ctxDil, setCtxDil] = useState('en'); // i18n.locale default is 'en'
   const [methods, setMethods] = useState({});
   const [direction, setDirection] = useState('ltr');
 
@@ -117,6 +116,21 @@ const App = () => {
     useExchangeRateStore.getState().fetchRates();
     useSheinPriceStore.getState().fetchSheinPrice();
 
+    (async () => {
+      try {
+        const savedLang = await storageGet('language');
+        if (savedLang) {
+          i18n.locale = savedLang;
+          setCtxDil(savedLang);
+        } else {
+          i18n.locale = 'en';
+          setCtxDil('en');
+        }
+      } catch (langErr) {
+        console.log('App init language error:', langErr);
+      }
+    })();
+
     // Handle shared links
     try {
       ReceiveSharingIntent.getReceivedFiles(
@@ -138,15 +152,19 @@ const App = () => {
     }
 
     if (notifInerval && FIREBASE_ENABLED) {
+      let intervalId = null;
       let timeout = IS_DEV ? 1000 * 60 * 3 : 1000 * 60 * 3;
       intervalId = setInterval(async () => {
         await fetchAllNotifications(ctx, setCtx);
       }, timeout);
 
       return () => {
-        clearInterval(intervalId);
+        if (intervalId) {
+          clearInterval(intervalId);
+        }
       };
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

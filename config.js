@@ -19,7 +19,10 @@ export const IS_LOCAL = API_URL.includes("localhost") || API_URL.includes("172.2
 export const DELAY_TIME = 100;
 export const TARIH_FORMAT = 'dd/MM/yyyy';
 
-export const paymentTypes = [{ id: 1, name: 'WaafiPay', target: 'WaafiPay' },];
+export const paymentTypes = [
+  { id: 1, name: 'WaafiPay', target: 'WaafiPay' },
+  { id: 2, name: 'eDahab', target: 'EDahab' },
+];
 export const supportPhone = "+252637979636";
 
 const MOBIL_SCRIPT_URL = 'http://app.1clicktoshop.com/mobile-scripts/bundle.js';

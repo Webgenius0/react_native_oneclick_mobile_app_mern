@@ -175,15 +175,21 @@ export const normalizeCartItem = item => {
 
   let currency = item.currency ?? '';
   const itemUrl = item.url ? String(item.url) : '';
-  if (!currency || (currency === 'TL' && (itemUrl.includes('shein.com') || itemUrl.includes('amazon.com')))) {
-    if (itemUrl.includes('shein.com')) {
-      currency = 'AED';
-    } else if (itemUrl.includes('amazon.com')) {
-      currency = 'USD';
-    } else if (itemUrl.includes('amazon.ae') || itemUrl.includes('noon.com')) {
+  const isShein = Boolean(
+    (item?.store && String(item.store).toLowerCase().includes('shein')) ||
+    (itemUrl && itemUrl.includes('shein.com')) ||
+    (item?.marketplace && String(item.marketplace).toLowerCase().includes('shein')),
+  );
+
+  if (isShein) {
+    currency = 'AED';
+  } else if (!currency || currency === 'TL') {
+    if (itemUrl.includes('amazon.ae') || itemUrl.includes('noon.com')) {
       currency = 'AED';
     } else if (itemUrl.includes('amazon.sa')) {
       currency = 'SAR';
+    } else if (itemUrl.includes('amazon.com')) {
+      currency = 'USD';
     }
   }
 

@@ -56,7 +56,7 @@ import { EXPRESS } from './config.js';
 import BannerList from './src/pages/BannerList.js';
 
 export default function AppNavigator() {
-  const { ctx, setCtxDil } = useContext(EmContext);
+  const { ctx, ctxDil, setCtxDil } = useContext(EmContext);
   const { addItem } = useCartStore();
 
   const [state, setState] = useState({

@@ -20,7 +20,7 @@ import React from 'react';
 import Dump from '../Dump';
 import { useExchangeRateStore } from '../../store/useExchangeRateStore';
 import { useSheinPriceStore } from '../../store/useSheinPriceStore';
-import { normalizeCurrency, parsePrice } from '../../helpers/currencyHelper';
+import { normalizeCurrency, parsePrice, calculateConvertedPrice } from '../../helpers/currencyHelper';
 import { cleanProductTitle, getStoreName } from '../../helpers/storeHelper';
 
 const CartItem = ({
@@ -34,6 +34,7 @@ const CartItem = ({
   navigation,
 }) => {
   const targetId = item.id || item.url;
+  const { rates, inverseRates } = useExchangeRateStore();
   const sheinPercent = useSheinPriceStore(state => state.percent) ?? 0;
   const safePercent = Number(sheinPercent) > 0 ? Number(sheinPercent) : 0;
   const isShein = Boolean(
@@ -49,6 +50,25 @@ const CartItem = ({
     : 0;
   const finalPrice = basePrice + percentAmount;
   const displayPrice = finalPrice > 0 ? finalPrice.toFixed(2) : (item?.price || '');
+
+  let detectedCurrency = item?.currency;
+  if (isShein) {
+    detectedCurrency = 'AED';
+  } else if (!detectedCurrency || detectedCurrency === 'TL') {
+    const itemUrl = String(item?.url || '');
+    if (itemUrl.includes('amazon.ae') || itemUrl.includes('noon.com')) {
+      detectedCurrency = 'AED';
+    } else if (itemUrl.includes('amazon.sa')) {
+      detectedCurrency = 'SAR';
+    } else if (itemUrl.includes('amazon.com')) {
+      detectedCurrency = 'USD';
+    }
+  }
+
+  const itemCurrency = normalizeCurrency(detectedCurrency || 'AED', item?.price);
+  const convertedUsd = finalPrice > 0
+    ? calculateConvertedPrice(finalPrice, itemCurrency, rates, inverseRates)
+    : null;
 
   const changeItem = (field, value) => {
     onChange(targetId, field, value);
@@ -129,9 +149,22 @@ const CartItem = ({
                   </TouchableOpacity>
                   {Boolean(item?.price) ? (
                     <View style={styles.priceContainer}>
-                      <Text style={styles.priceText}>
-                        {`${displayPrice} AED`}
-                      </Text>
+                      {convertedUsd !== null ? (
+                        <>
+                          <Text style={styles.priceText}>
+                            {`$${convertedUsd.toFixed(2)}`}
+                          </Text>
+                          {itemCurrency !== 'USD' && (
+                            <Text style={styles.originalPriceText}>
+                              {` (${displayPrice} ${itemCurrency})`}
+                            </Text>
+                          )}
+                        </>
+                      ) : (
+                        <Text style={styles.priceText}>
+                          {`${displayPrice} ${itemCurrency}`}
+                        </Text>
+                      )}
                     </View>
                   ) : (
                     <View style={styles.priceContainer}>
@@ -496,9 +529,15 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   priceText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: 'bold',
     color: '#F15927',
+  },
+  originalPriceText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#777',
+    marginLeft: 6,
   },
   convertedPriceText: {
     fontSize: 13,

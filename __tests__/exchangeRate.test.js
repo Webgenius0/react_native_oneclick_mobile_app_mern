@@ -136,5 +136,31 @@ describe('Exchange Rate & Currency Helpers', () => {
       expect(finalPrice).toBe(36.30);
       expect(`${finalPrice.toFixed(2)} AED`).toBe('36.30 AED');
     });
+    it('correctly formats cart display with USD primary and original on side', () => {
+      // User case: 108.90 AED -> $29.67 (108.90 AED)
+      const aedAmount1 = 108.90;
+      const convertedUsd1 = calculateConvertedPrice(aedAmount1, 'AED', { AED: 0.272479 });
+      expect(convertedUsd1).toBe(29.67);
+      const displayString1 = `$${convertedUsd1.toFixed(2)} (${aedAmount1.toFixed(2)} AED)`;
+      expect(displayString1).toBe('$29.67 (108.90 AED)');
+
+      // User case: 132 AED -> $35.97 (132.00 AED)
+      const aedAmount2 = 132;
+      const convertedUsd2 = calculateConvertedPrice(aedAmount2, 'AED', { AED: 0.272479 });
+      expect(convertedUsd2).toBe(35.97);
+      const displayString2 = `$${convertedUsd2.toFixed(2)} (${aedAmount2.toFixed(2)} AED)`;
+      expect(displayString2).toBe('$35.97 (132.00 AED)');
+    });
+
+    it('correctly converts prices using inverseRates formula', () => {
+      // Formula: Local_Price / inverseRates[CURRENCY]
+      const priceAed = 108.90;
+      const convertedWithInverseNumber = calculateConvertedPrice(priceAed, 'AED', {}, { AED: 3.67 });
+      expect(convertedWithInverseNumber).toBe(29.67);
+
+      const convertedWithInverseString = calculateConvertedPrice(priceAed, 'AED', {}, { AED: '3.67' });
+      expect(convertedWithInverseString).toBe(29.67);
+    });
   });
 });
+

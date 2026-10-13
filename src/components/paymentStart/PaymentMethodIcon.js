@@ -1,5 +1,5 @@
 import React from 'react';
-import {Dimensions, Image, StyleSheet, Text, View} from 'react-native';
+import {Dimensions, Image, Platform, StyleSheet, Text, View} from 'react-native';
 import {tr} from '../../translate/i18n';
 
 export default function PaymentMethodIcon({
@@ -10,15 +10,20 @@ export default function PaymentMethodIcon({
   iosComingSoon,
   androidComingSoon,
 }) {
-  const {width, height} = Dimensions.get('window');
+  const {width} = Dimensions.get('window');
 
   const icon = {
     WaafiPay: require('../../assets/img/waafipay.png'),
+    waafipay: require('../../assets/img/waafipay.png'),
     Fastpay: require('../../assets/img/fastpay.png'),
     eDahab: require('../../assets/img/edahab.png'),
+    EDahab: require('../../assets/img/edahab.png'),
+    edahab: require('../../assets/img/edahab.png'),
   };
 
-  if (!icon[ad]) {
+  const selectedIcon = icon[ad] || icon[(ad || '').toLowerCase()];
+
+  if (!selectedIcon) {
     return <Text>Icon Bulunamadı {ad}</Text>;
   }
 
@@ -47,7 +52,7 @@ export default function PaymentMethodIcon({
 
   return (
     <View style={styles.container}>
-      <Image source={icon[ad]} style={styles.icon} />
+      <Image source={selectedIcon} style={styles.icon} />
       {komisyonYuzde > 0 && (
         <Text style={{color: '#333'}}>
           {tr('Komisyon')}: {komisyonYuzde}%

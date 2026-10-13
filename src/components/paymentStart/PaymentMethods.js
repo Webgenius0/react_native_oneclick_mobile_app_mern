@@ -1,4 +1,4 @@
-import {TouchableOpacity, View, StyleSheet, Text} from 'react-native';
+import {TouchableOpacity, View, StyleSheet, Platform} from 'react-native';
 import PaymentMethodIcon from './PaymentMethodIcon';
 import React from 'react';
 import {round} from '../../helpers/common';
@@ -11,11 +11,15 @@ export default function ({methods, siparis_ids, tutar, navigation, ctx}) {
 
   const prePaymentUrl = async t => {
     let enabled = Platform.select({
-      ios: t.ios,
-      android: t.android,
+      ios: t.ios !== undefined ? t.ios : 1,
+      android: t.android !== undefined ? t.android : 1,
+    });
+    let comingSoon = Platform.select({
+      ios: t.iosComingSoon || 0,
+      android: t.androidComingSoon || 0,
     });
 
-    if (!enabled) {
+    if (!enabled || comingSoon) {
       return;
     }
 
@@ -49,13 +53,11 @@ export default function ({methods, siparis_ids, tutar, navigation, ctx}) {
 
     console.log(navigateParams);
 
-    switch (t.ad) {
-      case 'WaafiPay':
-        navigation.navigate('WaafiPay', navigateParams);
-        break;
-      case 'eDahab':
-        navigation.navigate('EDahab', navigateParams);
-        break;
+    const target = (t.target || t.ad || '').toLowerCase();
+    if (target === 'waafipay') {
+      navigation.navigate('WaafiPay', navigateParams);
+    } else if (target === 'edahab') {
+      navigation.navigate('EDahab', navigateParams);
     }
   };
 

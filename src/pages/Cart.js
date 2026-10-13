@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, createRef } from 'react';
+import React, { useCallback, useEffect, useState, createRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SafeAreaView, Text, View, StyleSheet, Image, TouchableOpacity, Alert, FlatList, RefreshControl } from 'react-native';
 
@@ -9,6 +9,7 @@ import { useCartStore, isCartItemComplete } from '../store/useCartStore';
 import CartItem from '../components/cart/CartItem';
 import Colors from '../assets/Colors';
 import CartManuelItemModal from '../components/cart/CartManuelItemModal';
+import CartOrderConfirmModal from '../components/cart/CartOrderConfirmModal';
 import { getToken, getUser } from '../helpers/auth';
 import ai from '../helpers/ai';
 import Loading from '../components/Loading';
@@ -25,6 +26,7 @@ export default function CartPage({ navigation, route }) {
   const { items, addItem, removeItem, checkItem, updateAll, increaseCount, decreaseCount, clearCart, updateField, updateOption } = useCartStore();
 
   const [modalVisible, setModalVisible] = useState(false);
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [teslimatSehirs, setTeslimatSehirs] = useState([]);
   const [teslimatSehirID, setTeslimatSehirID] = useState(null);
@@ -63,6 +65,66 @@ export default function CartPage({ navigation, route }) {
     return sum;
   }, 0);
 
+  const totalUsdPrice = checkedItems.reduce((sum, item) => {
+    const basePrice = parsePrice(item?.price) || 0;
+    const isShein = Boolean(
+      (item?.store && String(item.store).toLowerCase().includes('shein')) ||
+      (item?.url && String(item.url).toLowerCase().includes('shein.com')) ||
+      (item?.marketplace && String(item.marketplace).toLowerCase().includes('shein')) ||
+      String(getStoreName(item?.url, item?.store || '')).toLowerCase() === 'shein',
+    );
+    const percentAmount = isShein && safePercent > 0
+      ? (basePrice * (safePercent / 100))
+      : 0;
+    const finalPrice = basePrice + percentAmount;
+    const count = Number(item?.count) > 0 ? Number(item.count) : 1;
+
+    let detectedCurrency = item?.currency;
+    if (isShein) {
+      detectedCurrency = 'AED';
+    } else if (!detectedCurrency || detectedCurrency === 'TL') {
+      const itemUrl = String(item?.url || '');
+      if (itemUrl.includes('amazon.ae') || itemUrl.includes('noon.com')) {
+        detectedCurrency = 'AED';
+      } else if (itemUrl.includes('amazon.sa')) {
+        detectedCurrency = 'SAR';
+      } else if (itemUrl.includes('amazon.com')) {
+        detectedCurrency = 'USD';
+      }
+    }
+
+    const itemCurrency = normalizeCurrency(detectedCurrency || 'AED', item?.price);
+    const usd = calculateConvertedPrice(finalPrice, itemCurrency, rates, inverseRates);
+    const effectiveUsd = usd !== null ? usd : finalPrice;
+    return sum + effectiveUsd * count;
+  }, 0);
+
+  const primaryCurrency = checkedItems.length > 0
+    ? (() => {
+        const first = checkedItems[0];
+        const isShein = Boolean(
+          (first?.store && String(first.store).toLowerCase().includes('shein')) ||
+          (first?.url && String(first.url).toLowerCase().includes('shein.com')) ||
+          (first?.marketplace && String(first.marketplace).toLowerCase().includes('shein')) ||
+          String(getStoreName(first?.url, first?.store || '')).toLowerCase() === 'shein',
+        );
+        let curr = first?.currency;
+        if (isShein) {
+          curr = 'AED';
+        } else if (!curr || curr === 'TL') {
+          const u = String(first?.url || '');
+          if (u.includes('amazon.ae') || u.includes('noon.com')) {
+            curr = 'AED';
+          } else if (u.includes('amazon.sa')) {
+            curr = 'SAR';
+          } else if (u.includes('amazon.com')) {
+            curr = 'USD';
+          }
+        }
+        return normalizeCurrency(curr || 'AED', first?.price);
+      })()
+    : 'AED';
+
   // setTitle
   useEffect(() => {
     let title = t('Sepet');
@@ -83,45 +145,30 @@ export default function CartPage({ navigation, route }) {
     setModalVisible(true);
   };
 
-  const handleSubmit = async () => {
+  const handleOpenConfirmModal = async () => {
     if (isSubmitting) {
       Alert.alert(t('Lütfen bekleyin'));
       return;
     }
 
-    setIsSubmitting(true);
-
-    // Sepeti onayla
     const user = await getUser();
     if (user && user.kod === 'GUEST') {
       Alert.alert(
         t('Sipariş verebilmeniz için üye girişi yapın veya kayıt olun'),
       );
-      setIsSubmitting(false);
       return;
     }
 
     if (items.length === 0) {
       Alert.alert(t('Sepetinizde hiç ürün yok'));
-      setIsSubmitting(false);
       return;
     }
 
-    /* if (teslimatSehirID === null || teslimatSehirID === 0) {
-      Alert.alert(t('Lütfen teslimat şehri seçin'));
-      setIsSubmitting(false);
-      return;
-    } */
-
-    let postData = new FormData();
     const checkedLen = (items ? items.filter(item => item.checked === true).length : 0) || 0;
-
     if (checkedLen === 0) {
       Alert.alert(t('Lütfen en az bir ürünü seçin'));
-      setIsSubmitting(false);
       return;
     }
-
 
     // Check if any checked item has incomplete variant details
     const incompleteItems = items.filter(
@@ -139,147 +186,201 @@ export default function CartPage({ navigation, route }) {
         `${t('eksikUrunDetayi') || 'Lütfen sipariş vermeden önce seçili ürünlerin beden / renk detaylarını tamamlayınız.'}\n\n• ${incompleteNames}`,
         [{ text: t('Tamam') || 'Tamam' }]
       );
-      setIsSubmitting(false);
       return;
     }
 
-    var i = 0;
-    let commonMarketplace = '';
-    items.forEach(item => {
-      if (item.checked === false) {
+    setConfirmModalVisible(true);
+  };
+
+  const handleSubmit = async () => {
+    if (isSubmitting) {
+      Alert.alert(t('Lütfen bekleyin'));
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Sepeti onayla
+      const user = await getUser();
+      if (user && user.kod === 'GUEST') {
+        Alert.alert(
+          t('Sipariş verebilmeniz için üye girişi yapın veya kayıt olun'),
+        );
+        setIsSubmitting(false);
+        setConfirmModalVisible(false);
         return;
       }
 
-      const storeName = item.store ? item.store : '';
-      if (!commonMarketplace && storeName) {
-        commonMarketplace = storeName;
+      if (items.length === 0) {
+        Alert.alert(t('Sepetinizde hiç ürün yok'));
+        setIsSubmitting(false);
+        setConfirmModalVisible(false);
+        return;
       }
 
-      const parsedPriceVal = parsePrice(item.price);
-      const normalizedCurr = normalizeCurrency(item.currency, item.price);
-      const convertedPriceVal = calculateConvertedPrice(
-        item.price,
-        item.currency,
-        rates,
-        inverseRates,
-      );
+      let postData = new FormData();
+      const checkedLen = (items ? items.filter(item => item.checked === true).length : 0) || 0;
 
-      // fill post data with both new schema fields and backwards compatibility fields
-      postData.append('cart[' + i + '][ad]', cleanProductTitle(item.title, item.url));
-      postData.append('cart[' + i + '][link]', item.url);
-      postData.append('cart[' + i + '][sayi]', item.count);
-      postData.append('cart[' + i + '][size]', item.size ? item.size : '');
-      postData.append('cart[' + i + '][color]', item.color ? item.color : '');
-      postData.append('cart[' + i + '][renk]', item.color ? item.color : '');
-      postData.append('cart[' + i + '][store]', storeName);
-      postData.append('cart[' + i + '][store_name]', storeName);
-      postData.append('cart[' + i + '][magaza]', storeName);
-      postData.append('cart[' + i + '][marketplace]', storeName);
-
-      const isSheinItem = Boolean(
-        (item?.store && String(item.store).toLowerCase().includes('shein')) ||
-        (item?.url && String(item.url).toLowerCase().includes('shein.com')) ||
-        (item?.marketplace && String(item.marketplace).toLowerCase().includes('shein')) ||
-        String(getStoreName(item?.url, item?.store || '')).toLowerCase() === 'shein',
-      );
-      const percentAmount = isSheinItem && safePercent > 0 && parsedPriceVal !== null
-        ? (parsedPriceVal * (safePercent / 100))
-        : 0;
-      const finalPriceVal = parsedPriceVal !== null
-        ? parseFloat((parsedPriceVal + percentAmount).toFixed(2))
-        : null;
-
-      if (finalPriceVal !== null) {
-        postData.append('cart[' + i + '][price]', finalPriceVal);
-        postData.append('cart[' + i + '][original_price]', parsedPriceVal ?? finalPriceVal);
-        postData.append('cart[' + i + '][fiyat]', finalPriceVal);
-      } else {
-        postData.append('cart[' + i + '][fiyat]', item.price ? item.price : '');
+      if (checkedLen === 0) {
+        Alert.alert(t('Lütfen en az bir ürünü seçin'));
+        setIsSubmitting(false);
+        setConfirmModalVisible(false);
+        return;
       }
 
-      postData.append('cart[' + i + '][currency]', 'AED');
-      postData.append('cart[' + i + '][original_currency]', 'AED');
-      postData.append('cart[' + i + '][parabirim]', 'AED');
-
-      if (finalPriceVal !== null) {
-        postData.append('cart[' + i + '][converted_price]', finalPriceVal);
-        postData.append('cart[' + i + '][price_usd]', finalPriceVal);
-        postData.append('cart[' + i + '][fiyat_usd]', finalPriceVal);
-        postData.append('cart[' + i + '][converted_currency]', 'AED');
-        postData.append('cart[' + i + '][target_currency]', 'AED');
-      }
-
-      let optionsStr = '';
-      if (Array.isArray(item.options) && item.options.length > 0) {
-        optionsStr = item.options
-          .filter(o => o && o.name && o.selected)
-          .map(o => `${o.name}: ${o.selected}`)
-          .join(', ');
-        if (optionsStr) {
-          postData.append('cart[' + i + '][options]', optionsStr);
+      var i = 0;
+      let commonMarketplace = '';
+      items.forEach(item => {
+        if (item.checked === false) {
+          return;
         }
-      }
 
-      const combinedDesc = [item.desc, optionsStr].filter(Boolean).join(' | ');
-      postData.append('cart[' + i + '][acik]', combinedDesc);
-      postData.append('cart[' + i + '][img]', item.image);
-      postData.append('file[' + i + ']', item?.imageData || '');
-      i++;
-      // add imageData file to postData
-    });
+        const storeName = item.store ? item.store : '';
+        if (!commonMarketplace && storeName) {
+          commonMarketplace = storeName;
+        }
 
-    let token = await getToken();
-    postData.append('token', token);
-    postData.append('teslimatSehirID', teslimatSehirID);
-    if (commonMarketplace) {
-      postData.append('marketplace', commonMarketplace);
-    }
-    // console.log("postData", postData);
-    const response = await ai.post('new-order-multiple', postData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+        const isSheinItem = Boolean(
+          (item?.store && String(item.store).toLowerCase().includes('shein')) ||
+          (item?.url && String(item.url).toLowerCase().includes('shein.com')) ||
+          (item?.marketplace && String(item.marketplace).toLowerCase().includes('shein')) ||
+          String(getStoreName(item?.url, item?.store || '')).toLowerCase() === 'shein',
+        );
 
-    if (response.data.error === false) {
-      console.log('Error false', response.data);
+        const parsedPriceVal = parsePrice(item.price);
+        const percentAmount = isSheinItem && safePercent > 0 && parsedPriceVal !== null
+          ? (parsedPriceVal * (safePercent / 100))
+          : 0;
+        const finalPriceVal = parsedPriceVal !== null
+          ? parseFloat((parsedPriceVal + percentAmount).toFixed(2))
+          : null;
 
-      setIsSubmitting(false);
+        let detectedCurrency = item?.currency;
+        if (isSheinItem) {
+          detectedCurrency = 'AED';
+        } else if (!detectedCurrency || detectedCurrency === 'TL') {
+          const itemUrl = String(item?.url || '');
+          if (itemUrl.includes('amazon.ae') || itemUrl.includes('noon.com')) {
+            detectedCurrency = 'AED';
+          } else if (itemUrl.includes('amazon.sa')) {
+            detectedCurrency = 'SAR';
+          } else if (itemUrl.includes('amazon.com')) {
+            detectedCurrency = 'USD';
+          }
+        }
 
-      const orderIds = response.data.order_ids || (response.data.order_id ? [response.data.order_id] : []);
-      const grupID = response.data.grupID;
-      const totalUsd = response.data.total_usd;
+        const normalizedCurr = normalizeCurrency(detectedCurrency || 'AED', item.price);
+        const convertedPriceVal = finalPriceVal !== null
+          ? calculateConvertedPrice(finalPriceVal, normalizedCurr, rates, inverseRates)
+          : null;
 
-      // If backend returned direct approval (Status 16) with total_usd and IDs, go directly to PaymentStart.
-      // DO NOT clear cart here: cart items remain until payment is successfully completed!
-      if (totalUsd !== undefined && (grupID || (orderIds && orderIds.length > 0))) {
-        navigation.navigate('PaymentStart', {
-          quick: true,
-          tutar: totalUsd,
-          siparis_ids: orderIds,
-          siparis_id: orderIds.length > 0 ? orderIds[0] : null,
-          grupID: grupID,
-        });
-      } else {
-        // For orders that do not go to online payment (quote request or manual review), clear cart
-        if (checkedLen === items.length) {
-          clearCart();
+        // fill post data with both new schema fields and backwards compatibility fields
+        postData.append('cart[' + i + '][ad]', cleanProductTitle(item.title, item.url));
+        postData.append('cart[' + i + '][link]', item.url);
+        postData.append('cart[' + i + '][sayi]', item.count);
+        postData.append('cart[' + i + '][size]', item.size ? item.size : '');
+        postData.append('cart[' + i + '][color]', item.color ? item.color : '');
+        postData.append('cart[' + i + '][renk]', item.color ? item.color : '');
+        postData.append('cart[' + i + '][store]', storeName);
+        postData.append('cart[' + i + '][store_name]', storeName);
+        postData.append('cart[' + i + '][magaza]', storeName);
+        postData.append('cart[' + i + '][marketplace]', storeName);
+
+        if (finalPriceVal !== null) {
+          postData.append('cart[' + i + '][price]', finalPriceVal);
+          postData.append('cart[' + i + '][original_price]', parsedPriceVal ?? finalPriceVal);
+          postData.append('cart[' + i + '][fiyat]', finalPriceVal);
         } else {
-          let newItems = items.filter(item => item.checked !== true);
-          updateAll(newItems);
+          postData.append('cart[' + i + '][fiyat]', item.price ? item.price : '');
         }
 
-        Alert.alert(tr('Sipariş Alındı'));
-        setTimeout(function () {
-          let d = +new Date();
-          navigation.navigate('Orders', { refetch: d });
-        }, 1000);
+        postData.append('cart[' + i + '][currency]', normalizedCurr);
+        postData.append('cart[' + i + '][original_currency]', normalizedCurr);
+        postData.append('cart[' + i + '][parabirim]', normalizedCurr);
+
+        if (convertedPriceVal !== null) {
+          postData.append('cart[' + i + '][converted_price]', convertedPriceVal);
+          postData.append('cart[' + i + '][price_usd]', convertedPriceVal);
+          postData.append('cart[' + i + '][fiyat_usd]', convertedPriceVal);
+          postData.append('cart[' + i + '][converted_currency]', 'USD');
+          postData.append('cart[' + i + '][target_currency]', 'USD');
+        }
+
+        let optionsStr = '';
+        if (Array.isArray(item.options) && item.options.length > 0) {
+          optionsStr = item.options
+            .filter(o => o && o.name && o.selected)
+            .map(o => `${o.name}: ${o.selected}`)
+            .join(', ');
+          if (optionsStr) {
+            postData.append('cart[' + i + '][options]', optionsStr);
+          }
+        }
+
+        const combinedDesc = [item.desc, optionsStr].filter(Boolean).join(' | ');
+        postData.append('cart[' + i + '][acik]', combinedDesc);
+        postData.append('cart[' + i + '][img]', item.image);
+        postData.append('file[' + i + ']', item?.imageData || '');
+        i++;
+      });
+
+      let token = await getToken();
+      postData.append('token', token);
+      postData.append('teslimatSehirID', teslimatSehirID);
+      if (commonMarketplace) {
+        postData.append('marketplace', commonMarketplace);
       }
-    } else {
+
+      const response = await ai.post('new-order-multiple', postData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (response.data.error === false) {
+        console.log('Error false', response.data);
+
+        setIsSubmitting(false);
+        setConfirmModalVisible(false);
+
+        const orderIds = response.data.order_ids || (response.data.order_id ? [response.data.order_id] : []);
+        const grupID = response.data.grupID;
+        const totalUsd = response.data.total_usd;
+
+        // If backend returned direct approval with total_usd and IDs, go directly to PaymentStart
+        if (totalUsd !== undefined && (grupID || (orderIds && orderIds.length > 0))) {
+          navigation.navigate('PaymentStart', {
+            quick: true,
+            tutar: totalUsd,
+            siparis_ids: orderIds,
+            siparis_id: orderIds.length > 0 ? orderIds[0] : null,
+            grupID: grupID,
+          });
+        } else {
+          // For orders that do not go to online payment (quote request or manual review), clear cart
+          if (checkedLen === items.length) {
+            clearCart();
+          } else {
+            let newItems = items.filter(item => item.checked !== true);
+            updateAll(newItems);
+          }
+
+          Alert.alert(tr('Sipariş Alındı'));
+          setTimeout(function () {
+            let d = +new Date();
+            navigation.navigate('Orders', { refetch: d });
+          }, 1000);
+        }
+      } else {
+        Alert.alert(tr('Hata Oluştu'));
+        setIsSubmitting(false);
+        console.log('Hata Oluştu', response.data);
+      }
+    } catch (err) {
+      console.log('Order submission error:', err);
       Alert.alert(tr('Hata Oluştu'));
       setIsSubmitting(false);
-
-      console.log('Hata Oluştu', response.data);
     }
   };
 
@@ -320,6 +421,13 @@ export default function CartPage({ navigation, route }) {
       fontSize: 15,
       fontWeight: 'bold',
       color: Colors.primary || '#F15927',
+      marginTop: 2,
+    },
+    totalOriginalText: {
+      fontSize: 12,
+      fontWeight: '500',
+      color: '#777',
+      marginLeft: 4,
       marginTop: 2,
     },
     btn: {
@@ -442,6 +550,20 @@ export default function CartPage({ navigation, route }) {
         setModalVisible={setModalVisible}
       />
 
+      <CartOrderConfirmModal
+        visible={confirmModalVisible}
+        onClose={() => setConfirmModalVisible(false)}
+        onConfirm={handleSubmit}
+        isSubmitting={isSubmitting}
+        items={checkedItems}
+        totalUsdPrice={totalUsdPrice}
+        totalPrice={totalPrice}
+        primaryCurrency={primaryCurrency}
+        rates={rates}
+        inverseRates={inverseRates}
+        safePercent={safePercent}
+      />
+
       <Dump items={items} scroll={true} show={false} />
 
       {!loading && (
@@ -453,11 +575,24 @@ export default function CartPage({ navigation, route }) {
                   totalItems > 0 ? totalItems + ' ' + t('Ürün') : ''
                 }
               </Text>
-              {totalPrice > 0 && (
+              {totalUsdPrice > 0 ? (
+                <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                  <Text style={styles.totalUsdText}>
+                    {`$${totalUsdPrice.toFixed(2)} USD`}
+                  </Text>
+                  {totalPrice > 0 && primaryCurrency !== 'USD' && (
+                    <Text style={styles.totalOriginalText}>
+                      {` (${totalPrice.toFixed(2)} ${primaryCurrency})`}
+                    </Text>
+                  )}
+                </View>
+              ) : totalPrice > 0 ? (
                 <Text style={styles.totalUsdText}>
-                  {`${totalPrice.toFixed(2)} AED`}
+                  {primaryCurrency === 'USD'
+                    ? `$${totalPrice.toFixed(2)} USD`
+                    : `${totalPrice.toFixed(2)} ${primaryCurrency}`}
                 </Text>
-              )}
+              ) : null}
             </View>
             <View
               style={{
@@ -541,7 +676,7 @@ export default function CartPage({ navigation, route }) {
             <TouchableOpacity
               style={[styles.btn, styles.btnOnayla]}
               disabled={isSubmitting}
-              onPress={handleSubmit}>
+              onPress={handleOpenConfirmModal}>
               {isSubmitting && <Loading status={true} color="#FFF" />}
               {!isSubmitting && (
                 <Text style={styles.btnText}>{t('Sepeti Onayla')}</Text>

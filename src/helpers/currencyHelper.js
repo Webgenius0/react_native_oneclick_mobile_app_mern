@@ -208,27 +208,27 @@ export const calculateConvertedPrice = (
     return parseFloat(price.toFixed(2));
   }
 
-  // 1. Check dynamic rates
-  if (rates && typeof rates[currency] === 'number' && rates[currency] > 0) {
-    return parseFloat((price * rates[currency]).toFixed(2));
+  // 1. Check dynamic rates (Multiplier: Price_in_USD = Local_Price * rates[CURRENCY])
+  const rateVal = Number(rates?.[currency]);
+  if (!isNaN(rateVal) && rateVal > 0) {
+    return parseFloat((price * rateVal).toFixed(2));
   }
 
-  // 2. Check dynamic inverse rates
-  if (
-    inverseRates &&
-    typeof inverseRates[currency] === 'number' &&
-    inverseRates[currency] > 0
-  ) {
-    return parseFloat((price / inverseRates[currency]).toFixed(2));
+  // 2. Check dynamic inverse rates (Divisor: Price_in_USD = Local_Price / inverseRates[CURRENCY])
+  const inverseRateVal = Number(inverseRates?.[currency]);
+  if (!isNaN(inverseRateVal) && inverseRateVal > 0) {
+    return parseFloat((price / inverseRateVal).toFixed(2));
   }
 
   // 3. Fallback to default rates
-  if (DEFAULT_RATES[currency]) {
-    return parseFloat((price * DEFAULT_RATES[currency]).toFixed(2));
+  const defaultRate = Number(DEFAULT_RATES[currency]);
+  if (!isNaN(defaultRate) && defaultRate > 0) {
+    return parseFloat((price * defaultRate).toFixed(2));
   }
 
-  if (DEFAULT_INVERSE_RATES[currency]) {
-    return parseFloat((price / DEFAULT_INVERSE_RATES[currency]).toFixed(2));
+  const defaultInverseRate = Number(DEFAULT_INVERSE_RATES[currency]);
+  if (!isNaN(defaultInverseRate) && defaultInverseRate > 0) {
+    return parseFloat((price / defaultInverseRate).toFixed(2));
   }
 
   return null;

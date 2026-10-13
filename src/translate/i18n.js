@@ -8,20 +8,12 @@ const defaultLocale = 'en';
 
 i18n.defaultLocale = defaultLocale;
 i18n.locale = defaultLocale;
+i18n.enableFallback = true;
 i18n.exists = (key) => {
-  // return i18n.translations[i18n.locale][key] !== undefined;
-  var s = Object.keys(i18n.translations[i18n.locale]).includes(key);
-
-  /*
-  var ceviri;
-  if(s){
-    ceviri = i18n.t(key);
+  if (!i18n.translations || !i18n.locale || !i18n.translations[i18n.locale]) {
+    return false;
   }
-
-  console.log("exists", i18n.locale, s, ceviri, key );
-*/
-
-  return s;
+  return Object.keys(i18n.translations[i18n.locale]).includes(key);
 };
 
 const t = (key, options = {}) => {

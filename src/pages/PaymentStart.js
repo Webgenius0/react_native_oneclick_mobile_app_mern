@@ -154,14 +154,68 @@ export default function ({navigation, route}) {
   };
 
   const fetchMethods = async () => {
-    const c = await ai.get('payment-methods');
-    console.log(c.data);
-    if (c.data.error === false && c.data.ss.length > 0) {
-      setMethods(c.data.ss);
-      // console.log(c.data.ss);
+    try {
+      const c = await ai.get('payment-methods');
+      console.log('payment-methods response:', c?.data);
+      if (c?.data?.error === false && c?.data?.ss?.length > 0) {
+        setMethods(c.data.ss);
+      } else {
+        setMethods([
+          {
+            id: 1,
+            ad: 'WaafiPay',
+            target: 'WaafiPay',
+            durum: 1,
+            ios: 1,
+            android: 1,
+            iosComingSoon: 0,
+            androidComingSoon: 0,
+            komisyonYuzde: 1,
+            komisyonFixed: 0,
+          },
+          {
+            id: 2,
+            ad: 'eDahab',
+            target: 'EDahab',
+            durum: 1,
+            ios: 1,
+            android: 1,
+            iosComingSoon: 0,
+            androidComingSoon: 0,
+            komisyonYuzde: 0,
+            komisyonFixed: 0,
+          },
+        ]);
+      }
+    } catch (err) {
+      console.log('fetchMethods error:', err);
+      setMethods([
+        {
+          id: 1,
+          ad: 'WaafiPay',
+          target: 'WaafiPay',
+          durum: 1,
+          ios: 1,
+          android: 1,
+          iosComingSoon: 0,
+          androidComingSoon: 0,
+          komisyonYuzde: 1,
+          komisyonFixed: 0,
+        },
+        {
+          id: 2,
+          ad: 'eDahab',
+          target: 'EDahab',
+          durum: 1,
+          ios: 1,
+          android: 1,
+          iosComingSoon: 0,
+          androidComingSoon: 0,
+          komisyonYuzde: 0,
+          komisyonFixed: 0,
+        },
+      ]);
     }
-
-    // console.log(c.data);
   };
 
   const init = async () => {
@@ -176,6 +230,7 @@ export default function ({navigation, route}) {
         setGettingPaymentUrl(false);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFocused]);
 
   useEffect(() => {
@@ -187,6 +242,7 @@ export default function ({navigation, route}) {
       init();
       // fastPay();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

@@ -123,14 +123,34 @@ export default function({ route, navigation }) {
     let token = await getToken();
     console.log("token", token);
 
+    const storeName = getStoreName(state.link);
+    const isShein = Boolean(
+      (storeName && String(storeName).toLowerCase().includes('shein')) ||
+      (state.link && String(state.link).toLowerCase().includes('shein.com')),
+    );
+
+    let rawCurrency = state.currency || route.params?.currency;
+    if (isShein) {
+      rawCurrency = 'AED';
+    } else if (!rawCurrency || rawCurrency === 'TL') {
+      const linkStr = String(state.link || '');
+      if (linkStr.includes('amazon.ae') || linkStr.includes('noon.com')) {
+        rawCurrency = 'AED';
+      } else if (linkStr.includes('amazon.sa')) {
+        rawCurrency = 'SAR';
+      } else if (linkStr.includes('amazon.com')) {
+        rawCurrency = 'USD';
+      }
+    }
+
     const parsedPrice = parsePrice(state.price || route.params?.price);
     const normalizedCurr = normalizeCurrency(
-      state.currency || route.params?.currency,
+      rawCurrency || 'AED',
       state.price || route.params?.price,
     );
     const convertedPrice = calculateConvertedPrice(
-      state.price || route.params?.price,
-      state.currency || route.params?.currency,
+      parsedPrice !== null ? parsedPrice : state.price || route.params?.price,
+      normalizedCurr,
       rates,
       inverseRates,
     );
@@ -143,7 +163,6 @@ export default function({ route, navigation }) {
     postData.append("renk", state.color || route.params?.color || "");
     postData.append("acik", state.desc || "");
 
-    const storeName = getStoreName(state.link);
     postData.append("store", storeName);
     postData.append("store_name", storeName);
     postData.append("magaza", storeName);
