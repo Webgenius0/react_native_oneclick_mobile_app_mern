@@ -85,8 +85,8 @@ android {
         applicationId "com.oneclick.shop"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 66
-        versionName "1.2.66"
+        versionCode 68
+        versionName "1.2.68"
         resConfigs "en"
     }
     signingConfigs {
