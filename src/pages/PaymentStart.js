@@ -133,19 +133,25 @@ export default function ({navigation, route}) {
 
   const tutarHesapla = (siparisler, siparis_ids, grup) => {
     let tutar = 0;
-    siparisler.map(item => {
-      if (siparis_ids.includes(item.id)) {
-        tutar += parseFloat(item.tutar);
+    (siparisler || []).forEach(item => {
+      if (item && siparis_ids && siparis_ids.includes(item.id)) {
+        const itemVal = parseFloat(item.tutar);
+        if (!isNaN(itemVal)) {
+          tutar += itemVal;
+        }
       }
     });
 
-    if (grup) {
-      tutar += parseFloat(grup.nakliye_usd);
+    if (grup && grup.nakliye_usd) {
+      const shippingVal = parseFloat(grup.nakliye_usd);
+      if (!isNaN(shippingVal)) {
+        tutar += shippingVal;
+      }
     }
 
     console.log('calculatedTutar', tutar);
 
-    return tutar.toFixed(2);
+    return Number(tutar || 0).toFixed(2);
   };
 
   const checkFocus = async () => {

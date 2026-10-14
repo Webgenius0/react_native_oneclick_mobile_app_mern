@@ -22,10 +22,13 @@ import { tr } from "../translate/i18n";
 import { EmContext } from "../contexts/EmContext";
 import { getStoreName } from "../helpers/storeHelper";
 import { useExchangeRateStore } from "../store/useExchangeRateStore";
+import { useSheinPriceStore } from "../store/useSheinPriceStore";
 import {
   calculateConvertedPrice,
   parsePrice,
   normalizeCurrency,
+  detectItemCurrency,
+  getReceivedCurrencyInfo,
 } from "../helpers/currencyHelper";
 
 export default function({ route, navigation }) {
@@ -37,15 +40,35 @@ export default function({ route, navigation }) {
     navigation.setOptions({
       title: tr("Yeni Sipariş"),
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const url = route.params?.url || "https://google.com";
 
   const { rates, inverseRates, fetchRates } = useExchangeRateStore();
+  const { fetchSheinPrice } = useSheinPriceStore();
+
+  const isSheinRoute = Boolean(
+    (route.params?.url && String(route.params.url).toLowerCase().includes('shein.com')) ||
+    (route.params?.store && String(route.params.store).toLowerCase().includes('shein')) ||
+    (route.params?.marketplace && String(route.params.marketplace).toLowerCase().includes('shein')) ||
+    String(getStoreName(route.params?.url || '', route.params?.store || '')).toLowerCase() === 'shein',
+  );
+
+  const isUsdItem = getReceivedCurrencyInfo({
+    url: route.params?.url || "https://google.com",
+    currency: route.params?.currency,
+    price: route.params?.price,
+  }).isUsd;
+
+  const shouldSkipExchangeRate = (isSheinRoute && isUsdItem) || isUsdItem;
 
   useEffect(() => {
-    fetchRates();
-  }, [fetchRates]);
+    if (!shouldSkipExchangeRate) {
+      fetchRates(route.params);
+    }
+    fetchSheinPrice();
+  }, [fetchRates, fetchSheinPrice, shouldSkipExchangeRate, route.params]);
 
   const [state, setState] = useState({
     link: url,
@@ -129,31 +152,23 @@ export default function({ route, navigation }) {
       (state.link && String(state.link).toLowerCase().includes('shein.com')),
     );
 
-    let rawCurrency = state.currency || route.params?.currency;
-    if (isShein) {
-      rawCurrency = 'AED';
-    } else if (!rawCurrency || rawCurrency === 'TL') {
-      const linkStr = String(state.link || '');
-      if (linkStr.includes('amazon.ae') || linkStr.includes('noon.com')) {
-        rawCurrency = 'AED';
-      } else if (linkStr.includes('amazon.sa')) {
-        rawCurrency = 'SAR';
-      } else if (linkStr.includes('amazon.com')) {
-        rawCurrency = 'USD';
-      }
-    }
+    const { code: normalizedCurr, display: receivedDisplay, isUsd } = getReceivedCurrencyInfo({
+      url: state.link,
+      currency: state.currency || route.params?.currency,
+      price: state.price || route.params?.price,
+    });
 
     const parsedPrice = parsePrice(state.price || route.params?.price);
-    const normalizedCurr = normalizeCurrency(
-      rawCurrency || 'AED',
-      state.price || route.params?.price,
-    );
-    const convertedPrice = calculateConvertedPrice(
-      parsedPrice !== null ? parsedPrice : state.price || route.params?.price,
-      normalizedCurr,
-      rates,
-      inverseRates,
-    );
+    const sheinPercent = useSheinPriceStore.getState().percent ?? 0;
+    const safePercent = Number(sheinPercent) > 0 ? Number(sheinPercent) : 0;
+    const percentAmount = isShein && safePercent > 0 && parsedPrice !== null
+      ? parsedPrice * (safePercent / 100)
+      : 0;
+    const finalPrice = parsedPrice !== null ? parseFloat((parsedPrice + percentAmount).toFixed(2)) : null;
+
+    const convertedPrice = finalPrice !== null
+      ? (isUsd ? finalPrice : calculateConvertedPrice(finalPrice, normalizedCurr, rates, inverseRates))
+      : null;
 
     postData.append("link", state.link);
     postData.append("sayi", state.qty);
@@ -170,15 +185,16 @@ export default function({ route, navigation }) {
     postData.append("pazaryeri", storeName);
     postData.append("market", storeName);
 
-    if (parsedPrice !== null) {
-      postData.append("price", parsedPrice);
+    if (finalPrice !== null) {
+      postData.append("price", finalPrice);
       postData.append("original_price", parsedPrice);
-      postData.append("fiyat", parsedPrice);
+      postData.append("fiyat", finalPrice);
     }
     if (normalizedCurr) {
-      postData.append("currency", normalizedCurr);
-      postData.append("original_currency", normalizedCurr);
-      postData.append("pb", normalizedCurr);
+      const postCurr = isUsd ? receivedDisplay : normalizedCurr;
+      postData.append("currency", postCurr);
+      postData.append("original_currency", postCurr);
+      postData.append("pb", postCurr);
     }
     if (convertedPrice !== null) {
       postData.append("converted_price", convertedPrice);
@@ -239,6 +255,7 @@ export default function({ route, navigation }) {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
 

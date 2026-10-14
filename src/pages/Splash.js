@@ -4,7 +4,6 @@ import { getUser } from '../helpers/auth';
 import { CommonActions } from '@react-navigation/native';
 import { BASE_URL, FIREBASE_ENABLED } from '../../config';
 import { getInitialNotification, getMessaging } from '@react-native-firebase/messaging';
-import { useExchangeRateStore } from '../store/useExchangeRateStore';
 
 export default function ({ navigation }) {
   const [state, setState] = useState({
@@ -17,9 +16,6 @@ export default function ({ navigation }) {
   const { width } = Dimensions.get('window');
 
   useEffect(() => {
-    // Prefetch and cache dynamic exchange rates on splash launch
-    useExchangeRateStore.getState().fetchRates();
-
     const checkToken = async () => {
       try {
         let user = await getUser();

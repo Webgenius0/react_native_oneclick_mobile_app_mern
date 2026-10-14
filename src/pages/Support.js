@@ -5,7 +5,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   Linking,
-  Animated, Share, Alert,
+  Animated,
+  Share,
+  Alert,
+  Platform,
 } from 'react-native';
 import ai from '../helpers/ai';
 import {t} from '../translate/i18n';

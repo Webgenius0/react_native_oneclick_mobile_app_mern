@@ -15,6 +15,7 @@ import { userAgent } from '../helpers/webview';
 import { injectedJavascript, normalizeProductImageUrl } from '../helpers/webview1';
 import { cleanProductTitle, getFallbackTitleFromUrl, getStoreName, isProductUrl } from '../helpers/storeHelper';
 import { isPlaceholderValue } from '../helpers/variantUtils';
+import { getReceivedCurrencyInfo } from '../helpers/currencyHelper';
 import { t } from '../translate/i18n';
 
 const styles = StyleSheet.create({
@@ -1500,9 +1501,11 @@ export default function Webview({ route, navigation }) {
               t = t.replace(/[٠-٩]/g, function(d) { return String.fromCharCode(d.charCodeAt(0) - 1632 + 48); });
               var detectedCurr = '';
               if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:AED|د\.?إ|درهم)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'AED';
-              else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:SAR|ر\.?س|ريال)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'SAR';
+              else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:SAR|SR|ر\.?س|ريال)(?:$|[^a-zA-Z\u0600-\u06FF])|[﷼\uFDFC]/i.test(t)) detectedCurr = 'SAR';
               else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:KWD|د\.?ك)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'KWD';
               else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:QAR|ر\.?ق)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'QAR';
+              else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:BHD|د\.?ب)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'BHD';
+              else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:OMR|ر\.?ع)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'OMR';
               else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:TL|TRY)(?:$|[^a-zA-Z\u0600-\u06FF])|₺/i.test(t)) detectedCurr = 'TL';
               else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:USD|US\$)(?:$|[^a-zA-Z\u0600-\u06FF])|\$/i.test(t)) detectedCurr = 'USD';
               else if (/(?:^|[^a-zA-Z\u0600-\u06FF])EUR(?:$|[^a-zA-Z\u0600-\u06FF])|€/i.test(t)) detectedCurr = 'EUR';
@@ -1636,11 +1639,52 @@ export default function Webview({ route, navigation }) {
                   if (parsed.price) {
                     price = parsed.price;
                     if (parsed.currency && !currency) currency = parsed.currency;
+
+                    // If currency not detected directly inside currEl, inspect parent / container and siblings
+                    if (!currency && currEl) {
+                      var containerEl = (currEl.closest && currEl.closest(
+                        '[class*="head-price"], [class*="floor-price"], [class*="product-price"], [class*="productPrice"], [class*="goods-price"], [class*="selling-price"], [class*="goodsPrice"], .product-intro__head-price'
+                      )) || currEl.parentElement;
+                      if (containerEl) {
+                        var containerText = getCleanElementPriceText(containerEl);
+                        var parsedContainer = parsePriceAndCurrency(containerText);
+                        if (parsedContainer.currency) {
+                          currency = parsedContainer.currency;
+                        }
+                      }
+                    }
                     break;
                   }
                 }
               }
               if (price) break;
+            }
+
+            // Check live cookies or localStorage if currency still not determined from DOM
+            if (!currency) {
+              try {
+                var cookieMatch = document.cookie.match(/(?:^|;\s*)(?:currency|shein_currency|sitecurrency|local_currency|user_currency)=([A-Za-z]{3})/i);
+                if (cookieMatch && cookieMatch[1]) {
+                  var cVal = cookieMatch[1].toUpperCase();
+                  if (/^[A-Z]{3}$/.test(cVal)) currency = cVal;
+                }
+                if (!currency && window.localStorage) {
+                  var lsCur = window.localStorage.getItem('currency') || window.localStorage.getItem('shein_currency') || window.localStorage.getItem('currency_code');
+                  if (lsCur && typeof lsCur === 'string') {
+                    lsCur = lsCur.trim().toUpperCase().replace(/[^A-Z]/g, '');
+                    if (lsCur.length === 3) currency = lsCur;
+                  }
+                }
+              } catch(_eCk) {}
+            }
+
+            // Normalize currency symbol into price if USD
+            if (price) {
+              if (currency === 'USD' || currency === '$') {
+                if (!price.includes('$') && !/USD/i.test(price)) {
+                  price = '$' + price;
+                }
+              }
             }
 
             // 3b. Check Trendyol application state (if DOM extraction hasn't found price yet)
@@ -2530,17 +2574,24 @@ export default function Webview({ route, navigation }) {
       const isAmazonUsUrl = currentUrlRef.current.includes('amazon.com');
       const isUaeUrl = currentUrlRef.current.includes('amazon.ae') || currentUrlRef.current.includes('noon.com');
       const isSaUrl = currentUrlRef.current.includes('amazon.sa');
-      const fallbackCurrency = isShein
-        ? 'AED'
-        : (isAmazonUsUrl ? 'USD' : (isUaeUrl ? 'AED' : (isSaUrl ? 'SAR' : 'TL')));
+      const fallbackCurrency = isAmazonUsUrl ? 'USD' : (isUaeUrl ? 'AED' : (isSaUrl ? 'SAR' : (isShein ? 'USD' : 'TL')));
 
       const resolvedImage = normalizeProductImageUrl(finalImage || freshSnapshot?.image || imageRef.current || '');
       let resolvedPrice = freshSnapshot?.price || priceRef.current || '';
-      let resolvedCurrency = freshSnapshot?.currency || currencyRef.current || fallbackCurrency;
-      if (isShein) {
-        resolvedCurrency = 'AED';
-      } else if (resolvedCurrency === 'TL' && isAmazonUsUrl) {
-        resolvedCurrency = 'USD';
+      let rawCurrency = freshSnapshot?.currency || currencyRef.current || '';
+
+      const currencyInfo = getReceivedCurrencyInfo({
+        url: currentUrlRef.current,
+        price: resolvedPrice,
+        currency: rawCurrency,
+        store: finalStore,
+      });
+
+      let resolvedCurrency;
+      if (currencyInfo.isUsd) {
+        resolvedCurrency = currencyInfo.display; // '$' or 'USD' exactly as received
+      } else {
+        resolvedCurrency = rawCurrency ? currencyInfo.code : (currencyInfo.code || fallbackCurrency);
       }
 
       // Sanitize options so that only the user-selected value is retained
@@ -2920,6 +2971,25 @@ export default function Webview({ route, navigation }) {
           onError={onError}
           onNavigationStateChange={onNavigationStateChange}
           onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}
+          androidLayerType="hardware"
+          onRenderProcessGone={syntheticEvent => {
+            const { didCrash } = syntheticEvent?.nativeEvent || {};
+            console.warn('WebView render process terminated, didCrash:', didCrash);
+            try {
+              webViewRef.current?.reload();
+            } catch (err) {
+              console.warn('Failed to reload WebView after render process gone:', err);
+            }
+            return true;
+          }}
+          onContentProcessDidTerminate={() => {
+            console.warn('WebView content process terminated');
+            try {
+              webViewRef.current?.reload();
+            } catch (err) {
+              console.warn('Failed to reload WebView after content process terminated:', err);
+            }
+          }}
         />
         <AddToCart addChart={addChart} loading={isAddingToCart} />
         {isAddingToCart && (

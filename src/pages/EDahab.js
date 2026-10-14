@@ -172,12 +172,14 @@ export default function EDahab({navigation, route}) {
       ? siparis_ids.join(',')
       : String(siparis_ids || '');
 
+    const numericTutar = Number(String(tutar).replace(/[^0-9.]/g, '')) || 0;
+
     const basePayload = {
       phoneNumber: phoneNumber.trim(),
       cardNumber: phoneNumber.trim(),
       accountNumber: phoneNumber.trim(),
-      tutar: parseFloat(tutar),
-      amount: parseFloat(tutar),
+      tutar: numericTutar,
+      amount: numericTutar,
       ana_tutar: anaTutar,
       komisyon_tutar: komisyonTutar,
       komisyon_yuzde: route?.params?.komisyonYuzde || 0,

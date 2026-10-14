@@ -1,7 +1,5 @@
-import { I18n } from "i18n-js";
-import * as RNLocalize from 'react-native-localize';
-import {storageGet, storageSet} from '../helpers/storage';
-import translations from "./translations.json";
+import { I18n } from 'i18n-js';
+import translations from './translations.json';
 
 const i18n = new I18n(translations);
 const defaultLocale = 'en';

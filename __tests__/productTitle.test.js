@@ -248,7 +248,7 @@ describe('Product Title Extraction & Cleaning Tests', () => {
       };
 
       const normalized = normalizeCartItem(sheinItem);
-      expect(normalized.currency).toBe('AED');
+      expect(normalized.currency).toBe('USD');
       expect(normalized.price).toBe('13.04');
     });
   });

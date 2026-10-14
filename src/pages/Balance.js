@@ -244,24 +244,4 @@ export default function({ route, navigation }) {
 
 
 
-const generateData = () => {
-  let data = [];
-  for (let i = 0; i < 100; i++) {
-    // random turID between 1,4
 
-    let turID = Math.floor(Math.random() * 4) + 1;
-    let randomDate = new Date(
-      new Date().setDate(d.getDate() - Math.floor(Math.random() * 100)),
-    );
-
-    data.push({
-      id: i,
-      turID: turID,
-      tur: turs.find((t) => t.id === turID).ad,
-      tutar: Math.floor(Math.random() * 1000) + 1,
-      tarih: randomDate.getDay() + "." + randomDate.getMonth() + "." + randomDate.getFullYear(),
-    });
-  }
-
-  return data;
-};

@@ -12,7 +12,6 @@ import { i18n, tr } from './src/translate/i18n';
 import { storageGet } from './src/helpers/storage';
 import { DEV_REDIRECT_STORE, FIREBASE_ENABLED, MOBIL_SCRIPT } from './config';
 import { useScriptServiceStore } from './src/store/useScriptServiceStore';
-import { useExchangeRateStore } from './src/store/useExchangeRateStore';
 import { useSheinPriceStore } from './src/store/useSheinPriceStore';
 
 // @ts-ignore
@@ -113,7 +112,6 @@ const App = () => {
 
     loadTheme(ctx, setCtx);
     fetchAllNotifications(ctx, setCtx);
-    useExchangeRateStore.getState().fetchRates();
     useSheinPriceStore.getState().fetchSheinPrice();
 
     (async () => {

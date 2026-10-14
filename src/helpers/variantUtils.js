@@ -108,14 +108,6 @@ export const normalizeDimName = rawName => {
   ) return 'Color';
 
   if (
-    lower.indexOf('hafıza') > -1 ||
-    lower.indexOf('storage') > -1 ||
-    lower.indexOf('dahili hafıza') > -1 ||
-    lower.indexOf('kapasite') > -1 ||
-    lower.indexOf('capacity') > -1
-  ) return 'Storage';
-
-  if (
     lower.indexOf('ağırlık') > -1 ||
     lower.indexOf('weight') > -1 ||
     lower.indexOf('gram') > -1 ||
@@ -125,8 +117,66 @@ export const normalizeDimName = rawName => {
   if (
     lower.indexOf('hacim') > -1 ||
     lower.indexOf('volume') > -1 ||
-    lower.indexOf('ml') > -1
+    lower.indexOf('kapasite') > -1 ||
+    lower.indexOf('capacity') > -1 ||
+    lower.indexOf('hafıza') > -1 ||
+    lower.indexOf('storage') > -1
   ) return 'Volume';
+
+  if (
+    lower.indexOf('stil') > -1 ||
+    lower.indexOf('style') > -1 ||
+    lower.indexOf('tarz') > -1
+  ) return 'Style';
+
+  if (
+    lower.indexOf('model') > -1 ||
+    lower.indexOf('tip') > -1 ||
+    lower === 'type'
+  ) return 'Model';
+
+  if (
+    lower.indexOf('materyal') > -1 ||
+    lower.indexOf('malzeme') > -1 ||
+    lower.indexOf('material') > -1
+  ) return 'Material';
+
+  if (
+    lower.indexOf('paket') > -1 ||
+    lower.indexOf('pack') > -1 ||
+    lower.indexOf('adetli') > -1 ||
+    lower.indexOf('set') > -1
+  ) return 'Pack';
+
+  if (
+    lower.indexOf('desen') > -1 ||
+    lower.indexOf('pattern') > -1
+  ) return 'Pattern';
+
+  if (
+    lower.indexOf('uzunluk') > -1 ||
+    lower.indexOf('length') > -1
+  ) return 'Length';
+
+  if (
+    lower.indexOf('genişlik') > -1 ||
+    lower.indexOf('width') > -1
+  ) return 'Width';
+
+  if (
+    lower.indexOf('aroma') > -1 ||
+    lower.indexOf('flavor') > -1 ||
+    lower.indexOf('flavour') > -1 ||
+    lower.indexOf('tat') > -1
+  ) return 'Flavor';
+
+  // Generic fallback: valid dimension name must be 2 to 24 letters/spaces
+  if (/^[a-zA-ZçğıöşüÇĞİÖŞÜ\s\-]{2,24}$/.test(n)) {
+    return n
+      .split(/[\s\-]+/)
+      .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+      .join(' ');
+  }
 
   return null;
 };

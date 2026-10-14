@@ -6,8 +6,8 @@
 export const DEFAULT_RATES = {
   USD: 1.0,
   TRY: 0.029412,
-  AED: 0.272479,
-  UAE: 0.272479,
+  AED: 0.3125,
+  UAE: 0.3125,
   EUR: 1.08,
   GBP: 1.28,
   SAR: 0.266667,
@@ -15,8 +15,8 @@ export const DEFAULT_RATES = {
 
 export const DEFAULT_INVERSE_RATES = {
   USD: 1.0,
-  AED: 3.67,
-  UAE: 3.67,
+  AED: 3.2,
+  UAE: 3.2,
   TRY: 33.9997,
   EUR: 0.9259,
   GBP: 0.7813,
@@ -40,7 +40,7 @@ export const normalizeCurrency = (rawCurrency, rawPrice = '') => {
   if (c === 'UAE') {
     return 'UAE';
   }
-  if (c === 'AED' || c === 'DHS' || c === 'DH' || c.includes('DIRHAM')) {
+  if (c === 'AED' || c === 'DHS' || c === 'DH' || c.includes('DIRHAM') || c.includes('د.إ') || c.includes('درهم')) {
     return 'AED';
   }
   if (c === 'EUR' || c.includes('€') || c.includes('EURO')) {
@@ -49,22 +49,31 @@ export const normalizeCurrency = (rawCurrency, rawPrice = '') => {
   if (c === 'GBP' || c.includes('£') || c.includes('POUND')) {
     return 'GBP';
   }
-  if (c === 'SAR' || c === 'SR' || c.includes('RIYAL') || c.includes('RIAL')) {
+  if (
+    c === 'SAR' ||
+    c === 'SR' ||
+    c.includes('﷼') ||
+    c.includes('\uFDFC') ||
+    c.includes('ر.س') ||
+    c.includes('ريال') ||
+    c.includes('RIYAL') ||
+    c.includes('RIAL')
+  ) {
     return 'SAR';
   }
   if (c === 'USD' || c.includes('$') || c.includes('DOLLAR')) {
     return 'USD';
   }
-  if (c === 'KWD' || c === 'KD') {
+  if (c === 'KWD' || c === 'KD' || c.includes('د.ك')) {
     return 'KWD';
   }
-  if (c === 'QAR' || c === 'QR') {
+  if (c === 'QAR' || c === 'QR' || c.includes('ر.ق')) {
     return 'QAR';
   }
-  if (c === 'BHD' || c === 'BD') {
+  if (c === 'BHD' || c === 'BD' || c.includes('د.ب')) {
     return 'BHD';
   }
-  if (c === 'OMR' || c === 'RO') {
+  if (c === 'OMR' || c === 'RO' || c.includes('ر.ع')) {
     return 'OMR';
   }
   if (c === 'IQD') {
@@ -78,7 +87,7 @@ export const normalizeCurrency = (rawCurrency, rawPrice = '') => {
   if (p.includes('UAE')) {
     return 'UAE';
   }
-  if (p.includes('AED') || /\bDHS?\b/.test(p)) {
+  if (p.includes('AED') || /\bDHS?\b/.test(p) || p.includes('DIRHAM') || p.includes('د.إ') || p.includes('درهم')) {
     return 'AED';
   }
   if (p.includes('€') || p.includes('EUR')) {
@@ -87,7 +96,16 @@ export const normalizeCurrency = (rawCurrency, rawPrice = '') => {
   if (p.includes('£') || p.includes('GBP')) {
     return 'GBP';
   }
-  if (p.includes('SAR') || /\bSR\b/.test(p)) {
+  if (
+    p.includes('SAR') ||
+    /\bSR\b/.test(p) ||
+    p.includes('﷼') ||
+    p.includes('\uFDFC') ||
+    p.includes('ر.س') ||
+    p.includes('ريال') ||
+    p.includes('RIYAL') ||
+    p.includes('RIAL')
+  ) {
     return 'SAR';
   }
   if (p.includes('$') || p.includes('USD')) {
@@ -244,4 +262,164 @@ export const formatUsd = amount => {
     return '';
   }
   return `$${amount.toFixed(2)} USD`;
+};
+
+/**
+ * Detects the source currency for an item based on its explicit currency,
+ * price string, store/marketplace, or URL domain.
+ * Supports dynamic detection of USD, AED, SAR, TRY, EUR, GBP, etc.
+ * When price or currency is '$' or 'USD', it is preserved as USD without being overwritten.
+ * @param {Object} item - Product/Cart item object or param bag
+ * @param {string} [fallbackCurrency='AED']
+ * @returns {string} 3-letter currency code (e.g. 'USD', 'AED', 'SAR', 'TRY')
+ */
+export const detectItemCurrency = (item = {}, fallbackCurrency = 'USD') => {
+  if (!item) return normalizeCurrency(fallbackCurrency);
+
+  const rawCurr = item.currency || '';
+  const rawPrice = item.price || '';
+  const url = String(item.url || item.link || '').toLowerCase();
+  const store = String(item.store || item.marketplace || '').toLowerCase();
+
+  // 1. Check price string first for explicit symbols or currency codes
+  if (rawPrice) {
+    const p = String(rawPrice).trim();
+    if (p.includes('$') || /\bUSD\b/i.test(p)) return 'USD';
+    if (p.includes('€') || /\bEUR\b/i.test(p)) return 'EUR';
+    if (p.includes('£') || /\bGBP\b/i.test(p)) return 'GBP';
+    if (
+      /\b(?:SAR|SR|RIYAL|RIAL)\b/i.test(p) ||
+      p.includes('﷼') ||
+      p.includes('\uFDFC') ||
+      p.includes('ر.س') ||
+      p.includes('ريال')
+    ) return 'SAR';
+    if (/\b(?:AED|DHS|DH|DIRHAM)\b/i.test(p) || p.includes('د.إ') || p.includes('درهم')) return 'AED';
+    if (p.includes('₺') || /\bTL\b/i.test(p) || /\bTRY\b/i.test(p)) return 'TRY';
+  }
+
+  // 2. Check explicit currency field
+  if (rawCurr) {
+    const norm = normalizeCurrency(rawCurr, rawPrice);
+    if (norm === 'USD' || norm === '$') return 'USD';
+    if (norm === 'SAR') return 'SAR';
+    if (norm === 'AED' || norm === 'UAE') return 'AED';
+    if (norm === 'EUR') return 'EUR';
+    if (norm === 'GBP') return 'GBP';
+    if (norm === 'TRY') return 'TRY';
+    return norm;
+  }
+
+  // 3. Domain-based detection
+  if (url.includes('shein.ae') || url.includes('amazon.ae') || url.includes('noon.com')) {
+    return 'AED';
+  }
+  if (url.includes('shein.sa') || url.includes('shein.com.sa') || url.includes('amazon.sa')) {
+    return 'SAR';
+  }
+  if (url.includes('shein.com.tr') || url.includes('trendyol.') || url.includes('hepsiburada.')) {
+    return 'TRY';
+  }
+  if (url.includes('amazon.de') || url.includes('.de/') || url.includes('.fr/')) {
+    return 'EUR';
+  }
+  if (url.includes('amazon.co.uk') || url.includes('.co.uk/')) {
+    return 'GBP';
+  }
+  if (
+    url.includes('us.shein.com') ||
+    url.includes('amazon.com') ||
+    url.includes('.com/us') ||
+    url.includes('/us/') ||
+    store.includes('shein') ||
+    url.includes('shein.com')
+  ) {
+    return 'USD';
+  }
+
+  // 4. Fallback to fallbackCurrency (default USD)
+  return normalizeCurrency(fallbackCurrency, rawPrice);
+};
+
+/**
+ * Returns how the currency was originally specified: '$', 'USD', '﷼', 'ر.س', or the normalized currency code.
+ * Used to preserve and show the currency format exactly as received.
+ * @param {Object} item - Product/Cart item object
+ * @returns {{ code: string, display: string, isUsd: boolean }}
+ */
+export const getReceivedCurrencyInfo = (item = {}) => {
+  const rawCurr = String(item?.currency || '').trim();
+  const rawPrice = String(item?.price || '').trim();
+  const rawCurrUpper = rawCurr.toUpperCase();
+  const rawPriceUpper = rawPrice.toUpperCase();
+
+  // If explicit 'USD' text is present
+  if (/\bUSD\b/.test(rawCurrUpper) || /\bUSD\b/.test(rawPriceUpper) || rawCurrUpper === 'USD') {
+    return { code: 'USD', display: 'USD', isUsd: true };
+  }
+
+  // If '$' symbol is present in currency (e.g. '$', 'US$') or price (e.g. '$12.99', '12.99$')
+  if (rawCurr.includes('$') || rawPrice.includes('$')) {
+    return { code: 'USD', display: '$', isUsd: true };
+  }
+
+  // If SAR symbols are present
+  if (rawCurr.includes('﷼') || rawCurr.includes('\uFDFC') || rawPrice.includes('﷼') || rawPrice.includes('\uFDFC')) {
+    return { code: 'SAR', display: '﷼', isUsd: false };
+  }
+  if (rawCurr.includes('ر.س') || rawPrice.includes('ر.س')) {
+    return { code: 'SAR', display: 'ر.س', isUsd: false };
+  }
+
+  // If AED Arabic symbols are present
+  if (rawCurr.includes('د.إ') || rawPrice.includes('د.إ') || rawCurr.includes('درهم') || rawPrice.includes('درهم')) {
+    return { code: 'AED', display: 'د.إ', isUsd: false };
+  }
+
+  // If TRY symbol is present
+  if (rawCurr.includes('₺') || rawPrice.includes('₺')) {
+    return { code: 'TRY', display: '₺', isUsd: false };
+  }
+
+  // If EUR symbol is present
+  if (rawCurr.includes('€') || rawPrice.includes('€')) {
+    return { code: 'EUR', display: '€', isUsd: false };
+  }
+
+  // If GBP symbol is present
+  if (rawCurr.includes('£') || rawPrice.includes('£')) {
+    return { code: 'GBP', display: '£', isUsd: false };
+  }
+
+  const detected = detectItemCurrency(item, 'USD');
+  return {
+    code: detected,
+    display: detected === 'USD' ? '$' : detected,
+    isUsd: detected === 'USD',
+  };
+};
+
+/**
+ * Formats the final price displaying the received currency symbol/code.
+ * @param {number} finalPrice
+ * @param {Object} item
+ * @param {number|null} convertedUsd
+ * @returns {string}
+ */
+export const formatDisplayPrice = (finalPrice, item = {}, convertedUsd = null) => {
+  const info = getReceivedCurrencyInfo(item);
+  const priceVal = typeof finalPrice === 'number' ? finalPrice.toFixed(2) : String(finalPrice || '');
+
+  if (info.isUsd) {
+    if (info.display === '$') {
+      return `$${priceVal}`;
+    }
+    return `${priceVal} USD`;
+  }
+
+  if (convertedUsd !== null && typeof convertedUsd === 'number' && !isNaN(convertedUsd)) {
+    return `$${convertedUsd.toFixed(2)}`;
+  }
+
+  return `${priceVal} ${info.display}`;
 };

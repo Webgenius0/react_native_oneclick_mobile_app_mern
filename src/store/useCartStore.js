@@ -155,10 +155,10 @@ export const normalizeCartItem = item => {
     };
   });
 
-  if (size) {
+  if (sizes.length === 0 && size) {
     sizes = [size];
   }
-  if (color) {
+  if (colors.length === 0 && color) {
     colors = [color];
   }
 
@@ -181,14 +181,12 @@ export const normalizeCartItem = item => {
     (item?.marketplace && String(item.marketplace).toLowerCase().includes('shein')),
   );
 
-  if (isShein) {
-    currency = 'AED';
-  } else if (!currency || currency === 'TL') {
-    if (itemUrl.includes('amazon.ae') || itemUrl.includes('noon.com')) {
+  if (!currency || currency === 'TL') {
+    if (itemUrl.includes('amazon.ae') || itemUrl.includes('noon.com') || itemUrl.includes('shein.ae')) {
       currency = 'AED';
-    } else if (itemUrl.includes('amazon.sa')) {
+    } else if (itemUrl.includes('amazon.sa') || itemUrl.includes('shein.sa')) {
       currency = 'SAR';
-    } else if (itemUrl.includes('amazon.com')) {
+    } else if (itemUrl.includes('amazon.com') || isShein) {
       currency = 'USD';
     }
   }

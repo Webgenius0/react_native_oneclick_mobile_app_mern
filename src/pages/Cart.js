@@ -17,7 +17,13 @@ import { useFocusEffect } from '@react-navigation/native';
 import TeslimatSehirPicker from '../components/TeslimatSehirPicker';
 import { useExchangeRateStore } from '../store/useExchangeRateStore';
 import { useSheinPriceStore } from '../store/useSheinPriceStore';
-import { calculateConvertedPrice, parsePrice, normalizeCurrency } from '../helpers/currencyHelper';
+import {
+  calculateConvertedPrice,
+  parsePrice,
+  normalizeCurrency,
+  detectItemCurrency,
+  getReceivedCurrencyInfo,
+} from '../helpers/currencyHelper';
 import { cleanProductTitle, getStoreName } from '../helpers/storeHelper';
 
 export default function CartPage({ navigation, route }) {
@@ -37,10 +43,31 @@ export default function CartPage({ navigation, route }) {
   const { rates, inverseRates, fetchRates } = useExchangeRateStore();
   const { fetchSheinPrice } = useSheinPriceStore();
 
+  const hasNonUsdItems = Boolean(
+    items &&
+    items.length > 0 &&
+    items.some(it => {
+      const isShein = Boolean(
+        (it?.store && String(it.store).toLowerCase().includes('shein')) ||
+        (it?.url && String(it.url).toLowerCase().includes('shein.com')) ||
+        (it?.marketplace && String(it.marketplace).toLowerCase().includes('shein')) ||
+        String(getStoreName(it?.url, it?.store || '')).toLowerCase() === 'shein',
+      );
+      const info = getReceivedCurrencyInfo(it);
+      // On SHEIN, if price is in USD or $, disable conversion
+      if (isShein && info.isUsd) {
+        return false;
+      }
+      return !info.isUsd;
+    }),
+  );
+
   useEffect(() => {
-    fetchRates();
+    if (hasNonUsdItems) {
+      fetchRates(items);
+    }
     fetchSheinPrice();
-  }, [fetchRates, fetchSheinPrice]);
+  }, [fetchRates, fetchSheinPrice, hasNonUsdItems, items]);
 
   const sheinPercent = useSheinPriceStore(state => state.percent) ?? 0;
   const checkedItems = items ? items.filter(item => item.checked === true) : [];
@@ -79,51 +106,17 @@ export default function CartPage({ navigation, route }) {
     const finalPrice = basePrice + percentAmount;
     const count = Number(item?.count) > 0 ? Number(item.count) : 1;
 
-    let detectedCurrency = item?.currency;
-    if (isShein) {
-      detectedCurrency = 'AED';
-    } else if (!detectedCurrency || detectedCurrency === 'TL') {
-      const itemUrl = String(item?.url || '');
-      if (itemUrl.includes('amazon.ae') || itemUrl.includes('noon.com')) {
-        detectedCurrency = 'AED';
-      } else if (itemUrl.includes('amazon.sa')) {
-        detectedCurrency = 'SAR';
-      } else if (itemUrl.includes('amazon.com')) {
-        detectedCurrency = 'USD';
-      }
-    }
-
-    const itemCurrency = normalizeCurrency(detectedCurrency || 'AED', item?.price);
-    const usd = calculateConvertedPrice(finalPrice, itemCurrency, rates, inverseRates);
+    const { code: itemCurrency, isUsd } = getReceivedCurrencyInfo(item);
+    const usd = isUsd
+      ? finalPrice
+      : calculateConvertedPrice(finalPrice, itemCurrency, rates, inverseRates);
     const effectiveUsd = usd !== null ? usd : finalPrice;
     return sum + effectiveUsd * count;
   }, 0);
 
   const primaryCurrency = checkedItems.length > 0
-    ? (() => {
-        const first = checkedItems[0];
-        const isShein = Boolean(
-          (first?.store && String(first.store).toLowerCase().includes('shein')) ||
-          (first?.url && String(first.url).toLowerCase().includes('shein.com')) ||
-          (first?.marketplace && String(first.marketplace).toLowerCase().includes('shein')) ||
-          String(getStoreName(first?.url, first?.store || '')).toLowerCase() === 'shein',
-        );
-        let curr = first?.currency;
-        if (isShein) {
-          curr = 'AED';
-        } else if (!curr || curr === 'TL') {
-          const u = String(first?.url || '');
-          if (u.includes('amazon.ae') || u.includes('noon.com')) {
-            curr = 'AED';
-          } else if (u.includes('amazon.sa')) {
-            curr = 'SAR';
-          } else if (u.includes('amazon.com')) {
-            curr = 'USD';
-          }
-        }
-        return normalizeCurrency(curr || 'AED', first?.price);
-      })()
-    : 'AED';
+    ? detectItemCurrency(checkedItems[0], 'USD')
+    : 'USD';
 
   // setTitle
   useEffect(() => {
@@ -256,23 +249,9 @@ export default function CartPage({ navigation, route }) {
           ? parseFloat((parsedPriceVal + percentAmount).toFixed(2))
           : null;
 
-        let detectedCurrency = item?.currency;
-        if (isSheinItem) {
-          detectedCurrency = 'AED';
-        } else if (!detectedCurrency || detectedCurrency === 'TL') {
-          const itemUrl = String(item?.url || '');
-          if (itemUrl.includes('amazon.ae') || itemUrl.includes('noon.com')) {
-            detectedCurrency = 'AED';
-          } else if (itemUrl.includes('amazon.sa')) {
-            detectedCurrency = 'SAR';
-          } else if (itemUrl.includes('amazon.com')) {
-            detectedCurrency = 'USD';
-          }
-        }
-
-        const normalizedCurr = normalizeCurrency(detectedCurrency || 'AED', item.price);
+        const { code: normalizedCurr, display: receivedDisplay, isUsd } = getReceivedCurrencyInfo(item);
         const convertedPriceVal = finalPriceVal !== null
-          ? calculateConvertedPrice(finalPriceVal, normalizedCurr, rates, inverseRates)
+          ? (isUsd ? finalPriceVal : calculateConvertedPrice(finalPriceVal, normalizedCurr, rates, inverseRates))
           : null;
 
         // fill post data with both new schema fields and backwards compatibility fields
@@ -575,22 +554,22 @@ export default function CartPage({ navigation, route }) {
                   totalItems > 0 ? totalItems + ' ' + t('Ürün') : ''
                 }
               </Text>
-              {totalUsdPrice > 0 ? (
+              {Number(totalUsdPrice) > 0 ? (
                 <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
                   <Text style={styles.totalUsdText}>
-                    {`$${totalUsdPrice.toFixed(2)} USD`}
+                    {`$${Number(totalUsdPrice).toFixed(2)} USD`}
                   </Text>
-                  {totalPrice > 0 && primaryCurrency !== 'USD' && (
+                  {Number(totalPrice) > 0 && primaryCurrency !== 'USD' && (
                     <Text style={styles.totalOriginalText}>
-                      {` (${totalPrice.toFixed(2)} ${primaryCurrency})`}
+                      {` (${Number(totalPrice).toFixed(2)} ${primaryCurrency})`}
                     </Text>
                   )}
                 </View>
-              ) : totalPrice > 0 ? (
+              ) : Number(totalPrice) > 0 ? (
                 <Text style={styles.totalUsdText}>
                   {primaryCurrency === 'USD'
-                    ? `$${totalPrice.toFixed(2)} USD`
-                    : `${totalPrice.toFixed(2)} ${primaryCurrency}`}
+                    ? `$${Number(totalPrice).toFixed(2)} USD`
+                    : `${Number(totalPrice).toFixed(2)} ${primaryCurrency}`}
                 </Text>
               ) : null}
             </View>

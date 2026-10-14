@@ -523,7 +523,7 @@ export const getMetaTagPriceAndCurrency = page_url => {
           t = t.replace(/[٠-٩]/g, function(d) { return String.fromCharCode(d.charCodeAt(0) - 1632 + 48); });
           var detectedCurr = '';
           if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:AED|د\.?إ|درهم)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'AED';
-          else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:SAR|ر\.?س|ريال)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'SAR';
+          else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:SAR|SR|ر\.?س|ريال)(?:$|[^a-zA-Z\u0600-\u06FF])|[﷼\uFDFC]/i.test(t)) detectedCurr = 'SAR';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:KWD|د\.?ك)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'KWD';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:QAR|ر\.?ق)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'QAR';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:TL|TRY)(?:$|[^a-zA-Z\u0600-\u06FF])|₺/i.test(t)) detectedCurr = 'TL';
@@ -2308,7 +2308,7 @@ export const getProductSnapshotBridge = page_url => {
           t = t.replace(/[٠-٩]/g, function(d) { return String.fromCharCode(d.charCodeAt(0) - 1632 + 48); });
           var detectedCurr = '';
           if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:AED|د\.?إ|درهم)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'AED';
-          else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:SAR|ر\.?س|ريال)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'SAR';
+          else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:SAR|SR|ر\.?س|ريال)(?:$|[^a-zA-Z\u0600-\u06FF])|[﷼\uFDFC]/i.test(t)) detectedCurr = 'SAR';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:KWD|د\.?ك)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'KWD';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:QAR|ر\.?ق)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'QAR';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:TL|TRY)(?:$|[^a-zA-Z\u0600-\u06FF])|₺/i.test(t)) detectedCurr = 'TL';
@@ -2631,3 +2631,297 @@ export const userAgent = () => {
       'Mozilla/5.0 (Linux; Android 10; SM-G973F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Mobile Safari/537.36',
   });
 };
+
+export const checkProductPageBridge = page_url => {
+  return `
+  (function() {
+    if (window.__RN_PRODUCT_CHECK_TIMER__) {
+      try {
+        if (typeof window.clearInterval === 'function') {
+          window.clearInterval(window.__RN_PRODUCT_CHECK_TIMER__);
+        } else if (typeof clearInterval === 'function') {
+          clearInterval(window.__RN_PRODUCT_CHECK_TIMER__);
+        }
+      } catch(e) {}
+      window.__RN_PRODUCT_CHECK_TIMER__ = null;
+    }
+    if (window.__RN_PRODUCT_MUTATION_OBSERVER__) {
+      try {
+        window.__RN_PRODUCT_MUTATION_OBSERVER__.disconnect();
+      } catch(e) {}
+      window.__RN_PRODUCT_MUTATION_OBSERVER__ = null;
+    }
+
+    var attempts = 0;
+    var maxAttempts = 25;
+    var lastPostedState = null;
+
+    var postStatus = function(isProduct, currentHref) {
+      if (window.ReactNativeWebView && typeof window.ReactNativeWebView.postMessage === 'function') {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'isProductPage',
+          data: {
+            isProduct: !!isProduct,
+            url: currentHref || window.location.href
+          }
+        }));
+      }
+    };
+
+    var isElementVisible = function(el) {
+      if (!el) return false;
+      try {
+        if (el.disabled || el.getAttribute('aria-disabled') === 'true') {
+          return false;
+        }
+        var style = window.getComputedStyle(el);
+        if (!style || style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+          return false;
+        }
+        var rect = el.getBoundingClientRect();
+        return (rect.width > 0 && rect.height > 0) || (el.offsetWidth > 0 && el.offsetHeight > 0);
+      } catch(e) {
+        return false;
+      }
+    };
+
+    var hasActiveCartOrBuyButton = function() {
+      var candidateSelectors = [
+        '#add-to-cart-button',
+        '#buy-now-button',
+        '#add-to-cart-button-ubb',
+        'input[name="submit.add-to-cart"]',
+        'input[name="submit.buy-now"]',
+        '.add-to-basket',
+        '.add-to-basket-button',
+        '.product-button-container',
+        '[data-testid*="add-to-basket"]',
+        '[data-testid*="add-to-cart"]',
+        '[data-testid*="addToCart"]',
+        '[data-test-id*="addToCart"]',
+        '[data-test-id*="add-to-basket"]',
+        '[class*="add-to-basket"]',
+        '[class*="addToBasket"]',
+        '[class*="add-to-cart"]',
+        '[class*="addToCart"]',
+        '[class*="add-to-bag"]',
+        '[class*="addToBag"]',
+        '[class*="buy-now"]',
+        '[class*="buyNow"]',
+        'form[action*="/cart/add"] button[type="submit"]',
+        'form[action*="/cart/add"] input[type="submit"]',
+        'button[name="add"]',
+        '#addToCart',
+        '#buyNow'
+      ];
+
+      for (var i = 0; i < candidateSelectors.length; i++) {
+        var els = document.querySelectorAll(candidateSelectors[i]);
+        for (var j = 0; j < els.length; j++) {
+          var btn = els[j];
+          if (!isElementVisible(btn)) continue;
+          var btnText = (btn.innerText || btn.textContent || btn.value || btn.getAttribute('aria-label') || '').toLowerCase();
+          if (
+            btnText.indexOf('tükendi') > -1 ||
+            btnText.indexOf('stokta yok') > -1 ||
+            btnText.indexOf('gelince haber ver') > -1 ||
+            btnText.indexOf('haber ver') > -1 ||
+            btnText.indexOf('out of stock') > -1 ||
+            btnText.indexOf('sold out') > -1 ||
+            btnText.indexOf('currently unavailable') > -1 ||
+            btnText.indexOf('notify me') > -1 ||
+            btnText.indexOf('غير متوفر') > -1
+          ) {
+            continue;
+          }
+
+          var nonBuyPhrases = [
+            'view details', 'details', 'detay', 'detaylar', 'read more', 'dahası',
+            'close', 'kapat', 'cancel', 'iptal', 'back', 'geri', 'next', 'ileri',
+            'sign in', 'giriş yap', 'login', 'register', 'kayıt ol'
+          ];
+          var isNonBuy = false;
+          for (var nb = 0; nb < nonBuyPhrases.length; nb++) {
+            if (btnText === nonBuyPhrases[nb] || btnText.indexOf(nonBuyPhrases[nb]) > -1) {
+              isNonBuy = true;
+              break;
+            }
+          }
+          if (isNonBuy) continue;
+
+          return true;
+        }
+      }
+
+      var genericCandidates = document.querySelectorAll(
+        'button, input[type="button"], input[type="submit"], [role="button"], a, div[class*="btn"], div[class*="button"], div[class*="basket"], div[class*="cart"], div[class*="buy"], span[class*="btn"], span[class*="button"], span[class*="basket"]'
+      );
+      var validPhrases = [
+        'add to cart', 'add to bag', 'add to basket', 'buy now', 'buy it now', 'instant checkout',
+        'sepete ekle', 'hemen al', 'şimdi al', 'simdi al', 'satın al', 'satin al', 'sepete at', 'torbaya ekle',
+        'أضف إلى عربة التسوق', 'أضف إلى السلة', 'اشتري الآن', 'شراء الآن', 'إضافة إلى السلة', 'أضف إلى الحقيبة', 'اضف الى السلة'
+      ];
+      var invalidPhrases = [
+        'tükendi', 'stokta yok', 'gelince haber ver', 'out of stock', 'sold out',
+        'currently unavailable', 'notify me', 'view cart', 'go to cart', 'sepeti görüntüle',
+        'sepete git', 'sepetim', 'cart', 'basket', 'checkout', 'odeme', 'ödeme'
+      ];
+
+      for (var k = 0; k < genericCandidates.length; k++) {
+        var gBtn = genericCandidates[k];
+        if (!isElementVisible(gBtn)) continue;
+
+        var text = (gBtn.innerText || gBtn.textContent || gBtn.value || gBtn.getAttribute('aria-label') || '').trim().toLowerCase();
+        if (!text || text.length > 50) continue;
+
+        var isInvalid = false;
+        for (var inv = 0; inv < invalidPhrases.length; inv++) {
+          if (text === invalidPhrases[inv] || text.indexOf(invalidPhrases[inv]) > -1) {
+            isInvalid = true;
+            break;
+          }
+        }
+        if (isInvalid) continue;
+
+        for (var v = 0; v < validPhrases.length; v++) {
+          if (text.indexOf(validPhrases[v]) > -1) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    };
+
+    var isSingleProductPage = function(href) {
+      var lowerHref = (href || window.location.href || '').toLowerCase();
+      var path = window.location.pathname ? window.location.pathname.toLowerCase() : '';
+
+      if (path === '/' || path === '' || path === '/en' || path === '/tr' || path === '/som' || path === '/home') {
+        return false;
+      }
+
+      var isSearchOrListingUrl = (
+        lowerHref.indexOf('/search') > -1 ||
+        lowerHref.indexOf('/sr?') > -1 ||
+        lowerHref.indexOf('/s?') > -1 ||
+        lowerHref.indexOf('?keyword=') > -1 ||
+        lowerHref.indexOf('/kategori/') > -1 ||
+        lowerHref.indexOf('/category/') > -1 ||
+        lowerHref.indexOf('/categories/') > -1 ||
+        lowerHref.indexOf('/collection/') > -1 ||
+        lowerHref.indexOf('/collections/') > -1 ||
+        lowerHref.indexOf('/catalog/') > -1 ||
+        lowerHref.indexOf('/checkout') > -1 ||
+        lowerHref.indexOf('/odeme') > -1 ||
+        lowerHref.indexOf('/account') > -1 ||
+        lowerHref.indexOf('/user') > -1 ||
+        lowerHref.indexOf('/login') > -1 ||
+        lowerHref.indexOf('/register') > -1
+      );
+
+      var isProductUrl = (
+        /-p-[a-z0-9_-]+/i.test(lowerHref) ||
+        /-pm-[a-z0-9_-]+/i.test(lowerHref) ||
+        /\/dp\/[a-z0-9]+/i.test(lowerHref) ||
+        /\/gp\/aw\/d\/[a-z0-9]+/i.test(lowerHref) ||
+        /\/gp\/product\/[a-z0-9]+/i.test(lowerHref) ||
+        /\/d\/[a-z0-9]+/i.test(lowerHref) ||
+        /\/p\/[a-z0-9_-]+/i.test(lowerHref) ||
+        /\/product\/[a-z0-9_-]+/i.test(lowerHref) ||
+        /\/products\/[a-z0-9_-]+/i.test(lowerHref) ||
+        /\/item\/[a-z0-9_-]+/i.test(lowerHref) ||
+        /\/items\/[a-z0-9_-]+/i.test(lowerHref) ||
+        /\/itm\/[a-z0-9_-]+/i.test(lowerHref) ||
+        /\/goods\/[a-z0-9_-]+/i.test(lowerHref) ||
+        /\/pd\/[a-z0-9_-]+/i.test(lowerHref) ||
+        /[?&](product_id|goods_id|item_id|pid|sku|asin)=/i.test(lowerHref)
+      );
+
+      if (isProductUrl) {
+        return true;
+      }
+
+      if (isSearchOrListingUrl) {
+        return false;
+      }
+
+      var ogType = document.querySelector('meta[property="og:type"]');
+      var isProductMeta = (
+        (ogType && ogType.content && ogType.content.toLowerCase().indexOf('product') > -1) ||
+        !!document.querySelector('meta[property="product:price:amount"], meta[property="og:price:amount"], meta[itemprop="price"]')
+      );
+      if (isProductMeta) {
+        return true;
+      }
+
+      var jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
+      for (var i = 0; i < jsonLdScripts.length; i++) {
+        try {
+          var text = jsonLdScripts[i].textContent || '';
+          if (text.indexOf('"Product"') > -1 || text.indexOf('"@type":"Product"') > -1 || text.indexOf('"IndividualProduct"') > -1) {
+            return true;
+          }
+        } catch(e) {}
+      }
+
+      var isProductContainer = !!document.querySelector(
+        '#productTitle, #centerCol, #buybox, .product-detail-container, .product-detail-wrapper, .product-detail-app, .product-detail, .product-container, .product-intro, .pr-in-w, .p-detail, [data-test-id="product-detail"], [data-testid*="product-detail"], [class*="productDetail"], [class*="product-detail"]'
+      );
+      if (isProductContainer) {
+        return true;
+      }
+
+      return false;
+    };
+
+    var check = function() {
+      attempts++;
+      try {
+        var currentHref = window.location.href || '';
+        var isSingleProduct = isSingleProductPage(currentHref);
+        var hasBuyButton = false;
+
+        if (isSingleProduct) {
+          hasBuyButton = hasActiveCartOrBuyButton();
+        }
+
+        var isProduct = isSingleProduct && hasBuyButton;
+
+        if (lastPostedState !== isProduct) {
+          lastPostedState = isProduct;
+          postStatus(isProduct, currentHref);
+        }
+
+        if (isProduct || attempts >= maxAttempts) {
+          if (window.__RN_PRODUCT_CHECK_TIMER__) {
+            try {
+              if (typeof window.clearInterval === 'function') {
+                window.clearInterval(window.__RN_PRODUCT_CHECK_TIMER__);
+              } else if (typeof clearInterval === 'function') {
+                clearInterval(window.__RN_PRODUCT_CHECK_TIMER__);
+              }
+            } catch(e) {}
+            window.__RN_PRODUCT_CHECK_TIMER__ = null;
+          }
+        }
+      } catch(err) {}
+    };
+
+    var setTimerFn = typeof window.setInterval === 'function' ? window.setInterval : setInterval;
+    window.__RN_PRODUCT_CHECK_TIMER__ = setTimerFn(check, 500);
+    check();
+
+    if (window.MutationObserver && document.body) {
+      try {
+        var observer = new MutationObserver(function() {
+          check();
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+        window.__RN_PRODUCT_MUTATION_OBSERVER__ = observer;
+      } catch(e) {}
+    }
+  })();
+  `;
+};
+

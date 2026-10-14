@@ -1,5 +1,4 @@
 import { Text, TouchableOpacity, View, StyleSheet, ScrollView, SafeAreaView } from "react-native";
-import { getPreset } from "metro-react-native-babel-preset";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import GlobalStyle from "../assets/GlobalStyle";
 

@@ -16,6 +16,8 @@ import {
   parsePrice,
   normalizeCurrency,
   calculateConvertedPrice,
+  detectItemCurrency,
+  getReceivedCurrencyInfo,
 } from '../../helpers/currencyHelper';
 import { cleanProductTitle, getStoreName } from '../../helpers/storeHelper';
 
@@ -29,7 +31,7 @@ const CartOrderConfirmModal = ({
   items = [],
   totalUsdPrice = 0,
   totalPrice = 0,
-  primaryCurrency = 'AED',
+  primaryCurrency = 'USD',
   rates = {},
   inverseRates = {},
   safePercent = 0,
@@ -43,6 +45,9 @@ const CartOrderConfirmModal = ({
   const checkedItems = Array.isArray(items)
     ? items.filter(item => item && item.checked !== false)
     : [];
+
+  const safeTotalUsd = Number(totalUsdPrice) > 0 ? Number(totalUsdPrice) : 0;
+  const safeTotalPrice = Number(totalPrice) > 0 ? Number(totalPrice) : 0;
 
   const totalItemCount = checkedItems.reduce(
     (acc, it) => acc + (Number(it?.count) > 0 ? Number(it.count) : 1),
@@ -107,32 +112,15 @@ const CartOrderConfirmModal = ({
               const displayLocal =
                 finalPrice > 0 ? finalPrice.toFixed(2) : item?.price || '';
 
-              let detectedCurrency = item?.currency;
-              if (isShein) {
-                detectedCurrency = 'AED';
-              } else if (!detectedCurrency || detectedCurrency === 'TL') {
-                const u = String(item?.url || '');
-                if (u.includes('amazon.ae') || u.includes('noon.com')) {
-                  detectedCurrency = 'AED';
-                } else if (u.includes('amazon.sa')) {
-                  detectedCurrency = 'SAR';
-                } else if (u.includes('amazon.com')) {
-                  detectedCurrency = 'USD';
-                }
-              }
-
-              const itemCurr = normalizeCurrency(
-                detectedCurrency || 'AED',
-                item?.price,
-              );
+              const { code: itemCurr, display: receivedDisplay, isUsd } = getReceivedCurrencyInfo(item);
               const convertedUsd =
                 finalPrice > 0
-                  ? calculateConvertedPrice(
+                  ? (isUsd ? finalPrice : calculateConvertedPrice(
                       finalPrice,
                       itemCurr,
                       rates,
                       inverseRates,
-                    )
+                    ))
                   : null;
 
               // Extract options label
@@ -188,12 +176,14 @@ const CartOrderConfirmModal = ({
 
                     <View style={styles.itemPriceRow}>
                       <View style={styles.itemPriceCol}>
-                        {convertedUsd !== null ? (
+                        {finalPrice > 0 ? (
                           <View style={styles.priceInline}>
                             <Text style={styles.itemUsdPrice}>
-                              {`$${convertedUsd.toFixed(2)}`}
+                              {isUsd
+                                ? (receivedDisplay === '$' ? `$${finalPrice.toFixed(2)}` : `${finalPrice.toFixed(2)} USD`)
+                                : `$${(convertedUsd ?? finalPrice).toFixed(2)}`}
                             </Text>
-                            {itemCurr !== 'USD' && (
+                            {!isUsd && (
                               <Text style={styles.itemOriginalPrice}>
                                 {` (${displayLocal} ${itemCurr})`}
                               </Text>
@@ -226,13 +216,13 @@ const CartOrderConfirmModal = ({
               </Text>
             </View>
 
-            {totalPrice > 0 && primaryCurrency !== 'USD' && (
+            {safeTotalPrice > 0 && primaryCurrency !== 'USD' && (
               <View style={styles.totalLine}>
                 <Text style={styles.totalLabel}>
                   {tr('Orijinal Tutar')}
                 </Text>
                 <Text style={styles.totalValueMuted}>
-                  {`${totalPrice.toFixed(2)} ${primaryCurrency}`}
+                  {`${safeTotalPrice.toFixed(2)} ${primaryCurrency}`}
                 </Text>
               </View>
             )}
@@ -242,9 +232,9 @@ const CartOrderConfirmModal = ({
                 {tr('Ödenecek Tutar')}
               </Text>
               <Text style={styles.grandTotalValue}>
-                {totalUsdPrice > 0
-                  ? `$${totalUsdPrice.toFixed(2)} USD`
-                  : `${totalPrice.toFixed(2)} ${primaryCurrency}`}
+                {safeTotalUsd > 0
+                  ? `$${safeTotalUsd.toFixed(2)} USD`
+                  : `${safeTotalPrice.toFixed(2)} ${primaryCurrency}`}
               </Text>
             </View>
           </View>

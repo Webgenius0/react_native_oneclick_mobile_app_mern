@@ -20,7 +20,13 @@ import React from 'react';
 import Dump from '../Dump';
 import { useExchangeRateStore } from '../../store/useExchangeRateStore';
 import { useSheinPriceStore } from '../../store/useSheinPriceStore';
-import { normalizeCurrency, parsePrice, calculateConvertedPrice } from '../../helpers/currencyHelper';
+import {
+  normalizeCurrency,
+  parsePrice,
+  calculateConvertedPrice,
+  detectItemCurrency,
+  getReceivedCurrencyInfo,
+} from '../../helpers/currencyHelper';
 import { cleanProductTitle, getStoreName } from '../../helpers/storeHelper';
 
 const CartItem = ({
@@ -51,23 +57,9 @@ const CartItem = ({
   const finalPrice = basePrice + percentAmount;
   const displayPrice = finalPrice > 0 ? finalPrice.toFixed(2) : (item?.price || '');
 
-  let detectedCurrency = item?.currency;
-  if (isShein) {
-    detectedCurrency = 'AED';
-  } else if (!detectedCurrency || detectedCurrency === 'TL') {
-    const itemUrl = String(item?.url || '');
-    if (itemUrl.includes('amazon.ae') || itemUrl.includes('noon.com')) {
-      detectedCurrency = 'AED';
-    } else if (itemUrl.includes('amazon.sa')) {
-      detectedCurrency = 'SAR';
-    } else if (itemUrl.includes('amazon.com')) {
-      detectedCurrency = 'USD';
-    }
-  }
-
-  const itemCurrency = normalizeCurrency(detectedCurrency || 'AED', item?.price);
+  const { code: itemCurrency, display: receivedDisplay, isUsd } = getReceivedCurrencyInfo(item);
   const convertedUsd = finalPrice > 0
-    ? calculateConvertedPrice(finalPrice, itemCurrency, rates, inverseRates)
+    ? (isUsd ? finalPrice : calculateConvertedPrice(finalPrice, itemCurrency, rates, inverseRates))
     : null;
 
   const changeItem = (field, value) => {
@@ -149,12 +141,14 @@ const CartItem = ({
                   </TouchableOpacity>
                   {Boolean(item?.price) ? (
                     <View style={styles.priceContainer}>
-                      {convertedUsd !== null ? (
+                      {finalPrice > 0 ? (
                         <>
                           <Text style={styles.priceText}>
-                            {`$${convertedUsd.toFixed(2)}`}
+                            {isUsd
+                              ? (receivedDisplay === '$' ? `$${finalPrice.toFixed(2)}` : `${finalPrice.toFixed(2)} USD`)
+                              : `$${(convertedUsd ?? finalPrice).toFixed(2)}`}
                           </Text>
-                          {itemCurrency !== 'USD' && (
+                          {!isUsd && (
                             <Text style={styles.originalPriceText}>
                               {` (${displayPrice} ${itemCurrency})`}
                             </Text>

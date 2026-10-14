@@ -181,6 +181,25 @@ export default function MasterWebView({
       onMessage={onMessage}
       onNavigationStateChange={handleNavigationStateChange}
       onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}
+      androidLayerType="hardware"
+      onRenderProcessGone={syntheticEvent => {
+        const { didCrash } = syntheticEvent?.nativeEvent || {};
+        console.warn('MasterWebView render process terminated, didCrash:', didCrash);
+        try {
+          resolvedWebViewRef.current?.reload();
+        } catch (err) {
+          console.warn('Failed to reload MasterWebView after render process gone:', err);
+        }
+        return true;
+      }}
+      onContentProcessDidTerminate={() => {
+        console.warn('MasterWebView content process terminated');
+        try {
+          resolvedWebViewRef.current?.reload();
+        } catch (err) {
+          console.warn('Failed to reload MasterWebView after content process terminated:', err);
+        }
+      }}
       source={source}
     />
   );
