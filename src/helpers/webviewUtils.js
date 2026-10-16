@@ -15,6 +15,7 @@ export const isProductUrl = url => {
     /\/gp\/aw\/d\/[a-z0-9]+/i,
     /\/gp\/product\/[a-z0-9]+/i,
     /\/d\/[a-z0-9]+/i,
+    /\/pr\/[a-z0-9_-]+/i,
     /\/p\/[a-z0-9_-]+/i,
     /\/product\/[a-z0-9_-]+/i,
     /\/products\/[a-z0-9_-]+/i,
@@ -24,6 +25,7 @@ export const isProductUrl = url => {
     /\/itm\/[a-z0-9_-]+/i,
     /\/goods\/[a-z0-9_-]+/i,
     /\/pd\/[a-z0-9_-]+/i,
+    /\/pid\.[a-z0-9]+/i,
     /[?&](product_id|goods_id|item_id|pid|sku|asin)=/i,
   ];
 

@@ -417,13 +417,28 @@ describe('URL Comparison & Stale Message Prevention', () => {
   });
 
   test('isProductUrl correctly identifies product vs non-product URLs', () => {
+    const { isProductUrl: storeIsProductUrl } = require('../src/helpers/storeHelper');
+
     expect(isProductUrl('https://trendyol.com/brand/product-name-p-12345')).toBe(true);
     expect(isProductUrl('https://amazon.ae/dp/B0FQFHZF6L')).toBe(true);
     expect(isProductUrl('https://m.shein.com/ar-en/item-p-100188201.html')).toBe(true);
+    expect(isProductUrl('https://www.iherb.com/pr/california-gold-nutrition-lactobif-30-probiotics-30-veggie-capsules/64009')).toBe(true);
+    expect(isProductUrl('https://www.yesstyle.com/en/info.html/pid.1119058223')).toBe(true);
+    expect(isProductUrl('https://www.yesstyle.com/en/beauty-of-joseon/info.html/pid.1119058223')).toBe(true);
     expect(isProductUrl('https://amazon.ae/')).toBe(false);
     expect(isProductUrl('https://trendyol.com/en/')).toBe(false);
+    expect(isProductUrl('https://www.iherb.com/c/supplements')).toBe(false);
+    expect(isProductUrl('https://www.yesstyle.com/en/women.html')).toBe(false);
     expect(isProductUrl('about:blank')).toBe(false);
     expect(isProductUrl('')).toBe(false);
+
+    // Also verify storeHelper's isProductUrl handles iHerb and YesStyle
+    expect(storeIsProductUrl('https://www.iherb.com/pr/california-gold-nutrition-lactobif-30-probiotics-30-veggie-capsules/64009')).toBe(true);
+    expect(storeIsProductUrl('https://sa.iherb.com/pr/california-gold-nutrition-lactobif-30-probiotics-30-veggie-capsules/64009')).toBe(true);
+    expect(storeIsProductUrl('https://www.yesstyle.com/en/info.html/pid.1119058223')).toBe(true);
+    expect(storeIsProductUrl('https://www.yesstyle.com/en/beauty-of-joseon/info.html/pid.1119058223')).toBe(true);
+    expect(storeIsProductUrl('https://www.iherb.com/c/supplements')).toBe(false);
+    expect(storeIsProductUrl('https://www.yesstyle.com/en/women.html')).toBe(false);
   });
 });
 

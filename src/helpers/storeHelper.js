@@ -172,10 +172,19 @@ export const isProductUrl = url => {
       return /\/p\/[a-z0-9]+/i.test(path);
     }
 
+    if (host.includes('iherb.')) {
+      return /\/pr\/[a-z0-9_-]+/i.test(path);
+    }
+
+    if (host.includes('yesstyle.')) {
+      return /\/pid\.[a-z0-9]+/i.test(path) || path.includes('/info.html/pid.');
+    }
+
     // Generic e-commerce indicators
     if (
-      /\/(products?|items?|goods|p)\/[^/?#]+/i.test(path) ||
-      /-p-\d+/i.test(path)
+      /\/(products?|items?|goods|p|pr)\/[^/?#]+/i.test(path) ||
+      /-p-\d+/i.test(path) ||
+      /\/pid\.[a-z0-9]+/i.test(path)
     ) {
       return true;
     }

@@ -2356,7 +2356,7 @@ export default function Webview({ route, navigation }) {
                 return true;
               }
 
-              if (new RegExp('/(products?|items?|goods|p)/[^/?#]+', 'i').test(pPath) || new RegExp('-p-[0-9]+', 'i').test(pPath)) {
+              if (new RegExp('/(products?|items?|goods|p|pr)/[^/?#]+', 'i').test(pPath) || new RegExp('-p-[0-9]+', 'i').test(pPath) || new RegExp('/pid\\.[a-z0-9]+', 'i').test(pPath)) {
                 return true;
               }
 

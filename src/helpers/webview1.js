@@ -2827,6 +2827,7 @@ export const checkProductPageBridge = page_url => {
         /\/gp\/aw\/d\/[a-z0-9]+/i.test(lowerHref) ||
         /\/gp\/product\/[a-z0-9]+/i.test(lowerHref) ||
         /\/d\/[a-z0-9]+/i.test(lowerHref) ||
+        /\/pr\/[a-z0-9_-]+/i.test(lowerHref) ||
         /\/p\/[a-z0-9_-]+/i.test(lowerHref) ||
         /\/product\/[a-z0-9_-]+/i.test(lowerHref) ||
         /\/products\/[a-z0-9_-]+/i.test(lowerHref) ||
@@ -2835,6 +2836,7 @@ export const checkProductPageBridge = page_url => {
         /\/itm\/[a-z0-9_-]+/i.test(lowerHref) ||
         /\/goods\/[a-z0-9_-]+/i.test(lowerHref) ||
         /\/pd\/[a-z0-9_-]+/i.test(lowerHref) ||
+        /\/pid\.[a-z0-9]+/i.test(lowerHref) ||
         /[?&](product_id|goods_id|item_id|pid|sku|asin)=/i.test(lowerHref)
       );
 
