@@ -1901,11 +1901,29 @@ export default function Webview({ route, navigation }) {
                 }
               }
 
+              var isAgeOrMeasurement = function(s) {
+                if (!s || typeof s !== 'string') return false;
+                var str = s.trim();
+                if (/\b\d+\s*[-–/]\s*\d+\s*(?:y|m|yr|yrs|mo|mos|ya[sş]|years?|months?|t|cm|mm|in|inch)(?![a-zA-Z0-9])/i.test(str)) return true;
+                if (/[\(\[]\s*\d+\s*[-–/]\s*\d+\s*(?:y|m|yr|yrs|mo|mos|ya[sş]|years?|months?|t)?\s*[\)\]]/i.test(str)) return true;
+                if (/^\d+\s*[-–/]\s*\d+$/i.test(str)) return true;
+                if (/^\d+[yYtTmM]$/i.test(str)) return true;
+                return false;
+              };
+
               var optPrice = explicitPrice ? String(explicitPrice).trim() : '';
-              if (!optPrice && strVal) {
-                var pMatch = strVal.match(/[\(\[]\s*[+\-]?\s*([0-9]{1,3}(?:[., ][0-9]{3})+(?:[.,][0-9]{1,2})|[0-9]+(?:[.,][0-9]{1,2})|[0-9]+)\s*[\)\]]|[-–]\s*[$€£₺]?\s*([0-9]{1,3}(?:[., ][0-9]{3})+(?:[.,][0-9]{1,2})|[0-9]+(?:[.,][0-9]{1,2})|[0-9]+)/);
+              if (!optPrice && strVal && !isAgeOrMeasurement(strVal)) {
+                var pMatch = strVal.match(
+                  /[\(\[]\s*([+\-]?\s*(?:[$€£₺]|(?:usd|eur|tl|try|aed|sar|kwd|qar|bhd|omr)\b)\s*[0-9]+(?:[.,][0-9]{1,2})?|[+\-]?\s*[0-9]+(?:[.,][0-9]{1,2})?\s*(?:[$€£₺]|(?:usd|eur|tl|try|aed|sar|kwd|qar|bhd|omr)\b)|[+\-]\s*[0-9]+(?:[.,][0-9]{1,2})?)\s*[\)\]]|[-–]\s*([$€£₺]|(?:usd|eur|tl|try|aed|sar|kwd|qar|bhd|omr)\b)?\s*([0-9]+(?:[.,][0-9]{1,2})?)\s*([$€£₺]|(?:usd|eur|tl|try|aed|sar|kwd|qar|bhd|omr)\b)?/i
+                );
                 if (pMatch) {
-                  optPrice = pMatch[1] || pMatch[2] || '';
+                  var hasCurrencyOrSign = /[$€£₺]|(?:usd|eur|tl|try|aed|sar|kwd|qar|bhd|omr)/i.test(pMatch[0]) || /^[+\-]/.test(pMatch[0].trim());
+                  if (hasCurrencyOrSign) {
+                    var numMatch = pMatch[0].match(/([0-9]{1,3}(?:[., ][0-9]{3})+(?:[.,][0-9]{1,2})|[0-9]+(?:[.,][0-9]{1,2})|[0-9]+)/);
+                    if (numMatch) {
+                      optPrice = numMatch[0];
+                    }
+                  }
                 }
               }
 
@@ -2219,10 +2237,6 @@ export default function Webview({ route, navigation }) {
               for (var so = 0; so < sOpts.length; so++) {
                 if (sOpts[so].value && sOpts[so].value !== '-1') {
                   var sOptPrice = sOpts[so].getAttribute('data-price') || '';
-                  if (!sOptPrice && sOpts[so].textContent) {
-                    var pSelMatch = sOpts[so].textContent.match(/[\(\[]\s*[+\-]?\s*([0-9]{1,3}(?:[., ][0-9]{3})+(?:[.,][0-9]{1,2})|[0-9]+(?:[.,][0-9]{1,2})|[0-9]+)\s*[\)\]]|[-–]\s*[$€£₺]?\s*([0-9]{1,3}(?:[., ][0-9]{3})+(?:[.,][0-9]{1,2})|[0-9]+(?:[.,][0-9]{1,2})|[0-9]+)/);
-                    if (pSelMatch) sOptPrice = pSelMatch[1] || pSelMatch[2] || '';
-                  }
                   addOptionValue(selName, sOpts[so].textContent, sOpts[so].selected, sOptPrice);
                 }
               }

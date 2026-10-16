@@ -14,7 +14,7 @@ const devCart = [
   },
 ];
 
-import { generateItemKey } from '../helpers/variantUtils';
+import { generateItemKey, isAgeOrMeasurement } from '../helpers/variantUtils';
 import { cleanProductTitle } from '../helpers/storeHelper';
 
 export const normalizeCartItem = item => {
@@ -99,7 +99,7 @@ export const normalizeCartItem = item => {
     if (sizes.length === 0 && Array.isArray(sizeOpt.values)) {
       sizes = sizeOpt.values.map(s => String(s).trim());
     }
-    if (size && sizeOpt.prices && sizeOpt.prices[size]) {
+    if (size && sizeOpt.prices && sizeOpt.prices[size] && !isAgeOrMeasurement(size)) {
       newPrice = sizeOpt.prices[size];
     }
   } else if (size || sizes.length > 0) {
@@ -139,7 +139,7 @@ export const normalizeCartItem = item => {
 
   // Check any selected generic option (e.g. Storage, Volume) with an explicit price
   for (const opt of options) {
-    if (opt && opt.selected && opt.prices && opt.prices[opt.selected]) {
+    if (opt && opt.selected && opt.prices && opt.prices[opt.selected] && !isAgeOrMeasurement(opt.selected)) {
       newPrice = opt.prices[opt.selected];
     }
   }
@@ -147,11 +147,19 @@ export const normalizeCartItem = item => {
   // Keep selected value clean and ensure values only contains selected value if selected
   options = options.map(opt => {
     const sel = opt.selected ? String(opt.selected).trim() : '';
+    const cleanPrices = {};
+    if (opt.prices && typeof opt.prices === 'object') {
+      Object.keys(opt.prices).forEach(k => {
+        if (!isAgeOrMeasurement(k)) {
+          cleanPrices[k] = opt.prices[k];
+        }
+      });
+    }
     return {
       ...opt,
       selected: sel,
       values: sel ? [sel] : (Array.isArray(opt.values) ? opt.values : []),
-      prices: opt.prices || {},
+      prices: cleanPrices,
     };
   });
 
@@ -166,9 +174,9 @@ export const normalizeCartItem = item => {
 
   // If price is missing but size/color has price, recover it
   if (!newPrice) {
-    if (sizeOpt && size && sizeOpt.prices && sizeOpt.prices[size]) {
+    if (sizeOpt && size && sizeOpt.prices && sizeOpt.prices[size] && !isAgeOrMeasurement(size)) {
       newPrice = sizeOpt.prices[size];
-    } else if (colorOpt && color && colorOpt.prices && colorOpt.prices[color]) {
+    } else if (colorOpt && color && colorOpt.prices && colorOpt.prices[color] && !isAgeOrMeasurement(color)) {
       newPrice = colorOpt.prices[color];
     }
   }
@@ -342,7 +350,7 @@ const useCartStore = create(
               optionName.toLowerCase().includes('renk');
 
             let newPrice = i.price;
-            if (targetOpt && targetOpt.prices && targetOpt.prices[selectedValue]) {
+            if (targetOpt && targetOpt.prices && targetOpt.prices[selectedValue] && !isAgeOrMeasurement(selectedValue)) {
               newPrice = targetOpt.prices[selectedValue];
             }
 

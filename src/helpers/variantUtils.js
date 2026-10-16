@@ -74,6 +74,21 @@ export const isPlaceholderValue = text => {
   return false;
 };
 
+/**
+ * Returns true if the string represents an age, month, or dimensional measurement
+ * range (e.g. "3-4Y", "12-18M", "2-3 Years", "4-5 Yaş", "110 (3-4Y)", "100-110cm", "36-38")
+ * rather than an added price option.
+ */
+export const isAgeOrMeasurement = text => {
+  if (!text || typeof text !== 'string') return false;
+  const str = text.trim();
+  if (/\b\d+\s*[-–/]\s*\d+\s*(?:y|m|yr|yrs|mo|mos|ya[sş]|years?|months?|t|cm|mm|in|inch)(?![a-zA-Z0-9])/i.test(str)) return true;
+  if (/[\(\[]\s*\d+\s*[-–/]\s*\d+\s*(?:y|m|yr|yrs|mo|mos|ya[sş]|years?|months?|t)?\s*[\)\]]/i.test(str)) return true;
+  if (/^\d+\s*[-–/]\s*\d+$/i.test(str)) return true;
+  if (/^\d+[yYtTmM]$/i.test(str)) return true;
+  return false;
+};
+
 export const normalizeDimName = rawName => {
   if (!rawName || typeof rawName !== 'string') return null;
   const n = cleanText(rawName);

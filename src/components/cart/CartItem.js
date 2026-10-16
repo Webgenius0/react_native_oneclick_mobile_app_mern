@@ -28,6 +28,7 @@ import {
   getReceivedCurrencyInfo,
 } from '../../helpers/currencyHelper';
 import { cleanProductTitle, getStoreName } from '../../helpers/storeHelper';
+import { isAgeOrMeasurement } from '../../helpers/variantUtils';
 
 const CartItem = ({
   item,
@@ -83,7 +84,7 @@ const CartItem = ({
     );
     onChange(targetId, 'options', updatedOptions);
 
-    if (targetOpt && targetOpt.prices && targetOpt.prices[selectedValue]) {
+    if (targetOpt && targetOpt.prices && targetOpt.prices[selectedValue] && !isAgeOrMeasurement(selectedValue)) {
       onChange(targetId, 'price', targetOpt.prices[selectedValue]);
     }
 
@@ -196,7 +197,8 @@ const CartItem = ({
                               {Boolean(
                                 opt.prices &&
                                   opt.prices[selectedVal] &&
-                                  opt.prices[selectedVal] !== item.price,
+                                  opt.prices[selectedVal] !== item.price &&
+                                  !isAgeOrMeasurement(selectedVal),
                               ) && (
                                 <Text style={styles.badgePriceText}>
                                   {` (${opt.prices[selectedVal]} ${item.currency || ''})`}

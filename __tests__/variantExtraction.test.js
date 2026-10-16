@@ -2,6 +2,7 @@ import {
   normalizeDimName,
   cleanOptionValue,
   generateItemKey,
+  isAgeOrMeasurement,
 } from '../src/helpers/variantUtils';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -104,6 +105,35 @@ describe('Variant Extraction & Normalization Utilities', () => {
     });
   });
 
+  describe('isAgeOrMeasurement (Kids sizes & measurements protection)', () => {
+    it('identifies child age and month ranges accurately', () => {
+      expect(isAgeOrMeasurement('3-4Y')).toBe(true);
+      expect(isAgeOrMeasurement('4-5Y')).toBe(true);
+      expect(isAgeOrMeasurement('110 (3-4Y)')).toBe(true);
+      expect(isAgeOrMeasurement('120 (4-5Y)')).toBe(true);
+      expect(isAgeOrMeasurement('12-18M')).toBe(true);
+      expect(isAgeOrMeasurement('6-9 Months')).toBe(true);
+      expect(isAgeOrMeasurement('2-3 Years')).toBe(true);
+      expect(isAgeOrMeasurement('4-5 Yaş')).toBe(true);
+      expect(isAgeOrMeasurement('2T')).toBe(true);
+      expect(isAgeOrMeasurement('4Y')).toBe(true);
+      expect(isAgeOrMeasurement('6M')).toBe(true);
+      expect(isAgeOrMeasurement('36-38')).toBe(true);
+      expect(isAgeOrMeasurement('100-110cm')).toBe(true);
+    });
+
+    it('does not classify standard adult sizes or options as age/measurement ranges', () => {
+      expect(isAgeOrMeasurement('S')).toBe(false);
+      expect(isAgeOrMeasurement('M')).toBe(false);
+      expect(isAgeOrMeasurement('L')).toBe(false);
+      expect(isAgeOrMeasurement('XL')).toBe(false);
+      expect(isAgeOrMeasurement('38')).toBe(false);
+      expect(isAgeOrMeasurement('Midnight Black')).toBe(false);
+      expect(isAgeOrMeasurement('Option (+ $5.00)')).toBe(false);
+      expect(isAgeOrMeasurement('512GB (+$100.00)')).toBe(false);
+    });
+  });
+
   describe('generateItemKey & Cart De-duplication', () => {
     it('generates consistent keys for identical variants', () => {
       const item1 = {
@@ -188,6 +218,27 @@ describe('Variant Extraction & Normalization Utilities', () => {
       expect(normalized.size).toBe('');
       expect(normalized.color).toBe('');
       expect(normalized.id).toBe('https://www.trendyol.com/p-999::');
+    });
+
+    it('protects product price from being overwritten by kids age/size numbers', () => {
+      const rawSheinKidsItem = {
+        url: 'https://m.shein.com/ar-en/item-p-12345.html',
+        title: 'Toddler Girls Floral Dress',
+        price: '25.00',
+        currency: 'USD',
+        size: '3-4Y',
+        options: [
+          {
+            name: 'Size',
+            values: ['3-4Y', '4-5Y'],
+            selected: '3-4Y',
+            prices: {'3-4Y': '4', '4-5Y': '5'}, // legacy false-positive
+          },
+        ],
+      };
+      const normalized = normalizeCartItem(rawSheinKidsItem);
+      expect(normalized.price).toBe('25.00'); // NOT '4'
+      expect(normalized.size).toBe('3-4Y');
     });
   });
 });
