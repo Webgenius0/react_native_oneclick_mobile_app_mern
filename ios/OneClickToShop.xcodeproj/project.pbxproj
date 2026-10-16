@@ -514,7 +514,7 @@
 				CODE_SIGN_ENTITLEMENTS = OneClickToShop/OneClickToShop.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 69;
+				CURRENT_PROJECT_VERSION = 70;
 				DEVELOPMENT_TEAM = Q36Q3DNV8N;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = OneClickToShop/Info.plist;
@@ -524,7 +524,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1.69;
+				MARKETING_VERSION = 1.1.70;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -548,7 +548,7 @@
 				CODE_SIGN_ENTITLEMENTS = OneClickToShop/OneClickToShop.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 69;
+				CURRENT_PROJECT_VERSION = 70;
 				DEVELOPMENT_TEAM = Q36Q3DNV8N;
 				INFOPLIST_FILE = OneClickToShop/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "1 Click";
@@ -557,7 +557,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1.69;
+				MARKETING_VERSION = 1.1.70;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
