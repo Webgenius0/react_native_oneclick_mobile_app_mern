@@ -2414,20 +2414,20 @@ export default function Webview({ route, navigation }) {
         // Snapshot script runs immediately inside the webview and extracts full product details + options
         resolvedSnapshot = await Promise.race([
           snapshotPromise,
-          new Promise(resolve => setTimeout(() => resolve(null), 2000)),
+          new Promise(resolve => setTimeout(() => resolve(null), 1200)),
         ]);
 
         if (resolvedSnapshot) {
-          // If options have already resolved or arrive quickly within 300ms, capture them; otherwise proceed with snapshot
+          // If options have already resolved or arrive quickly within 250ms, capture them; otherwise proceed with snapshot
           resolvedOpts = await Promise.race([
             optionPromise,
-            new Promise(resolve => setTimeout(() => resolve(null), 300)),
+            new Promise(resolve => setTimeout(() => resolve(null), 250)),
           ]);
         } else {
           // Fallback if snapshot didn't arrive fast
           resolvedOpts = await Promise.race([
             optionPromise,
-            new Promise(resolve => setTimeout(() => resolve(null), 800)),
+            new Promise(resolve => setTimeout(() => resolve(null), 350)),
           ]);
         }
 
@@ -2640,7 +2640,10 @@ export default function Webview({ route, navigation }) {
         color: selectedColor,
       });
 
-      await delay(150);
+      setIsAddingToCart(false);
+      isAddingRef.current = false;
+
+      await delay(100);
       navigation.navigate('Cart');
     } catch (err) {
       console.log('addChart error:', err);

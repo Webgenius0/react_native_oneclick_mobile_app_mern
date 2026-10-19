@@ -80,20 +80,41 @@ ai.interceptors.response.use(
 
     if (status === 403) {
       if (aiErrorLog) {
-        console.log('403 Err');
+        console.log('403 Err on:', error?.config?.url);
       }
+
+      // Do NOT kick to login for guest users or for cart-data / soft endpoints
+      const url = error?.config?.url || '';
+      const isPublicOrSoftEndpoint = url.includes('cart-data') || url.includes('home') || url.includes('banner');
 
       try {
         const storedUser = await AsyncStorage.getItem('user');
+        const isGuestStorage = (await AsyncStorage.getItem('is_guest')) === '1';
         const parsedUser = storedUser ? JSON.parse(storedUser) : null;
-        const isGuest = parsedUser?.kod === 'GUEST' || parsedUser?.token === 'GUEST';
+        const isGuest =
+          isGuestStorage ||
+          parsedUser?.kod === 'GUEST' ||
+          parsedUser?.kod === 'HG1000' ||
+          parsedUser?.token === 'GUEST';
 
-        if (!isGuest) {
+        if (!isGuest && parsedUser && !isPublicOrSoftEndpoint) {
           await AsyncStorage.removeItem('user');
 
           if (RootNavigation.navigationRef && RootNavigation.navigationRef.isReady()) {
             const currentRoute = RootNavigation.navigationRef.getCurrentRoute();
-            if (currentRoute && currentRoute.name !== 'Login' && currentRoute.name !== 'Splash') {
+            const authRoutes = [
+              'Login',
+              'Register',
+              'Splash',
+              'Onboarding',
+              'AuthWelcome',
+              'ContinueGuest',
+              'ChooseVerificationMethod',
+              'VerifyOtp',
+              'ForgotPassword',
+              'SetNewPassword',
+            ];
+            if (currentRoute && !authRoutes.includes(currentRoute.name)) {
               RootNavigation.reset('Login');
             }
           }

@@ -117,18 +117,28 @@ export default function({ route, navigation }) {
   };
 
   const fetchData = async () => {
-    const response = await ai.post("cart-data", { url: state.link });
-    console.log('FETCH DATA');
-    console.log(response.data);
+    try {
+      const response = await ai.post("cart-data", { url: state.link });
+      console.log('FETCH DATA');
+      console.log(response?.data);
 
-    if (response?.data?.error === false) {
-      let img = response.data.img;
-      // get image info
-      setUploadFile({ uri: img, type: mimeType(img), name: "image." + ext(img) });
+      if (response?.data?.error === false) {
+        let img = response.data.img;
+        // get image info
+        setUploadFile({ uri: img, type: mimeType(img), name: "image." + ext(img) });
+      }
+
+      let whatsapp_order = response?.data?.whatsapp_order || false;
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        whatsapp_order: whatsapp_order,
+        kur: response?.data?.kur ? response.data.kur.toString() : prev.kur,
+      }));
+    } catch (e) {
+      console.log('CartForm fetchData error:', e?.message || e);
+      setState(prev => ({ ...prev, loading: false }));
     }
-
-    let whatsapp_order = response?.data?.whatsapp_order || false;
-    setState({ ...state, loading: false, whatsapp_order: whatsapp_order, kur: response.data.kur.toString() });
   };
 
   const handleSubmit = async () => {

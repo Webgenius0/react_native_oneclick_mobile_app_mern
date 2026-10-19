@@ -448,17 +448,19 @@ export default function CartPage({ navigation, route }) {
   }, []);
 
   const fetchData = async () => {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    const response = await ai.post('cart-data');
-    // console.log(response?.data);
-    if (response?.data?.error === false) {
-      setTeslimatSehirs(response.data.teslimatSehirs);
-      setTeslimatSehirID(response.data.teslimatSehirID);
-      setLoading(false);
-    } else {
-      console.log('Hata Oluştu', response.data.msg);
-      Alert.alert(tr('Hata Oluştu'));
+      const response = await ai.post('cart-data');
+      if (response?.data?.error === false) {
+        setTeslimatSehirs(response.data.teslimatSehirs || []);
+        setTeslimatSehirID(response.data.teslimatSehirID || null);
+      } else if (response?.data?.msg) {
+        console.log('Cart fetchData msg:', response.data.msg);
+      }
+    } catch (err) {
+      console.log('Cart fetchData error:', err?.message || err);
+    } finally {
       setLoading(false);
     }
   };
