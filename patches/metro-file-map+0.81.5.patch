@@ -1,0 +1,32 @@
+diff --git a/node_modules/metro-file-map/src/watchers/FallbackWatcher.js b/node_modules/metro-file-map/src/watchers/FallbackWatcher.js
+--- a/node_modules/metro-file-map/src/watchers/FallbackWatcher.js
++++ b/node_modules/metro-file-map/src/watchers/FallbackWatcher.js
+@@ -85,13 +85,21 @@ module.exports = class FallbackWatcher extends AbstractWatcher {
+     if (this.watched[dir]) {
+       return false;
+     }
+-    const watcher = fs.watch(
+-      dir,
+-      {
+-        persistent: true,
+-      },
+-      (event, filename) => this._normalizeChange(dir, event, filename)
+-    );
++    let watcher;
++    try {
++      watcher = fs.watch(
++        dir,
++        {
++          persistent: true,
++        },
++        (event, filename) => this._normalizeChange(dir, event, filename)
++      );
++    } catch (error) {
++      if (isIgnorableFileError(error)) {
++        return false;
++      }
++      throw error;
++    }
+     this.watched[dir] = watcher;
+     watcher.on("error", this._checkedEmitError);
+     if (this.root !== dir) {
