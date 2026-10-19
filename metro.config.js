@@ -32,11 +32,14 @@ const config = {
     sourceExts: [...sourceExts, 'svg'],
     blockList: exclusionList([
       blockRoot('android/build'),
+      blockRoot('react_native_oneclick_old'),
       blockRoot('backups'),
       blockRoot('dokuman'),
       blockRoot('ios/Pods'),
       blockRoot('trendyol'),
       blockRoot('vendor'),
+      /.*[/\\]\.cxx[/\\].*/,
+      /.*[/\\]CMakeFiles[/\\].*/,
     ]),
   },
 };

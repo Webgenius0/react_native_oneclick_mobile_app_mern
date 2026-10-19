@@ -1,4 +1,5 @@
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../../config';
 import { getToken } from './auth';
 import * as RootNavigation from './../services/RootNavigation';
@@ -26,7 +27,7 @@ ai.interceptors.request.use(
       console.log('Request.URL', config.url + '\n\n\n');
     }
 
-    if (token) {
+    if (token && token !== 'GUEST') {
       config.headers.Authorization = token;
       config.headers.token = token;
 
@@ -55,27 +56,18 @@ ai.interceptors.request.use(
 
 ai.interceptors.response.use(
   response => {
-    // console.log("\n\n");
     if (aiLog) {
       console.log('response', response);
     }
-    // console.log("\n\n");
-
     return response;
   },
   async error => {
-    //console.log("\n\n\n");
-
     if (aiLog) {
       console.log('error status ======> ', JSON.stringify(error));
     }
-    //console.log("\n\n\n");
-    // console.log("error", error);
-    // console.log("\n\n\n");
 
     // react native error
     if (!error?.response) {
-      // print node error
       if (aiErrorLog) {
         console.warn('API network error:', error?.message || error, ai.defaults.baseURL);
       }
@@ -90,17 +82,24 @@ ai.interceptors.response.use(
       if (aiErrorLog) {
         console.log('403 Err');
       }
-      await asyncStorage.removeItem('user');
 
       try {
-        if (RootNavigation.navigationRef && RootNavigation.navigationRef.isReady()) {
-          const currentRoute = RootNavigation.navigationRef.getCurrentRoute();
-          if (currentRoute && currentRoute.name !== 'Login' && currentRoute.name !== 'Splash') {
-            RootNavigation.reset('Login');
+        const storedUser = await AsyncStorage.getItem('user');
+        const parsedUser = storedUser ? JSON.parse(storedUser) : null;
+        const isGuest = parsedUser?.kod === 'GUEST' || parsedUser?.token === 'GUEST';
+
+        if (!isGuest) {
+          await AsyncStorage.removeItem('user');
+
+          if (RootNavigation.navigationRef && RootNavigation.navigationRef.isReady()) {
+            const currentRoute = RootNavigation.navigationRef.getCurrentRoute();
+            if (currentRoute && currentRoute.name !== 'Login' && currentRoute.name !== 'Splash') {
+              RootNavigation.reset('Login');
+            }
           }
         }
       } catch (navErr) {
-        console.log('Navigation reset error:', navErr);
+        console.log('403 handler error:', navErr);
       }
     }
 

@@ -1,62 +1,69 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, Animated, Dimensions, Text, Image } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  Animated,
+  Text,
+  StatusBar,
+  Image,
+} from 'react-native';
 import { getUser } from '../helpers/auth';
 import { CommonActions } from '@react-navigation/native';
-import { BASE_URL, FIREBASE_ENABLED } from '../../config';
+import { FIREBASE_ENABLED } from '../../config';
 import { getInitialNotification, getMessaging } from '@react-native-firebase/messaging';
+import { storageGet } from '../helpers/storage';
 
-export default function ({ navigation }) {
-  const [state, setState] = useState({
-    logged: null,
-    target: 'Login',
-  });
-
-  const [animationCompleted, setAnimationCompleted] = useState(false);
-  const [tokenChecked, setTokenChecked] = useState(false);
-  const { width } = Dimensions.get('window');
+export default function Splash({ navigation }) {
+  const [authChecked, setAuthChecked] = useState(false);
+  const [destination, setDestination] = useState('Onboarding');
+  const progressAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const checkToken = async () => {
+    // Start progress bar animation
+    Animated.timing(progressAnim, {
+      toValue: 1,
+      duration: 1800,
+      useNativeDriver: false,
+    }).start(() => {
+      setAuthChecked(true);
+    });
+
+    const checkState = async () => {
       try {
-        let user = await getUser();
-        let token = user ? user.token : null;
-        let ns = {};
-        if (user && token) {
-          ns = { ...state, logged: true, target: 'Home' };
+        const user = await getUser();
+        const hasSeenOnboarding = await storageGet('has_seen_onboarding');
+        const isGuest = (await storageGet('is_guest')) === '1' || user?.kod === 'GUEST';
+
+        if (!hasSeenOnboarding) {
+          setDestination('Onboarding');
+        } else if ((user && user.token) || isGuest) {
+          setDestination('Home');
         } else {
-          ns = { ...state, logged: false, target: 'Login' };
+          setDestination('AuthWelcome');
         }
-        setState(ns);
       } catch (err) {
-        console.log('checkToken error:', err);
-        setState({ ...state, logged: false, target: 'Login' });
-      } finally {
-        setTokenChecked(true);
+        console.log('Splash check error:', err);
+        setDestination('Onboarding');
       }
     };
 
-    checkToken();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    checkState();
+  }, [progressAnim]);
 
   useEffect(() => {
-    if (animationCompleted && tokenChecked) {
-      let routes;
-      let defaultLoggedPage = 'AuthAfter';
-      let defaultParams = {};
-
-      if (state.target === 'Home') {
-        routes = [{ name: defaultLoggedPage }];
-      } else {
-        routes = [{ name: 'Login' }];
+    if (authChecked) {
+      let targetRoute = 'Onboarding';
+      if (destination === 'Home') {
+        targetRoute = 'AuthAfter';
+      } else if (destination === 'AuthWelcome') {
+        targetRoute = 'AuthWelcome';
       }
 
       var tip = null;
-      var orderId = null;
       var grupID = null;
 
       const navigateToTarget = (curTip, curGrupId) => {
-        if (state.logged) {
+        if (destination === 'Home') {
           if (curTip === 'order') {
             navigation.dispatch(
               CommonActions.reset({
@@ -79,8 +86,7 @@ export default function ({ navigation }) {
             navigation.dispatch(
               CommonActions.reset({
                 index: 0,
-                routes: routes,
-                params: defaultParams,
+                routes: [{ name: 'AuthAfter' }],
               }),
             );
           }
@@ -88,7 +94,7 @@ export default function ({ navigation }) {
           navigation.dispatch(
             CommonActions.reset({
               index: 0,
-              routes: routes,
+              routes: [{ name: targetRoute }],
             }),
           );
         }
@@ -99,10 +105,7 @@ export default function ({ navigation }) {
           .then(remoteMessage => {
             if (remoteMessage) {
               tip = remoteMessage.data?.type;
-              if (tip === 'order') {
-                orderId = remoteMessage.data?.id;
-                grupID = remoteMessage.data?.grupID;
-              }
+              grupID = remoteMessage.data?.grupID;
             }
           })
           .catch(error => {
@@ -115,124 +118,40 @@ export default function ({ navigation }) {
         navigateToTarget(tip, grupID);
       }
     }
-  }, [animationCompleted, tokenChecked, navigation, state]);
+  }, [authChecked, destination, navigation]);
 
-  const images = {
-    img1: require('../assets/img/splash/a1.png'),
-    img2: require('../assets/img/splash/a2.png'),
-    img3: require('../assets/img/splash/a3.png'),
-  };
-
-  const opacity1 = useRef(new Animated.Value(0)).current;
-  const opacity2 = useRef(new Animated.Value(0)).current;
-  const opacity3 = useRef(new Animated.Value(0)).current;
-
-  let fadeInDuration = 400;
-  let displayDuration = 600;
-  let fadeOutDuration = 400;
-
-  useEffect(() => {
-    Animated.sequence([
-      /*// Image 1 fade in
-      Animated.timing(opacity1, {
-        toValue: 1,
-        duration: fadeInDuration,
-        useNativeDriver: true,
-      }),
-      // Wait
-      Animated.delay(displayDuration),
-      // Image 1 fade out
-      Animated.timing(opacity1, {
-        toValue: 0,
-        duration: fadeOutDuration,
-        useNativeDriver: true,
-      }),*/
-      // Image 2 fade in
-      Animated.timing(opacity2, {
-        toValue: 1,
-        duration: fadeInDuration,
-        useNativeDriver: true,
-      }),
-      // Wait
-      Animated.delay(displayDuration),
-      // Image 2 fade out
-      Animated.timing(opacity2, {
-        toValue: 0,
-        duration: fadeOutDuration,
-        useNativeDriver: true,
-      }),
-      // Image 3 fade in
-      Animated.timing(opacity3, {
-        toValue: 1,
-        duration: fadeInDuration,
-        useNativeDriver: true,
-      }),
-      // Wait
-      Animated.delay(displayDuration),
-      // Image 3 fade out
-      Animated.timing(opacity3, {
-        toValue: 0,
-        duration: fadeOutDuration,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      //  console.log('Animation sequence completed');
-      setAnimationCompleted(true);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [opacity1, opacity2, opacity3]);
-
-  const BASE_TEXT = __DEV__ ? (
-    <Text style={{ color: '#000' }}>{BASE_URL}</Text>
-  ) : null;
-
-  const logoMaxWidth = width / 1.5 > 300 ? 300 : width / 1.5;
-  const whiteLogoWidth = 110;
-  const whiteLogoHeight = whiteLogoWidth / 1.66;
-  // console.log('whiteLogoHeight', whiteLogoHeight);
+  const progressWidth = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
 
   return (
     <View style={styles.container}>
-      <View style={{ flex: 1, width: '100%', paddingTop: 100 }}>
-        <View
-          style={{
-            // height: whiteLogoHeight + 20,
-            width: '100%',
-            backgroundColor: '#000',
-            paddingVertical: 10,
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}>
-          {/*<Logo maxWidth={logoMaxWidth} animation={0} />*/}
-          <Image
-            source={require('../assets/img/logoWhite.png')}
-            style={{
-              width: whiteLogoWidth,
-              height: whiteLogoHeight,
-              resizeMode: 'contain',
-            }}
-            resizeMode="contain"
+      <StatusBar barStyle="light-content" backgroundColor="#F58423" />
+
+      {/* Center Brand Logo from Figma */}
+      <View style={styles.centerContent}>
+        <Image
+          source={require('../assets/img/onboarding/splash_logo.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+      </View>
+
+      {/* Bottom Bags Background & Progress */}
+      <View style={styles.bottomContent}>
+        <Image
+          source={require('../assets/img/onboarding/splash_bg_bags.png')}
+          style={styles.bgBags}
+          resizeMode="contain"
+        />
+
+        <View style={styles.progressBarTrack}>
+          <Animated.View
+            style={[styles.progressBarFill, { width: progressWidth }]}
           />
         </View>
-      </View>
-      <View
-        style={{
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flex: 2,
-        }}>
-        {/* <Animated.Image
-        source={images.img1}
-        style={[styles.image, { opacity: opacity1 }]}
-      />*/}
-        <Animated.Image
-          source={images.img2}
-          style={[styles.image, { opacity: opacity2 }]}
-        />
-        <Animated.Image
-          source={images.img3}
-          style={[styles.image, { opacity: opacity3 }]}
-        />
+        <Text style={styles.versionText}>Version 1.0</Text>
       </View>
     </View>
   );
@@ -240,14 +159,54 @@ export default function ({ navigation }) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#F58423',
     flex: 1,
-    justifyContent: 'flex-start',
+    backgroundColor: '#F58423',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  image: {
-    width: 200,
-    height: 200,
+  centerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 80,
+  },
+  logo: {
+    width: 170,
+    height: 70,
+  },
+  bottomContent: {
+    alignItems: 'center',
+    width: '100%',
+    paddingBottom: 40,
+    position: 'relative',
+  },
+  bgBags: {
     position: 'absolute',
+    bottom: -20,
+    width: '100%',
+    height: 220,
+    opacity: 0.65,
+  },
+  progressBarTrack: {
+    width: 140,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    overflow: 'hidden',
+    marginBottom: 12,
+    zIndex: 2,
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 3,
+    backgroundColor: '#FFFFFF',
+  },
+  versionText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontFamily: 'System',
+    letterSpacing: 0.5,
+    zIndex: 2,
   },
 });

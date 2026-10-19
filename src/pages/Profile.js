@@ -19,6 +19,7 @@ import GlobalStyle from '../assets/GlobalStyle';
 import Colors from '../assets/Colors';
 import Logo from '../components/Logo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CommonActions } from '@react-navigation/native';
 import {availableLanguages, i18n, t, tr} from '../translate/i18n';
 import {storageGet, storageSet} from '../helpers/storage';
 import Phone from '../assets/svg/phone.svg';
@@ -95,13 +96,11 @@ export default function ({route, navigation}) {
       teslimatSehirID: teslimatSehirID,
     });
     let ns = {...state};
-    if (res.data.error === false) {
+    if (res?.data?.error === false) {
       Alert.alert(tr('Güncellendi'));
-      // window.alert(tr("Şifreniz başarıyla değiştirildi"));
       ns.newPassword = '';
-      // navigation.navigate("Login");
     } else {
-      window.alert(tr('Hata Oluştu'));
+      Alert.alert(tr('Hata Oluştu'), res?.data?.msg || '');
     }
     ns.update = false;
 
@@ -109,15 +108,29 @@ export default function ({route, navigation}) {
   };
   const handleLogout = async () => {
     await AsyncStorage.removeItem('user');
+    await AsyncStorage.removeItem('is_guest');
 
     const fcm = await getFcmToken();
     await fcmUpdate(fcm, true);
 
-    navigation.navigate('Login');
+    if (setCtx) {
+      setCtx(prev => ({
+        ...prev,
+        user: null,
+        token: null,
+      }));
+    }
+
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{ name: 'AuthWelcome' }],
+      }),
+    );
   };
   const handleDelete = async () => {
     if (state.s.kod === 'GUEST') {
-      alert(tr('Misafir hesabı silinemez'));
+      Alert.alert(tr('Misafir hesabı silinemez'));
       return;
     }
 
@@ -125,28 +138,38 @@ export default function ({route, navigation}) {
       tr('Hesabı Sil'),
       tr('Hesabınızı silmek istediğinize emin misiniz?'),
       [
-        // The "Yes" button
         {
           text: tr('Hesabı Sil') + '!',
           onPress: async () => {
-            const res = await ai.get('delete-account');
-
-            if (res.data.error === false) {
-              window.alert(tr('Hesabınız 24 saat içinde silinecektir'));
-
-              await AsyncStorage.removeItem('user');
-
-              const fcm = await getFcmToken();
-              await fcmUpdate(fcm, true);
-
-              navigation.navigate('Login');
-            } else {
-              window.alert(tr('Hesap silme işlemi başarısız oldu'));
+            try {
+              const res = await ai.get('delete-account');
+              if (res?.data?.error === false) {
+                Alert.alert(tr('Hesabınız 24 saat içinde silinecektir'));
+                await AsyncStorage.removeItem('user');
+                await AsyncStorage.removeItem('is_guest');
+                const fcm = await getFcmToken();
+                await fcmUpdate(fcm, true);
+                if (setCtx) {
+                  setCtx(prev => ({
+                    ...prev,
+                    user: null,
+                    token: null,
+                  }));
+                }
+                navigation.dispatch(
+                  CommonActions.reset({
+                    index: 0,
+                    routes: [{ name: 'AuthWelcome' }],
+                  }),
+                );
+              } else {
+                Alert.alert(tr('Hesap silme işlemi başarısız oldu'));
+              }
+            } catch (delErr) {
+              Alert.alert(tr('Hesap silme işlemi başarısız oldu'));
             }
           },
         },
-        // The "No" button
-        // Does nothing but dismiss the dialog when tapped
         {
           text: tr('Hayır'),
         },
@@ -172,41 +195,54 @@ export default function ({route, navigation}) {
     setState({...state, theme: theme});
     const {bgColor, color, isDark, isLight} = themeParams(theme);
     setCtx({...ctx, theme, bgColor, color, isDark, isLight});
-    // setCtxDil(dil);
   };
   const fetchData = async () => {
-    console.log('fetchData', +new Date());
-    const c = await ai.get('profile');
-    let ns;
-    if (c.data.error === false) {
-      let tmpData = [];
-      ns = {
-        ...state,
-        s: c.data.s,
-        fields: c.data.require_fields,
-        sosyal: c.data.sosyal,
-        banka: c.data.banka,
-      };
+    try {
+      console.log('fetchData', +new Date());
+      const c = await ai.get('profile');
+      let ns = {...state};
+      if (c?.data && c.data.error === false) {
+        ns = {
+          ...state,
+          s: c.data.s || {},
+          fields: Array.isArray(c.data.require_fields) ? c.data.require_fields : ['tel', 'adres'],
+          sosyal: Array.isArray(c.data.sosyal) ? c.data.sosyal : [],
+          banka: Array.isArray(c.data.banka) ? c.data.banka : [],
+        };
 
-      setTeslimatSehirs(c.data.teslimatSehirs);
-      setTeslimatSehirID(c.data.teslimatSehirID);
-    } else {
-      window.alert(tr('Hata Oluştu'));
-      ns = {...state, s: {}};
+        if (c.data.teslimatSehirs) {
+          setTeslimatSehirs(c.data.teslimatSehirs);
+        }
+        if (c.data.teslimatSehirID) {
+          setTeslimatSehirID(c.data.teslimatSehirID);
+        }
+      } else {
+        const currentUser = await storageGet('user');
+        ns = {
+          ...state,
+          s: currentUser || {},
+          fields: ['tel', 'adres'],
+        };
+      }
+
+      let language = await storageGet('language');
+      ns.language = language;
+
+      let theme = await storageGet('theme');
+      ns.theme = theme ? theme : 'light';
+
+      ns.loading = false;
+      setState(ns);
+    } catch (err) {
+      console.log('Profile fetch error fallback:', err);
+      const currentUser = await storageGet('user');
+      setState(prev => ({
+        ...prev,
+        s: currentUser || {},
+        fields: ['tel', 'adres'],
+        loading: false,
+      }));
     }
-
-    let language = await storageGet('language');
-    console.log('storage language', language);
-    ns.language = language;
-
-    let theme = await storageGet('theme');
-    console.log('storage theme', theme);
-    ns.theme = theme ? theme : 'light';
-
-    console.log('profile ns', ns);
-
-    ns.loading = false;
-    setState(ns);
   };
 
   const styles = StyleSheet.create({
@@ -330,6 +366,7 @@ export default function ({route, navigation}) {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -360,14 +397,14 @@ export default function ({route, navigation}) {
                   <Text style={styles.text}>{state.s.ad}</Text>
                 </View>
 
-                {state.fields.includes('tel') && (
+                {state.fields?.includes('tel') && (
                   <View style={styles.row}>
                     <Text style={styles.label}>{tr('Telefon')}</Text>
                     <Text style={styles.text}>{state.s.tel}</Text>
                   </View>
                 )}
 
-                {state.fields.includes('adres') && (
+                {state.fields?.includes('adres') && (
                   <View style={styles.row}>
                     <Text style={styles.label}>{tr('Adres')}</Text>
                     <Text style={styles.text}>{state.s.adres}</Text>

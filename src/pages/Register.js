@@ -1,493 +1,403 @@
+import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Dimensions,
-  Image,
-  Modal,
+  View,
+  Text,
+  StyleSheet,
   SafeAreaView,
   ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableHighlight,
   TouchableOpacity,
-  View,
+  Modal,
+  FlatList,
+  StatusBar,
+  Alert,
 } from 'react-native';
-import {useEffect, useState} from 'react';
-import Colors from '../assets/Colors';
-import Logo from '../components/Logo';
+import AppHeader from '../components/common/AppHeader';
+import AppTextInput from '../components/common/AppTextInput';
+import AppButton from '../components/common/AppButton';
+import AppCheckbox from '../components/common/AppCheckbox';
 import KeyboardAvoidingComponent from '../components/KeyboardAvoidingComponent';
-import DocumentPicker from 'react-native-document-picker';
-import IdentityIcon from '../assets/svg/identity.svg';
-import GlobalStyle from '../assets/GlobalStyle';
-import {getToken, setUser} from '../helpers/auth';
+import Svg, { Path } from 'react-native-svg';
 import ai from '../helpers/ai';
-import {SelectList} from 'react-native-dropdown-select-list/index';
-import Dump from '../components/Dump';
-import {i18n, tr, t} from '../translate/i18n';
-import {getFcmToken} from '../helpers/notification';
-import CheckBox from '@react-native-community/checkbox';
 
-export default function ({navigation}) {
-  let initalData = {
-    ad: '',
-    tel: '',
-    tel2: '',
-    ilID: 0,
-    sifre: '',
-    sifre_tekrar: '',
-    adres: '',
-    eposta: '',
-    error: '',
-    loading: true,
-    cities: [],
-    fields: [],
-  };
+const DEFAULT_CITIES = [
+  { id: 1, name: 'Erbil' },
+  { id: 2, name: 'Baghdad' },
+  { id: 3, name: 'Sulaymaniyah' },
+  { id: 4, name: 'Basra' },
+  { id: 5, name: 'Duhok' },
+  { id: 6, name: 'Kirkuk' },
+  { id: 7, name: 'Istanbul' },
+];
 
-  const defaultIl = null; // {"key":"2","value":"ERBİL"};
-  const devFill = true;
-  if (__DEV__ && devFill) {
-    initalData = {
-      ...initalData,
-      ad: 'test',
-      tel: '123456789',
-      // tel: Math.random().toString().slice(2, 11),
-      tel2: '',
-      eposta: 'test@msn.com',
-      ilID: 2,
-      sifre: '123456',
-      sifre_tekrar: '123456',
-      adres: 'test',
-    };
-  }
+export default function Register({ navigation }) {
+  const [formData, setFormData] = useState({
+    fullName: '',
+    phone: '',
+    email: '',
+    cityId: null,
+    cityName: '',
+    password: '',
+    confirmPassword: '',
+  });
 
-  const [state, setState] = useState(initalData);
-
-  const [policyChecked, setPolicyChecked] = useState(false);
-  const [policyText, setPolicyText] = useState('');
-  const [modalShow, setModalShow] = useState(false);
-
-  const [uploadFile, setUploadFile] = useState(null);
-
-  const selectFile = async () => {
-    try {
-      const res = await DocumentPicker.pick({
-        type: [DocumentPicker.types.images],
-        allowMultiSelection: false,
-      });
-
-      setUploadFile(res[0]);
-      console.log('select file res : ' + JSON.stringify(res[0]));
-    } catch (err) {
-      setUploadFile(null);
-      console.log('catch', err);
-      if (DocumentPicker.isCancel(err)) {
-        alert(t('İptal Edildi'));
-      } else {
-        alert('Unknown Error: ' + JSON.stringify(err));
-        throw err;
-      }
-    }
-  };
-
-  const handleChange = (name, text) => {
-    console.log('name : ' + name + ' text : ' + text);
-    setState({...state, [name]: text});
-  };
-
-  const handleSubmit = async () => {
-    if (state.ad.length === 0) {
-      alert(tr('Lütfen ad alanını boş bırakmayın'));
-      return;
-    }
-
-    if (state.sifre.length < 3) {
-      alert(tr('Lütfen en az 3 karakter şifre girin'));
-      return;
-    }
-    if (state.sifre !== state.sifre_tekrar) {
-      alert(tr('Şifreler uyuşmuyor'));
-      return;
-    }
-
-    if (state.req_fields.includes('tel') && state.tel.length < 6) {
-      alert(tr('Lütfen geçerli bir telefon numarası girin'));
-      return;
-    }
-    if (state.req_fields.includes('eposta') && state.eposta.length < 6) {
-      alert(tr('Lütfen geçerli bir eposta girin'));
-      return;
-    }
-
-    if (state.req_fields.includes('il') && state.ilID === 0) {
-      alert(tr('Lütfen il seçin'));
-      return;
-    }
-
-    if (state.req_fields.includes('adres') && state.adres.adres < 3) {
-      alert(tr('Lütfen geçerli bir adres girin'));
-      return;
-    }
-
-    if (state.req_fields.includes('kimlik') && uploadFile == null) {
-      alert(tr('Lütfen bir kimlik veya pasaport fotoğrafı seçiniz'));
-      return;
-    }
-
-    if (policyText.length > 0 && !policyChecked) {
-      alert(tr('Kullanıcı politikasını kabul etmelisiniz'));
-      return;
-    }
-
-    let postData = new FormData(),
-      token = await getToken();
-    console.log('token', token);
-
-    postData.append('ad', state.ad);
-    postData.append('tel', state.tel);
-    postData.append('tel2', state.tel2);
-    postData.append('ilID', state.ilID);
-    postData.append('sifre', state.sifre);
-    postData.append('sifre_tekrar', state.sifre_tekrar);
-    postData.append('adres', state.adres);
-    postData.append('eposta', state.eposta);
-    postData.append('dil', i18n.locale);
-
-    if (uploadFile) {
-      // postData.append("file", file.uri, file.name);
-      let imgData = {
-        uri: uploadFile?.uri,
-        type: uploadFile?.type, // or photo.type
-        name: uploadFile?.name,
-      };
-
-      console.log('imgData', imgData);
-      postData.append('file', imgData);
-    }
-    postData.append('token', token);
-
-    console.log('postData', postData);
-
-    const response = await ai.post('register', postData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-
-    if (response.data.error === false) {
-      await setUser(response.data.s);
-      let fcm = await getFcmToken();
-      console.log('Error false', response.data);
-      alert(
-        tr('Kayıt Tamamlandı') +
-          ', ' +
-          tr('Müşteri Kodu') +
-          ' : ' +
-          response.data.s.kod,
-      );
-      setTimeout(function () {
-        let d = +new Date();
-        navigation.navigate('AuthAfter');
-        // navigation.navigate('Home');
-      }, 1000);
-    } else {
-      let msg = response.data.msg;
-      if (i18n.exists(msg)) {
-        msg = tr(msg);
-      }
-      alert(msg);
-      console.log('Hata Oluştu', response.data);
-    }
-  };
-
-  const fetchRegisterData = async () => {
-    setState({...state, loading: true});
-    let ns = {...state, loading: false};
-    const response = await ai.get('register-data');
-    if (response.data.error === false) {
-      ns.cities = response.data.cities;
-      ns.fields = response.data.fields;
-      ns.req_fields = response.data.req_fields;
-
-      if (response.data.policy) {
-        let lang = i18n.locale;
-        console.log('lang', lang);
-        let policyText =
-          response.data?.policy[lang] || response.data.policy['en'];
-        setPolicyText(policyText);
-      }
-    } else {
-      console.log(response.data);
-      alert(tr('Şehir listesi getirilirken hata oluştu'));
-      // console.log("Hata Oluştu", response.data);
-      ns.cities = [];
-    }
-
-    setState(ns);
-  };
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [cityModalVisible, setCityModalVisible] = useState(false);
+  const [cities, setCities] = useState(DEFAULT_CITIES);
 
   useEffect(() => {
-    fetchRegisterData();
+    const fetchCities = async () => {
+      try {
+        const res = await ai.get('register-data');
+        if (res?.data?.cities && Array.isArray(res.data.cities) && res.data.cities.length > 0) {
+          const mapped = res.data.cities.map(c => ({
+            id: c.id || c.key,
+            name: c.name || c.value || c.ad,
+          }));
+          setCities(mapped);
+        }
+      } catch (e) {
+        // Fallback to default cities
+        console.log('City fetch fallback:', e?.message || e);
+      }
+    };
+
+    fetchCities();
   }, []);
 
+  const handleChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: null }));
+    }
+  };
+
+  const validate = () => {
+    const newErrors = {};
+
+    if (!formData.fullName.trim()) {
+      newErrors.fullName = 'Full Name is required';
+    }
+
+    if (!formData.phone.trim()) {
+      newErrors.phone = 'Phone Number is required';
+    } else if (formData.phone.trim().length < 6) {
+      newErrors.phone = 'Please enter a valid phone number';
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email address is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email.trim())) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+
+    if (!formData.cityId) {
+      newErrors.city = 'Please select a city';
+    }
+
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 8) {
+      newErrors.password = 'Use at least 8 characters.';
+    }
+
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = 'Confirm Password is required';
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+
+    if (!agreeTerms) {
+      Alert.alert(
+        'Terms & Policy',
+        'Please agree to the Terms of Service and Privacy Policy to proceed.',
+      );
+      return false;
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleCreateAccount = () => {
+    if (!validate()) {
+      return;
+    }
+
+    // Move to Choose Verification Method
+    navigation.navigate('ChooseVerificationMethod', {
+      registrationData: formData,
+      phone: formData.phone,
+      email: formData.email,
+    });
+  };
+
   return (
-    <SafeAreaView style={GlobalStyle.safeArea}>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+
+      <AppHeader navigation={navigation} showBack={true} />
+
       <KeyboardAvoidingComponent>
-        <View style={styles.container}>
-          {state.loading ? (
-            <ActivityIndicator size="large" color="#0000ff" />
-          ) : (
-            <ScrollView>
-              <Logo maxWidth={200} maxHeight={75} marginBottom={20} />
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}>
+          {/* Header Title */}
+          <View style={styles.titleSection}>
+            <Text style={styles.title}>Create Account</Text>
+            <Text style={styles.subtitle}>
+              Let's create your account to start shopping.
+            </Text>
+          </View>
 
-              <View style={styles.inputRow}>
-                <TextInput
-                  style={styles.textInput}
-                  onChangeText={s => handleChange('ad', s)}
-                  placeholderTextColor={Colors.placeholderTextColor}
-                  defaultValue={state.ad}
-                  placeholder={tr('Ad')}></TextInput>
-              </View>
+          {/* Form Fields */}
+          <AppTextInput
+            label="Full Name"
+            placeholder="Enter your full name"
+            value={formData.fullName}
+            onChangeText={t => handleChange('fullName', t)}
+            error={errors.fullName}
+          />
 
-              <View style={styles.inputRow}>
-                <TextInput
-                  style={styles.textInput}
-                  onChangeText={s => handleChange('sifre', s)}
-                  placeholderTextColor={Colors.placeholderTextColor}
-                  defaultValue={state.sifre}
-                  placeholder={tr('Parola')}></TextInput>
-              </View>
+          <AppTextInput
+            label="Phone Number"
+            placeholder="Enter your phone number"
+            keyboardType="phone-pad"
+            value={formData.phone}
+            onChangeText={t => handleChange('phone', t)}
+            error={errors.phone}
+          />
 
-              <View style={styles.inputRow}>
-                <TextInput
-                  style={styles.textInput}
-                  onChangeText={s => handleChange('sifre_tekrar', s)}
-                  placeholderTextColor={Colors.placeholderTextColor}
-                  defaultValue={state.sifre_tekrar}
-                  placeholder={tr('Parola Tekrar')}></TextInput>
-              </View>
+          <AppTextInput
+            label="Email address"
+            placeholder="Enter your email address"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            value={formData.email}
+            onChangeText={t => handleChange('email', t)}
+            error={errors.email}
+          />
 
-              <View style={styles.inputRow}>
-                <SelectList
-                  setSelected={val => handleChange('ilID', val)}
-                  data={state.cities}
-                  selected={state.ilID}
-                  placeholder={tr('Şehir Seçiniz')}
-                  label={tr('Şehir')}
-                  save="key"
-                  boxStyles={{color: '#333'}}
-                  inputStyles={{color: '#333'}}
-                  dropdownTextStyles={{color: '#333'}}
-                  defaultOption={defaultIl}
+          {/* City Selector */}
+          <AppTextInput
+            label="City"
+            placeholder="Select a city"
+            value={formData.cityName}
+            editable={false}
+            onPress={() => setCityModalVisible(true)}
+            error={errors.city}
+            rightComponent={
+              <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+                <Path
+                  d="M6 9l6 6 6-6"
+                  stroke="#9CA3AF"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 />
+              </Svg>
+            }
+          />
 
-                {/*<TextInput style={styles.textInput} onChangeText={s => handleChange("sehir", s)}
-                     placeholderTextColor={Colors.placeholderTextColor}
-                     placeholder="Şehir"></TextInput>*/}
-              </View>
+          <AppTextInput
+            label="Password"
+            placeholder="Enter your password"
+            secureTextEntry={true}
+            value={formData.password}
+            onChangeText={t => handleChange('password', t)}
+            helperText="Use at least 8 characters."
+            error={errors.password}
+          />
 
-              {state.fields.includes('tel') && (
-                <View style={styles.inputRow}>
-                  <TextInput
-                    style={styles.textInput}
-                    onChangeText={s => handleChange('tel', s)}
-                    placeholderTextColor={Colors.placeholderTextColor}
-                    defaultValue={state.tel}
-                    keyboardType="phone-pad"
-                    placeholder={tr('Telefon')}></TextInput>
-                </View>
-              )}
+          <AppTextInput
+            label="Confirm Password"
+            placeholder="Re-enter your password"
+            secureTextEntry={true}
+            value={formData.confirmPassword}
+            onChangeText={t => handleChange('confirmPassword', t)}
+            error={errors.confirmPassword}
+          />
 
-              {state.fields.includes('tel2') && (
-                <View style={styles.inputRow}>
-                  <TextInput
-                    style={styles.textInput}
-                    onChangeText={s => handleChange('tel2', s)}
-                    placeholderTextColor={Colors.placeholderTextColor}
-                    defaultValue={state.tel2}
-                    keyboardType="phone-pad"
-                    placeholder={tr('Telefon 2')}></TextInput>
-                </View>
-              )}
+          {/* Checkbox: Terms & Privacy */}
+          <AppCheckbox
+            checked={agreeTerms}
+            onChange={setAgreeTerms}
+            style={styles.checkboxWrap}>
+            <Text style={styles.termsText}>
+              I agree to the{' '}
+              <Text style={styles.orangeLink}>Terms of Service</Text> and{' '}
+              <Text style={styles.orangeLink}>Privacy Policy</Text>
+            </Text>
+          </AppCheckbox>
 
-              {state.fields.includes('adres') && (
-                <View style={styles.inputRow}>
-                  <TextInput
-                    style={[styles.textInputAdres]}
-                    onChangeText={s => handleChange('adres', s)}
-                    multiline={true}
-                    numberOfLines={2}
-                    placeholderTextColor={Colors.placeholderTextColor}
-                    placeholder={tr('Adres')}></TextInput>
-                </View>
-              )}
+          {/* Create Account CTA */}
+          <AppButton
+            title="Create Account"
+            variant="primary"
+            onPress={handleCreateAccount}
+            style={styles.submitBtn}
+          />
 
-              {state.fields.includes('eposta') && (
-                <View style={styles.inputRow}>
-                  <TextInput
-                    style={styles.textInput}
-                    onChangeText={s => handleChange('eposta', s)}
-                    placeholderTextColor={Colors.placeholderTextColor}
-                    keyboardType="email-address"
-                    placeholder={tr('Eposta')}></TextInput>
-                </View>
-              )}
-
-              {policyText.length > 0 ? (
-                <View
-                  style={[
-                    styles.inputRow,
-                    {flexDirection: 'row', alignItems: 'center'},
-                  ]}>
-                  <CheckBox
-                    value={policyChecked}
-                    tintColors={{true: '#F15927', false: 'black'}}
-                    onValueChange={setPolicyChecked}
-                    size={'small'}
-                  />
-                  <TouchableOpacity onPress={() => setModalShow(true)}>
-                    <Text
-                      style={{
-                        marginLeft: 10,
-                        color: 'blue',
-                      }}>
-                      {tr('Kullanıcı politikasını okudum ve kabul ediyorum')}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              ) : null}
-
-              {state.fields.includes('kimlik') ? (
-                <View style={styles.inputRow}>
-                  <TouchableOpacity
-                    onPress={async () => selectFile()}
-                    style={styles.uploadArea}>
-                    <View style={{flexDirection: 'column', marginBottom: 20}}>
-                      <View style={[GlobalStyle.pr10]}>
-                        <Text style={styles.uploadText}>
-                          {tr('Kimlik / Pasaport Resmi')}
-                        </Text>
-                      </View>
-                      <View
-                        style={{
-                          padding: 10,
-                          borderRadius: 10,
-                          borderWidth: 2,
-                          borderStyle: 'dashed',
-                          alignItems: 'center',
-                        }}>
-                        {uploadFile ? (
-                          <Image
-                            source={{uri: uploadFile.uri}}
-                            style={{
-                              width: 100,
-                              height: 100,
-                              resizeMode: 'contain',
-                            }}
-                          />
-                        ) : (
-                          <IdentityIcon height={40} width={40} />
-                        )}
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              ) : null}
-
-              {/*<Dump state={state} />*/}
-
-              <View style={[styles.inputRow, {alignItems: 'center'}]}>
-                <TouchableHighlight
-                  style={styles.button}
-                  onPress={() => handleSubmit()}>
-                  <Text style={styles.buttonText}>{tr('Kayıt Ol')}</Text>
-                </TouchableHighlight>
-              </View>
-
-              <View style={[styles.inputRow, {alignItems: 'center'}]}>
-                <Text style={styles.textColor}>
-                  {tr('Zaten hesabın var mı?')}
-                </Text>
-                <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-                  <Text style={{color: 'blue'}}>{tr('Giriş Yap')}</Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          )}
-        </View>
+          {/* Footer */}
+          <View style={styles.footerRow}>
+            <Text style={styles.footerText}>Already have an account? </Text>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate('Login')}>
+              <Text style={styles.orangeLinkBold}>Log In</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingComponent>
 
-      <Modal animationType="slide" transparent={true} visible={modalShow}>
-        <View
-          style={{
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: '#FFFFFF',
-            padding: 20,
-          }}>
-          <Text style={{color: '#000', marginBottom: 30}}>{policyText}</Text>
-
-          <TouchableHighlight
-            style={styles.button}
-            onPress={() => setModalShow(false)}>
-            <Text style={styles.buttonText}>{tr('Kapat')}</Text>
-          </TouchableHighlight>
-        </View>
+      {/* City Picker Modal */}
+      <Modal
+        visible={cityModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setCityModalVisible(false)}>
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setCityModalVisible(false)}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Select a City</Text>
+            <FlatList
+              data={cities}
+              keyExtractor={item => String(item.id)}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.cityItem,
+                    formData.cityId === item.id && styles.cityItemSelected,
+                  ]}
+                  onPress={() => {
+                    setFormData(prev => ({
+                      ...prev,
+                      cityId: item.id,
+                      cityName: item.name,
+                    }));
+                    if (errors.city) {
+                      setErrors(prev => ({ ...prev, city: null }));
+                    }
+                    setCityModalVisible(false);
+                  }}>
+                  <Text
+                    style={[
+                      styles.cityText,
+                      formData.cityId === item.id && styles.cityTextSelected,
+                    ]}>
+                    {item.name}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   );
 }
 
-const {width, height} = Dimensions.get('window');
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingTop: 10,
+    paddingBottom: 40,
+  },
+  titleSection: {
+    marginBottom: 24,
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 6,
+    fontFamily: 'System',
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontFamily: 'System',
+  },
+  checkboxWrap: {
+    marginVertical: 12,
+  },
+  termsText: {
+    fontSize: 13,
+    color: '#4B5563',
+    lineHeight: 18,
+    fontFamily: 'System',
+  },
+  orangeLink: {
+    color: '#F58423',
+    fontWeight: '600',
+  },
+  orangeLinkBold: {
+    color: '#F58423',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  submitBtn: {
+    marginTop: 18,
+    marginBottom: 20,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  footerText: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    width: '100%',
+    maxHeight: 380,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: 20,
-    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 5,
   },
-
-  inputRow: {
-    marginBottom: 10,
-    width: '100%',
-    maxWidth: 400,
-    // justifyContent: "center",
-    alignSelf: 'center',
-  },
-  textInput: {
-    height: 45,
-    borderColor: '#cbc9c9',
-    borderWidth: 1,
-    width: '100%',
-    backgroundColor: '#FFF',
-    color: '#000',
-    paddingHorizontal: 15,
-    borderRadius: 5,
-  },
-  textInputAdres: {
-    minHeight: 60,
-    borderColor: '#cbc9c9',
-    borderWidth: 1,
-    width: '100%',
-    backgroundColor: '#FFF',
-    color: '#000',
-    paddingHorizontal: 15,
-    borderRadius: 5,
-  },
-  button: {
-    backgroundColor: Colors.btnColor,
-    padding: 10,
-    borderRadius: 5,
-    minWidth: 200,
-    marginBottom: 10,
-  },
-  buttonText: {
-    color: Colors.btnTextColor,
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 16,
     textAlign: 'center',
-    fontWeight: 'bold',
-    fontSize: 16,
   },
-  textColor: {
-    color: Colors.textColor,
+  cityItem: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    marginBottom: 6,
+  },
+  cityItemSelected: {
+    backgroundColor: '#FFF7ED',
+  },
+  cityText: {
+    fontSize: 15,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  cityTextSelected: {
+    color: '#F58423',
+    fontWeight: '700',
   },
 });

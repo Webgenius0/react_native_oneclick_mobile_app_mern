@@ -4,7 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { HeaderBackButton } from '@react-navigation/elements';
 import { navigationRef } from './src/services/RootNavigation.js';
 
-import { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { i18n, t, tr } from './src/translate/i18n';
 import { storageGet } from './src/helpers/storage';
 import { EmContext } from './src/contexts/EmContext';
@@ -42,6 +42,14 @@ import WebsiteSuggest from './src/pages/WebsiteSuggest';
 import OrderDetail from './src/pages/OrderDetail';
 import OrderForm from './src/pages/OrderForm';
 import Splash from './src/pages/Splash';
+import Onboarding from './src/pages/Onboarding';
+import AuthWelcome from './src/pages/AuthWelcome';
+import ContinueGuest from './src/pages/ContinueGuest';
+import ChooseVerificationMethod from './src/pages/ChooseVerificationMethod';
+import VerifyOtp from './src/pages/VerifyOtp';
+import AccountCreatedSuccess from './src/pages/AccountCreatedSuccess';
+import ForgotPassword from './src/pages/ForgotPassword';
+import SetNewPassword from './src/pages/SetNewPassword';
 import Profile from './src/pages/Profile';
 import Test from './src/pages/Test';
 import Notifications from './src/pages/Notifications';
@@ -87,23 +95,10 @@ export default function AppNavigator() {
   const loadLanguage = async () => {
     try {
       const lang = await storageGet('language');
-      if (lang) {
-        i18n.locale = lang;
-        setCtxDil(lang);
-      } else {
-        const locales = RNLocalize.getLocales();
-        const deviceLanguageCodes = locales && locales.length ? locales.map(locale => locale.languageCode) : [];
-        const availableLanguages = ['en', 'tr', 'som'];
-
-        let findedLang = false;
-        deviceLanguageCodes.forEach(lang => {
-          if (findedLang === false && availableLanguages.includes(lang)) {
-            findedLang = lang;
-            i18n.locale = lang;
-            setCtxDil(lang);
-          }
-        });
-      }
+      const activeLang = lang && ['en', 'tr', 'som'].includes(lang) ? lang : 'en';
+      i18n.defaultLocale = 'en';
+      i18n.locale = activeLang;
+      setCtxDil(activeLang);
 
       const isRTL = i18n.locale === 'ar' || i18n.locale === 'ckb';
       ReactNative.I18nManager.allowRTL(isRTL);
@@ -152,6 +147,7 @@ export default function AppNavigator() {
     } catch (e) {
       // Ignored
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (state.loading) {
@@ -208,22 +204,15 @@ export default function AppNavigator() {
                   />
                 );
               }
-              return (<HomeIcon
-                width={width}
-                height={height}
-                size={size}
-                fill={fill}
-              />);
-
-              break;
+              return (
+                <HomeIcon
+                  width={width}
+                  height={height}
+                  size={size}
+                  fill={fill}
+                />
+              );
             case 'Categories':
-              /* 
-                            return (<TurkeyIcon
-                              width={width}
-                              height={height}
-                              size={size}
-                              fill={fill}
-                            />); */
               return (
                 <DotsIcon
                   width={width}
@@ -232,8 +221,6 @@ export default function AppNavigator() {
                   fill={fill}
                 />
               );
-
-              break;
             case 'CategoryList':
               return (
                 <DotsIcon
@@ -243,8 +230,6 @@ export default function AppNavigator() {
                   fill={fill}
                 />
               );
-
-              break;
             case 'Orders':
               return (
                 <BagIcon
@@ -254,7 +239,6 @@ export default function AppNavigator() {
                   fill={fill}
                 />
               );
-              break;
             case 'Cart':
               return (
                 <CartIcon
@@ -264,10 +248,7 @@ export default function AppNavigator() {
                   fill={fill}
                 />
               );
-
-              break;
             case 'Arrivals':
-              // console.log('route.name', route.name, 'focused', focused);
               return (
                 <TruckIcon
                   width={width}
@@ -276,8 +257,6 @@ export default function AppNavigator() {
                   fill={fill}
                 />
               );
-
-              break;
             case 'Balance':
               return (
                 <CreditIcon
@@ -287,7 +266,6 @@ export default function AppNavigator() {
                   fill={fill}
                 />
               );
-              break;
             case 'Menu':
               return (
                 <CategoriesIcon
@@ -297,7 +275,6 @@ export default function AppNavigator() {
                   fill={fill}
                 />
               );
-              break;
             case 'Support':
               return (
                 <SupportIcon
@@ -307,7 +284,6 @@ export default function AppNavigator() {
                   fill={fill}
                 />
               );
-              break;
           }
 
           // return <Icon name="information-circle-outline" color={"#000000"} />
@@ -419,19 +395,59 @@ export default function AppNavigator() {
           options={headerOptionNoTitle}
         />
         <Stack.Screen
+          name="Onboarding"
+          component={Onboarding}
+          options={headerOptionNoTitle}
+        />
+        <Stack.Screen
+          name="AuthWelcome"
+          component={AuthWelcome}
+          options={headerOptionNoTitle}
+        />
+        <Stack.Screen
+          name="ContinueGuest"
+          component={ContinueGuest}
+          options={headerOptionNoTitle}
+        />
+        <Stack.Screen
           name="Login"
           component={Login}
+          options={headerOptionNoTitle}
+        />
+        <Stack.Screen
+          name="Register"
+          component={Register}
+          options={headerOptionNoTitle}
+        />
+        <Stack.Screen
+          name="ChooseVerificationMethod"
+          component={ChooseVerificationMethod}
+          options={headerOptionNoTitle}
+        />
+        <Stack.Screen
+          name="VerifyOtp"
+          component={VerifyOtp}
+          options={headerOptionNoTitle}
+        />
+        <Stack.Screen
+          name="AccountCreatedSuccess"
+          component={AccountCreatedSuccess}
+          options={headerOptionNoTitle}
+        />
+        <Stack.Screen
+          name="ForgotPassword"
+          component={ForgotPassword}
+          options={headerOptionNoTitle}
+        />
+        <Stack.Screen
+          name="SetNewPassword"
+          component={SetNewPassword}
           options={headerOptionNoTitle}
         />
         <Stack.Screen
           name="AuthAfter"
           component={AuthAfterTabNavigator}
           options={headerNoShowOptionTitle('Anasayfa')}
-        />
-        <Stack.Screen
-          name="Register"
-          component={Register}
-          options={{ title: tr('Kayıt Ol'), headerTitleStyle: headerTitleStyle }}
         />
         <Stack.Screen
           name="Webview"
