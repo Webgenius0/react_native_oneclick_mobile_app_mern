@@ -14,14 +14,13 @@ export const setTheme = async (theme) => {
 }
 
 export const themeParams = (theme) => {
-
-  let bgColor = "#fff";
-  let color = "#333";
+  let bgColor = "#FFFFFF";
+  let color = "#111827";
   let isDark = false;
 
   if (theme === "dark") {
-    bgColor = "#000";
-    color = "#fff";
+    bgColor = "#111827";
+    color = "#F9FAFB";
     isDark = true;
   }
 
@@ -29,12 +28,12 @@ export const themeParams = (theme) => {
 
   return {
     bgColor,
+    backgroundColor: bgColor,
     color,
     isDark,
     isLight
-  }
-
-}
+  };
+};
 
 export const loadTheme = async (ctx, setCtx) => {
 

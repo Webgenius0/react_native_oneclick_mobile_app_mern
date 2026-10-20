@@ -52,7 +52,7 @@ const HomeNew = memo(({ route, navigation }) => {
   const styles = useMemo(() => StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: ctx.backgroundColor,
+      backgroundColor: ctx.bgColor || '#FFFFFF',
       // alignItems: "center",
       // justifyContent: "center",
       flexDirection: "column",
@@ -61,7 +61,7 @@ const HomeNew = memo(({ route, navigation }) => {
       alignItems: "center",
       justifyContent: "center",
       paddingHorizontal: 100,
-      backgroundColor: ctx.backgroundColor,
+      backgroundColor: ctx.bgColor || '#FFFFFF',
       height: Dimensions.get("window").height - 200,
       width: "100%",
       flex: 1,
@@ -69,9 +69,9 @@ const HomeNew = memo(({ route, navigation }) => {
 
     safeArea: {
       flex: 1,
-      backgroundColor: ctx.bgColor,
+      backgroundColor: ctx.bgColor || '#FFFFFF',
     },
-  }), [ctx.backgroundColor, ctx.bgColor]);
+  }), [ctx.bgColor]);
 
   const webViewRef = useRef(null);
 

@@ -132,7 +132,7 @@ export default function({ route, navigation }) {
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: ctx.backgroundColor,
+      backgroundColor: ctx.bgColor || '#FFFFFF',
       // alignItems: "center",
       // justifyContent: "center",
       flexDirection: "column",
@@ -141,7 +141,7 @@ export default function({ route, navigation }) {
       alignItems: "center",
       justifyContent: "center",
       paddingHorizontal: 100,
-      backgroundColor: ctx.backgroundColor,
+      backgroundColor: ctx.bgColor || '#FFFFFF',
       height: Dimensions.get("window").height - 200,
       width: "100%",
       flex: 1,

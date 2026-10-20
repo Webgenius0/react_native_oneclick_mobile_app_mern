@@ -13,6 +13,7 @@ import { storageGet } from './src/helpers/storage';
 import { DEV_REDIRECT_STORE, FIREBASE_ENABLED, MOBIL_SCRIPT } from './config';
 import { useScriptServiceStore } from './src/store/useScriptServiceStore';
 import { useSheinPriceStore } from './src/store/useSheinPriceStore';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // @ts-ignore
 const App = () => {
@@ -21,6 +22,7 @@ const App = () => {
     user: null,
     theme: 'light',
     bgColor: '#fff',
+    backgroundColor: '#fff',
     color: '#333',
     isDark: false,
     isLight: true,
@@ -166,11 +168,13 @@ const App = () => {
   }, []);
 
   return (
-    <EmContext.Provider value={contextData}>
-      {/*__DEV__ ? <WaafiPay /> : <AppNavigator />*/}
-      <AppNavigator />
-      <Toast />
-    </EmContext.Provider>
+    <SafeAreaProvider>
+      <EmContext.Provider value={contextData}>
+        {/*__DEV__ ? <WaafiPay /> : <AppNavigator />*/}
+        <AppNavigator />
+        <Toast />
+      </EmContext.Provider>
+    </SafeAreaProvider>
   );
 };
 

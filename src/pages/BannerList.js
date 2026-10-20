@@ -99,14 +99,14 @@ export default function({ route, navigation }) {
   const HOME_PASIF = false;
 
   const [state, setState] = useState({
-    banners: [],
-    sliders: [],
-    stories: [],
+    banners: DEFAULT_MARKET_DATA.banners,
+    sliders: DEFAULT_MARKET_DATA.sliders,
+    stories: DEFAULT_MARKET_DATA.stories,
     banners_orta: [],
-    ulkes: [],
+    ulkes: DEFAULT_MARKET_DATA.ulkes,
     kur: "",
     firstLoad: false,
-    loading: true,
+    loading: false,
     hasError: false,
     token: "",
     storageAllKeys: {},
@@ -234,7 +234,7 @@ export default function({ route, navigation }) {
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: ctx.backgroundColor,
+      backgroundColor: ctx.bgColor || '#FFFFFF',
       // alignItems: "center",
       // justifyContent: "center",
       flexDirection: "column",
@@ -243,7 +243,7 @@ export default function({ route, navigation }) {
       alignItems: "center",
       justifyContent: "center",
       paddingHorizontal: 100,
-      backgroundColor: ctx.backgroundColor,
+      backgroundColor: ctx.bgColor || '#FFFFFF',
       height: Dimensions.get("window").height - 200,
       width: "100%",
       flex: 1,
@@ -251,8 +251,7 @@ export default function({ route, navigation }) {
 
     safeArea: {
       flex: 1,
-      backgroundColor: ctx.bgColor,
-      paddingTop: insets.top,
+      backgroundColor: ctx.bgColor || '#FFFFFF',
     },
     errorContainer: {
       flex: 1,
@@ -362,7 +361,7 @@ export default function({ route, navigation }) {
         }
 
         {
-          state.loading === false && !subLoading && !HOME_PASIF && (state.banners.length > 0 || state.sliders.length > 0 || state.banners_orta.length > 0) && (
+          !HOME_PASIF && (state.banners.length > 0 || state.sliders.length > 0 || state.banners_orta.length > 0) && (
             <ScrollView
               contentContainerStyle={{ paddingBottom: 100 }}
               refreshControl={
