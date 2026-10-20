@@ -8,6 +8,8 @@ import { useContext } from "react";
 import { EmContext } from "../contexts/EmContext";
 import * as RootNavigation from "../services/RootNavigation";
 
+import { useUserStore } from "../store/useUserStore";
+
 export default function ({navigation}) {
   const { setCtx } = useContext(EmContext);
 
@@ -42,20 +44,43 @@ export default function ({navigation}) {
 
   const handleLogout = async () => {
     try {
-      await AsyncStorage.multiRemove(['user', 'is_guest', 'user-storage']);
+      await AsyncStorage.multiRemove(['user', 'is_guest', 'user-storage', 'tokenSend']);
       await storageDelete('user');
       await storageDelete('is_guest');
+      await storageDelete('tokenSend');
       try {
         useUserStore.getState().clearUser?.();
       } catch (e) {}
-      navigation.dispatch(
-        CommonActions.reset({
+      if (setCtx) {
+        setCtx(prev => ({
+          ...prev,
+          user: null,
+          token: null,
+        }));
+      }
+      try {
+        navigation.reset({
           index: 0,
-          routes: [{ name: 'AuthWelcome' }],
-        }),
-      );
+          routes: [{ name: 'Login' }],
+        });
+      } catch (e1) {
+        try {
+          navigation.dispatch(
+            CommonActions.reset({
+              index: 0,
+              routes: [{ name: 'Login' }],
+            }),
+          );
+        } catch (e2) {
+          try {
+            RootNavigation.reset('Login');
+          } catch (e3) {
+            navigation.navigate('Login');
+          }
+        }
+      }
     } catch (e) {
-      navigation.navigate('AuthWelcome');
+      navigation.navigate('Login');
     }
   };
 

@@ -16,7 +16,7 @@ import { storageGet, storageSet } from '../helpers/storage';
 import { setUser } from '../helpers/auth';
 import { EmContext } from '../contexts/EmContext';
 import ai from '../helpers/ai';
-import { getFcmToken } from '../helpers/notificationV2';
+import { getFcmToken } from '../helpers/notification';
 import { i18n } from '../translate/i18n';
 
 export default function ContinueGuest({ navigation }) {
