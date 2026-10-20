@@ -221,7 +221,9 @@
         "Ödenecek Tutar": "Ödenecek Tutar",
         "Orijinal Tutar": "Orijinal Tutar",
         "Ödeme öncesi ürünleri inceleyin": "Ödeme öncesi ürünleri inceleyin",
-        "Ödemeye Geç": "Ödemeye Geç"
+        "Ödemeye Geç": "Ödemeye Geç",
+        "Misafir Kullanıcı": "Misafir Kullanıcı",
+        "Misafir Modundan Çık": "Misafir Modundan Çık"
     },
     "en": {
         "Express": "Express",
@@ -445,7 +447,9 @@
         "Ödenecek Tutar": "Payable Total",
         "Orijinal Tutar": "Original Amount",
         "Ödeme öncesi ürünleri inceleyin": "Please review your items before payment",
-        "Ödemeye Geç": "Proceed to Payment"
+        "Ödemeye Geç": "Proceed to Payment",
+        "Misafir Kullanıcı": "Guest User",
+        "Misafir Modundan Çık": "Exit Guest Mode"
     },
     "som": {
         "Express": "Express",
@@ -669,6 +673,8 @@
         "Ödenecek Tutar": "Wadarta la bixinayo",
         "Orijinal Tutar": "Qadarka Asalka ah",
         "Ödeme öncesi ürünleri inceleyin": "Fadlan dib u eeg alaabtaada ka hor inta aadan bixin",
-        "Ödemeye Geç": "U gudub Lacag-bixinta"
+        "Ödemeye Geç": "U gudub Lacag-bixinta",
+        "Misafir Kullanıcı": "Isticmaale Marti ah",
+        "Misafir Modundan Çık": "Ka bax Qaabka Martida"
     }
 }

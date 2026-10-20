@@ -12,7 +12,7 @@ export function reset(name, params) {
   if (navigationRef.isReady()) {
     navigationRef.reset({
       index: 0,
-      routes: [{ name, params }],
+      routes: params !== undefined ? [{ name, params }] : [{ name }],
     });
   }
 }

@@ -85,7 +85,12 @@ ai.interceptors.response.use(
 
       // Do NOT kick to login for guest users or for cart-data / soft endpoints
       const url = error?.config?.url || '';
-      const isPublicOrSoftEndpoint = url.includes('cart-data') || url.includes('home') || url.includes('banner');
+      const isPublicOrSoftEndpoint =
+        url.includes('cart-data') ||
+        url.includes('home') ||
+        url.includes('banner') ||
+        url.includes('fcm') ||
+        url.includes('notification');
 
       try {
         const storedUser = await AsyncStorage.getItem('user');
