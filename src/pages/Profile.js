@@ -21,14 +21,16 @@ import Logo from '../components/Logo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CommonActions } from '@react-navigation/native';
 import {availableLanguages, i18n, t, tr} from '../translate/i18n';
-import {storageGet, storageSet} from '../helpers/storage';
+import {storageDelete, storageGet, storageSet} from '../helpers/storage';
+import * as RootNavigation from '../services/RootNavigation';
 import Phone from '../assets/svg/phone.svg';
 import Facebook from '../assets/svg/facebook.svg';
 import Instagram from '../assets/svg/instagram.svg';
 import Whatsapp from '../assets/svg/whatsapp.svg';
 import Youtube from '../assets/svg/youtube.svg';
 import Snapchat from '../assets/svg/snapchat.svg';
-import {fcmUpdate, getFcmToken} from '../helpers/notification';
+import ProfileIcon from '../assets/svg/profile1.svg';
+import {getFcmToken} from '../helpers/notification';
 import CopyItem from '../components/CopyItem';
 import {themeParams} from '../helpers/theme';
 import BankaItem from '../components/BankaItem';
@@ -52,6 +54,7 @@ export default function ({route, navigation}) {
     firstLoad: false,
     loading: true,
     update: false,
+    isGuest: false,
     token: '',
     dils: availableLanguages,
     language: null,
@@ -75,8 +78,8 @@ export default function ({route, navigation}) {
   const teslimatRef = createRef();
 
   const handleSubmit = async () => {
-    if (state.s.kod === 'GUEST') {
-      alert(tr('Misafir hesabında değişiklik yapılamaz'));
+    if (state.isGuest || state.s?.kod === 'GUEST' || state.s?.kod === 'HG1000') {
+      Alert.alert(tr('Misafir hesabında değişiklik yapılamaz'));
       return;
     }
 
@@ -106,30 +109,135 @@ export default function ({route, navigation}) {
 
     setState(ns);
   };
+
   const handleLogout = async () => {
-    await AsyncStorage.removeItem('user');
-    await AsyncStorage.removeItem('is_guest');
+    try {
+      // 1. Immediately remove all auth tokens and keys from storage
+      await AsyncStorage.multiRemove(['user', 'is_guest', 'user-storage', 'tokenSend']);
+      await storageDelete('user');
+      await storageDelete('is_guest');
+      await storageDelete('tokenSend');
 
-    const fcm = await getFcmToken();
-    await fcmUpdate(fcm, true);
+      // 2. Clear zustand store
+      try {
+        useUserStore.getState().clearUser?.();
+      } catch (storeErr) {
+        console.log('User store clear error:', storeErr);
+      }
 
-    if (setCtx) {
-      setCtx(prev => ({
-        ...prev,
-        user: null,
-        token: null,
-      }));
+      // 3. Clear context
+      if (setCtx) {
+        setCtx(prev => ({
+          ...prev,
+          user: null,
+          token: null,
+        }));
+      }
+
+      // 4. Reset navigation to Login
+      try {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        });
+      } catch (e1) {
+        try {
+          navigation.dispatch(
+            CommonActions.reset({
+              index: 0,
+              routes: [{ name: 'Login' }],
+            }),
+          );
+        } catch (e2) {
+          try {
+            RootNavigation.reset('Login');
+          } catch (e3) {
+            navigation.navigate('Login');
+          }
+        }
+      }
+    } catch (err) {
+      console.log('handleLogout error:', err);
+      try {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        });
+      } catch (navErr) {
+        try {
+          navigation.dispatch(
+            CommonActions.reset({
+              index: 0,
+              routes: [{ name: 'Login' }],
+            }),
+          );
+        } catch (dErr) {
+          navigation.navigate('Login');
+        }
+      }
     }
-
-    navigation.dispatch(
-      CommonActions.reset({
-        index: 0,
-        routes: [{ name: 'AuthWelcome' }],
-      }),
-    );
   };
+
+  const handleGoToLogin = async () => {
+    try {
+      await AsyncStorage.multiRemove(['user', 'is_guest', 'user-storage']);
+      await storageDelete('user');
+      await storageDelete('is_guest');
+      try {
+        useUserStore.getState().clearUser?.();
+      } catch (e) {}
+      if (setCtx) {
+        setCtx(prev => ({ ...prev, user: null, token: null }));
+      }
+      try {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        });
+      } catch (e1) {
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+          }),
+        );
+      }
+    } catch (e) {
+      navigation.navigate('Login');
+    }
+  };
+
+  const handleGoToRegister = async () => {
+    try {
+      await AsyncStorage.multiRemove(['user', 'is_guest', 'user-storage']);
+      await storageDelete('user');
+      await storageDelete('is_guest');
+      try {
+        useUserStore.getState().clearUser?.();
+      } catch (e) {}
+      if (setCtx) {
+        setCtx(prev => ({ ...prev, user: null, token: null }));
+      }
+      try {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Register' }],
+        });
+      } catch (e1) {
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'Register' }],
+          }),
+        );
+      }
+    } catch (e) {
+      navigation.navigate('Register');
+    }
+  };
+
   const handleDelete = async () => {
-    if (state.s.kod === 'GUEST') {
+    if (state.isGuest || state.s?.kod === 'GUEST' || state.s?.kod === 'HG1000') {
       Alert.alert(tr('Misafir hesabı silinemez'));
       return;
     }
@@ -145,10 +253,13 @@ export default function ({route, navigation}) {
               const res = await ai.get('delete-account');
               if (res?.data?.error === false) {
                 Alert.alert(tr('Hesabınız 24 saat içinde silinecektir'));
-                await AsyncStorage.removeItem('user');
-                await AsyncStorage.removeItem('is_guest');
-                const fcm = await getFcmToken();
-                await fcmUpdate(fcm, true);
+                await AsyncStorage.multiRemove(['user', 'is_guest', 'user-storage', 'tokenSend']);
+                await storageDelete('user');
+                await storageDelete('is_guest');
+                await storageDelete('tokenSend');
+                try {
+                  useUserStore.getState().clearUser?.();
+                } catch (storeErr) {}
                 if (setCtx) {
                   setCtx(prev => ({
                     ...prev,
@@ -156,12 +267,23 @@ export default function ({route, navigation}) {
                     token: null,
                   }));
                 }
-                navigation.dispatch(
-                  CommonActions.reset({
+                try {
+                  navigation.reset({
                     index: 0,
-                    routes: [{ name: 'AuthWelcome' }],
-                  }),
-                );
+                    routes: [{ name: 'Login' }],
+                  });
+                } catch (e1) {
+                  try {
+                    navigation.dispatch(
+                      CommonActions.reset({
+                        index: 0,
+                        routes: [{ name: 'Login' }],
+                      }),
+                    );
+                  } catch (e2) {
+                    RootNavigation.reset('Login');
+                  }
+                }
               } else {
                 Alert.alert(tr('Hesap silme işlemi başarısız oldu'));
               }
@@ -199,8 +321,34 @@ export default function ({route, navigation}) {
   const fetchData = async () => {
     try {
       console.log('fetchData', +new Date());
+      const isGuestStorage = (await storageGet('is_guest')) === '1';
+      const currentUser = await storageGet('user');
+      const isGuest =
+        isGuestStorage ||
+        currentUser?.kod === 'GUEST' ||
+        currentUser?.kod === 'HG1000' ||
+        currentUser?.token === 'GUEST' ||
+        ctx?.user?.kod === 'GUEST' ||
+        ctx?.user?.kod === 'HG1000' ||
+        ctx?.token === 'GUEST';
+
+      let language = await storageGet('language');
+      let theme = await storageGet('theme');
+
+      if (isGuest) {
+        setState(prev => ({
+          ...prev,
+          s: currentUser || { kod: 'HG1000', ad: tr('Misafir') },
+          language: language || 'en',
+          theme: theme || 'light',
+          loading: false,
+          isGuest: true,
+        }));
+        return;
+      }
+
       const c = await ai.get('profile');
-      let ns = {...state};
+      let ns = {...state, isGuest: false};
       if (c?.data && c.data.error === false) {
         ns = {
           ...state,
@@ -208,6 +356,7 @@ export default function ({route, navigation}) {
           fields: Array.isArray(c.data.require_fields) ? c.data.require_fields : ['tel', 'adres'],
           sosyal: Array.isArray(c.data.sosyal) ? c.data.sosyal : [],
           banka: Array.isArray(c.data.banka) ? c.data.banka : [],
+          isGuest: false,
         };
 
         if (c.data.teslimatSehirs) {
@@ -217,29 +366,29 @@ export default function ({route, navigation}) {
           setTeslimatSehirID(c.data.teslimatSehirID);
         }
       } else {
-        const currentUser = await storageGet('user');
         ns = {
           ...state,
           s: currentUser || {},
           fields: ['tel', 'adres'],
+          isGuest: false,
         };
       }
 
-      let language = await storageGet('language');
       ns.language = language;
-
-      let theme = await storageGet('theme');
       ns.theme = theme ? theme : 'light';
-
       ns.loading = false;
       setState(ns);
     } catch (err) {
       console.log('Profile fetch error fallback:', err);
       const currentUser = await storageGet('user');
+      let language = await storageGet('language');
+      let theme = await storageGet('theme');
       setState(prev => ({
         ...prev,
         s: currentUser || {},
         fields: ['tel', 'adres'],
+        language: language || 'en',
+        theme: theme || 'light',
         loading: false,
       }));
     }
@@ -358,6 +507,88 @@ export default function ({route, navigation}) {
       fontWeight: 'bold',
     },
 
+    guestCard: {
+      padding: 24,
+      backgroundColor: ctx.isLight ? '#F9FAFB' : '#1F2937',
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: ctx.isLight ? '#E5E7EB' : '#374151',
+      alignItems: 'center',
+      marginBottom: 20,
+    },
+    guestAvatar: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      backgroundColor: ctx.isLight ? '#FFF3E8' : '#2D1F15',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 16,
+    },
+    guestTitle: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: ctx.color,
+      marginBottom: 8,
+      textAlign: 'center',
+    },
+    guestSubtitle: {
+      fontSize: 14,
+      color: ctx.isLight ? '#6B7280' : '#9CA3AF',
+      textAlign: 'center',
+      lineHeight: 20,
+      marginBottom: 20,
+      paddingHorizontal: 10,
+    },
+    guestActionRow: {
+      flexDirection: 'row',
+      width: '100%',
+      justifyContent: 'space-between',
+    },
+    guestLoginBtn: {
+      flex: 1,
+      backgroundColor: Colors.primary,
+      paddingVertical: 14,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 6,
+    },
+    guestLoginBtnText: {
+      color: '#FFFFFF',
+      fontWeight: 'bold',
+      fontSize: 15,
+    },
+    guestRegisterBtn: {
+      flex: 1,
+      backgroundColor: 'transparent',
+      borderWidth: 1.5,
+      borderColor: Colors.primary,
+      paddingVertical: 14,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: 6,
+    },
+    guestRegisterBtnText: {
+      color: Colors.primary,
+      fontWeight: 'bold',
+      fontSize: 15,
+    },
+    logoutBtnFull: {
+      backgroundColor: '#DC2626',
+      paddingVertical: 14,
+      borderRadius: 10,
+      width: '100%',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    logoutBtnFullText: {
+      color: '#FFFFFF',
+      fontWeight: 'bold',
+      fontSize: 16,
+    },
+
     safeArea: {
       flex: 1,
       backgroundColor: ctx.bgColor,
@@ -373,7 +604,9 @@ export default function ({route, navigation}) {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         <ScrollView
-          contentContainerStyle={{paddingBottom: 100, paddingTop: 20}}>
+          contentContainerStyle={{paddingBottom: 40, paddingTop: 20}}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled">
           {/*<AuthHeader navigation={navigation} route={route} />*/}
           {/*<View style={styles.logoContainer}>
           <Logo maxWidth={120} />
@@ -384,8 +617,101 @@ export default function ({route, navigation}) {
             </View>
           ) : null}
 
-          {state.loading === false && state.s && (
-            <ScrollView style={styles.scroll}>
+          {state.loading === false && (
+            state.isGuest ? (
+              <View style={styles.scroll}>
+                {/* Guest Profile Card */}
+                <View style={styles.guestCard}>
+                  <View style={styles.guestAvatar}>
+                    <ProfileIcon fill={Colors.primary} width={38} height={38} />
+                  </View>
+                  <Text style={styles.guestTitle}>
+                    {tr('Misafir Kullanıcı')}
+                  </Text>
+                  <Text style={styles.guestSubtitle}>
+                    {i18n.locale === 'tr'
+                      ? 'Daha iyi bir alışveriş deneyimi ve sipariş takibi için giriş yapın veya hesap oluşturun.'
+                      : i18n.locale === 'som'
+                      ? 'Gal akoonkaaga ama sameyso akoon cusub si aad u hesho adeeg buuxa.'
+                      : 'Log in or create an account for a better shopping experience and order tracking.'}
+                  </Text>
+
+                  <View style={styles.guestActionRow}>
+                    <TouchableOpacity
+                      style={styles.guestLoginBtn}
+                      onPress={handleGoToLogin}>
+                      <Text style={styles.guestLoginBtnText}>{tr('Giriş Yap')}</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.guestRegisterBtn}
+                      onPress={handleGoToRegister}>
+                      <Text style={styles.guestRegisterBtnText}>{tr('Kayıt Ol')}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Language Selection */}
+                <View style={[styles.borderedBox, GlobalStyle.pb5]}>
+                  <View style={styles.row}>
+                    <Text style={[styles.labelw100, GlobalStyle.textCenter]}>
+                      {tr('Uygulama Dili')}
+                    </Text>
+                  </View>
+
+                  <View style={[styles.row, {justifyContent: 'center'}]}>
+                    {availableLanguages.map((dil, i) => (
+                      <TouchableOpacity
+                        key={i}
+                        onPress={() => handleDilUpdate(dil.id)}
+                        style={[
+                          styles.dil,
+                          dil.id === ctxDil ? styles.aktifDil : null,
+                        ]}>
+                        <Text style={styles.dilText}>{dil.ad.toUpperCase()}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Theme Selection */}
+                <View style={[styles.borderedBox, GlobalStyle.pb5]}>
+                  <View style={styles.row}>
+                    <Text style={[styles.labelw100, GlobalStyle.textCenter]}>
+                      {tr('Tema')}
+                    </Text>
+                  </View>
+
+                  <View style={[styles.row, {justifyContent: 'center'}]}>
+                    {state.themes.map((x, i) => (
+                      <TouchableOpacity
+                        key={i}
+                        onPress={() => handleThemeUpdate(x.id)}
+                        style={[
+                          styles.dil,
+                          x.id === state.theme ? styles.aktifDil : null,
+                        ]}>
+                        <Text style={styles.dilText}>
+                          {tr(x.ad).toUpperCase()}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Exit Guest Mode / Logout Button */}
+                <View style={{marginVertical: 15, width: '100%'}}>
+                  <TouchableOpacity
+                    style={styles.logoutBtnFull}
+                    onPress={handleLogout}>
+                    <Text style={styles.logoutBtnFullText}>
+                      {tr('Çıkış Yap')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+            <View style={styles.scroll}>
               <View style={styles.borderedBox}>
                 <View style={styles.row}>
                   <Text style={styles.label}>{tr('Müşteri Kodu')}</Text>
@@ -637,7 +963,8 @@ export default function ({route, navigation}) {
                   <Text style={styles.buttonText}>{tr('Çıkış Yap')}</Text>
                 </TouchableOpacity>
               </View>
-            </ScrollView>
+            </View>
+            )
           )}
         </ScrollView>
       </View>

@@ -2,7 +2,14 @@ import { Text, TouchableOpacity, View, StyleSheet, ScrollView, SafeAreaView } fr
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import GlobalStyle from "../assets/GlobalStyle";
 
+import { CommonActions } from "@react-navigation/native";
+import { storageDelete } from "../helpers/storage";
+import { useContext } from "react";
+import { EmContext } from "../contexts/EmContext";
+import * as RootNavigation from "../services/RootNavigation";
+
 export default function ({navigation}) {
+  const { setCtx } = useContext(EmContext);
 
 
   const menus = [
@@ -34,9 +41,23 @@ export default function ({navigation}) {
   }
 
   const handleLogout = async () => {
-    await AsyncStorage.removeItem('user');
-    navigation.navigate('Login');
-  }
+    try {
+      await AsyncStorage.multiRemove(['user', 'is_guest', 'user-storage']);
+      await storageDelete('user');
+      await storageDelete('is_guest');
+      try {
+        useUserStore.getState().clearUser?.();
+      } catch (e) {}
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'AuthWelcome' }],
+        }),
+      );
+    } catch (e) {
+      navigation.navigate('AuthWelcome');
+    }
+  };
 
 
   return (

@@ -69,9 +69,23 @@ export const getFcmToken = async () => {
 };
 
 export const fcmUpdate = async (fcmToken, force) => {
-  if (!FIREBASE_ENABLED) {
+  if (!FIREBASE_ENABLED || !fcmToken) {
     return;
   }
+  try {
+    const user = await storageGet('user');
+    const isGuest =
+      (await storageGet('is_guest')) === '1' ||
+      user?.kod === 'GUEST' ||
+      user?.kod === 'HG1000' ||
+      user?.token === 'GUEST';
+    if (!user || !user.token || isGuest) {
+      return;
+    }
+  } catch (authCheckErr) {
+    return;
+  }
+
   const dil = i18n.locale;
   const deviceBrand = DeviceInfo.getBrand();
   const deviceModel = DeviceInfo.getModel();
