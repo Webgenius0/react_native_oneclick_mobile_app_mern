@@ -113,10 +113,17 @@ export default function ({route, navigation}) {
   const handleLogout = async () => {
     try {
       // 1. Immediately remove all auth tokens and keys from storage
-      await AsyncStorage.multiRemove(['user', 'is_guest', 'user-storage', 'tokenSend']);
+      await AsyncStorage.multiRemove([
+        'user',
+        'is_guest',
+        'user-storage',
+        'tokenSend',
+        'has_seen_onboarding',
+      ]);
       await storageDelete('user');
       await storageDelete('is_guest');
       await storageDelete('tokenSend');
+      await storageDelete('has_seen_onboarding');
 
       // 2. Clear zustand store
       try {
@@ -134,25 +141,25 @@ export default function ({route, navigation}) {
         }));
       }
 
-      // 4. Reset navigation to Login
+      // 4. Reset navigation to Onboarding (if not logged in, always show Onboarding)
       try {
         navigation.reset({
           index: 0,
-          routes: [{ name: 'Login' }],
+          routes: [{ name: 'Onboarding' }],
         });
       } catch (e1) {
         try {
           navigation.dispatch(
             CommonActions.reset({
               index: 0,
-              routes: [{ name: 'Login' }],
+              routes: [{ name: 'Onboarding' }],
             }),
           );
         } catch (e2) {
           try {
-            RootNavigation.reset('Login');
+            RootNavigation.reset('Onboarding');
           } catch (e3) {
-            navigation.navigate('Login');
+            navigation.navigate('Onboarding');
           }
         }
       }
@@ -161,18 +168,18 @@ export default function ({route, navigation}) {
       try {
         navigation.reset({
           index: 0,
-          routes: [{ name: 'Login' }],
+          routes: [{ name: 'Onboarding' }],
         });
       } catch (navErr) {
         try {
           navigation.dispatch(
             CommonActions.reset({
               index: 0,
-              routes: [{ name: 'Login' }],
+              routes: [{ name: 'Onboarding' }],
             }),
           );
         } catch (dErr) {
-          navigation.navigate('Login');
+          navigation.navigate('Onboarding');
         }
       }
     }
@@ -253,10 +260,17 @@ export default function ({route, navigation}) {
               const res = await ai.get('delete-account');
               if (res?.data?.error === false) {
                 Alert.alert(tr('Hesabınız 24 saat içinde silinecektir'));
-                await AsyncStorage.multiRemove(['user', 'is_guest', 'user-storage', 'tokenSend']);
+                await AsyncStorage.multiRemove([
+                  'user',
+                  'is_guest',
+                  'user-storage',
+                  'tokenSend',
+                  'has_seen_onboarding',
+                ]);
                 await storageDelete('user');
                 await storageDelete('is_guest');
                 await storageDelete('tokenSend');
+                await storageDelete('has_seen_onboarding');
                 try {
                   useUserStore.getState().clearUser?.();
                 } catch (storeErr) {}
@@ -270,18 +284,18 @@ export default function ({route, navigation}) {
                 try {
                   navigation.reset({
                     index: 0,
-                    routes: [{ name: 'Login' }],
+                    routes: [{ name: 'Onboarding' }],
                   });
                 } catch (e1) {
                   try {
                     navigation.dispatch(
                       CommonActions.reset({
                         index: 0,
-                        routes: [{ name: 'Login' }],
+                        routes: [{ name: 'Onboarding' }],
                       }),
                     );
                   } catch (e2) {
-                    RootNavigation.reset('Login');
+                    RootNavigation.reset('Onboarding');
                   }
                 }
               } else {

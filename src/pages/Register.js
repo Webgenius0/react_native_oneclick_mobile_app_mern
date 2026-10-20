@@ -136,7 +136,17 @@ export default function Register({ navigation }) {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      <AppHeader navigation={navigation} showBack={true} />
+      <AppHeader
+        navigation={navigation}
+        showBack={true}
+        onBackPress={() => {
+          if (navigation.canGoBack()) {
+            navigation.goBack();
+          } else {
+            navigation.navigate('AuthWelcome');
+          }
+        }}
+      />
 
       <KeyboardAvoidingComponent>
         <ScrollView

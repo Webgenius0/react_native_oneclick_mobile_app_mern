@@ -31,15 +31,18 @@ export default function Splash({ navigation }) {
     const checkState = async () => {
       try {
         const user = await getUser();
-        const hasSeenOnboarding = await storageGet('has_seen_onboarding');
-        const isGuest = (await storageGet('is_guest')) === '1' || user?.kod === 'GUEST';
+        const isGuestStorage = (await storageGet('is_guest')) === '1';
+        const isGuest =
+          isGuestStorage ||
+          user?.kod === 'GUEST' ||
+          user?.kod === 'HG1000' ||
+          user?.token === 'GUEST';
+        const isLoggedIn = Boolean((user && user.token && !isGuest) || (isGuest && user));
 
-        if (!hasSeenOnboarding) {
-          setDestination('Onboarding');
-        } else if ((user && user.token) || isGuest) {
+        if (isLoggedIn) {
           setDestination('Home');
         } else {
-          setDestination('AuthWelcome');
+          setDestination('Onboarding');
         }
       } catch (err) {
         console.log('Splash check error:', err);

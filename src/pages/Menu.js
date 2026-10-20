@@ -44,10 +44,17 @@ export default function ({navigation}) {
 
   const handleLogout = async () => {
     try {
-      await AsyncStorage.multiRemove(['user', 'is_guest', 'user-storage', 'tokenSend']);
+      await AsyncStorage.multiRemove([
+        'user',
+        'is_guest',
+        'user-storage',
+        'tokenSend',
+        'has_seen_onboarding',
+      ]);
       await storageDelete('user');
       await storageDelete('is_guest');
       await storageDelete('tokenSend');
+      await storageDelete('has_seen_onboarding');
       try {
         useUserStore.getState().clearUser?.();
       } catch (e) {}
@@ -61,26 +68,26 @@ export default function ({navigation}) {
       try {
         navigation.reset({
           index: 0,
-          routes: [{ name: 'Login' }],
+          routes: [{ name: 'Onboarding' }],
         });
       } catch (e1) {
         try {
           navigation.dispatch(
             CommonActions.reset({
               index: 0,
-              routes: [{ name: 'Login' }],
+              routes: [{ name: 'Onboarding' }],
             }),
           );
         } catch (e2) {
           try {
-            RootNavigation.reset('Login');
+            RootNavigation.reset('Onboarding');
           } catch (e3) {
-            navigation.navigate('Login');
+            navigation.navigate('Onboarding');
           }
         }
       }
     } catch (e) {
-      navigation.navigate('Login');
+      navigation.navigate('Onboarding');
     }
   };
 
