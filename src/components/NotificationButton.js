@@ -1,37 +1,64 @@
+import React from "react";
 import { TouchableOpacity, Text, View, StyleSheet } from "react-native";
-import NotifyIcon from "../assets/svg/notification.svg";
+import HomeBellIcon from "../assets/svg/home_bell.svg";
 import cs from "../assets/Colors";
-import gs from "../assets/GlobalStyle";
 
-export default function({ navigation, notifyCount, ctx }) {
-
-
+export default function NotificationButton({
+  navigation,
+  ctx,
+  color,
+  badgeBgColor,
+  size = 28,
+}) {
+  const iconColor = color || cs.btnColor;
+  const count = ctx?.notificationCount || 0;
 
   return (
-    <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
-
-
-      <NotifyIcon width={35} height={35} fill={cs.btnColor} />
-      {ctx.notificationCount > 0 ? <Text style={styles.text}>{ctx.notificationCount}</Text> : null}
+    <TouchableOpacity
+      activeOpacity={0.7}
+      style={styles.container}
+      onPress={() => navigation?.navigate("Notifications")}>
+      <HomeBellIcon width={size} height={size} fill={iconColor} />
+      {count > 0 ? (
+        <View
+          style={[
+            styles.badge,
+            badgeBgColor ? { backgroundColor: badgeBgColor } : null,
+          ]}>
+          <Text style={styles.badgeText}>
+            {count > 99 ? "99+" : count}
+          </Text>
+        </View>
+      ) : null}
     </TouchableOpacity>
-  )
+  );
 }
 
-
 const styles = StyleSheet.create({
-  text: {
-    position: 'absolute',
-    top: -7,
-    right: -7,
-    backgroundColor: "#A20182",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#A20182",
-    overflow: 'hidden',
-    width: 20,
-    height: 20,
-    textAlign: 'center',
-    color: 'white',
-    fontSize: 12
-  }
-})
+  container: {
+    padding: 6,
+    position: "relative",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  badge: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    backgroundColor: "#FF3B30",
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: "#FFFFFF",
+  },
+  badgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+});

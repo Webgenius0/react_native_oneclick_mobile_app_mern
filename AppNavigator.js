@@ -516,25 +516,7 @@ export default function AppNavigator() {
         <Stack.Screen
           name="Notifications"
           component={Notifications}
-          options={({ navigation }) => ({
-            title: tr('Bildirimler'),
-            headerTitleStyle: headerTitleStyle,
-            headerLeft: props => (
-              <HeaderBackButton
-                {...props}
-                labelVisible={false}
-                backTitleVisible={false}
-                tintColor={ctx.color}
-                onPress={() => {
-                  if (navigation.canGoBack()) {
-                    navigation.goBack();
-                  } else {
-                    navigation.navigate('AuthAfter');
-                  }
-                }}
-              />
-            ),
-          })}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="OrderDetail"

@@ -68,10 +68,18 @@ export default function(props) {
           // backgroundColor: "rgba(0,0,0,0.5)",
         }}
         activeIndicatorStyle={{
-          backgroundColor: "orange",
-          borderWidth: 1,
-          borderColor: "orange"
-      }}
+          backgroundColor: "#F67922",
+          borderWidth: 0,
+          width: 16,
+          height: 6,
+          borderRadius: 3,
+        }}
+        inActiveIndicatorStyle={{
+          backgroundColor: "#DCDFE5",
+          width: 6,
+          height: 6,
+          borderRadius: 3,
+        }}
         // indicatorContainerStyle={{borderWidth: 1, borderColor: '#FFF'}}
         preview={false}
         closeIconColor="#fff"
