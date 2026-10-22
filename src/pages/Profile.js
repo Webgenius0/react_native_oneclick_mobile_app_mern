@@ -190,45 +190,6 @@ export default function Profile({ navigation }) {
     await logoutUser(navigation, setCtx);
   };
 
-  const handleDelete = () => {
-    if (state.isGuest) {
-      Alert.alert(tr('Misafir hesabı silinemez') || 'Cannot delete guest account');
-      return;
-    }
-
-    Alert.alert(
-      tr('Hesabı Sil') || 'Delete Account',
-      tr('Hesabınızı silmek istediğinize emin misiniz?') ||
-        'Are you sure you want to delete your account?',
-      [
-        {
-          text: tr('İptal') || 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: tr('Hesabı Sil') || 'Delete Account',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const res = await ai.get('delete-account');
-              if (res?.data?.error === false) {
-                Alert.alert(
-                  tr('Hesabınız 24 saat içinde silinecektir') ||
-                    'Your account will be deleted within 24 hours',
-                );
-                await handleLogout();
-              } else {
-                Alert.alert(tr('Hata') || 'Error', tr('Hesap silme işlemi başarısız oldu') || 'Failed');
-              }
-            } catch (delErr) {
-              Alert.alert(tr('Hata') || 'Error', tr('Hesap silme işlemi başarısız oldu') || 'Failed');
-            }
-          },
-        },
-      ],
-    );
-  };
-
   const displayName = state.s.ad || state.s.name || tr('Kullanıcı') || 'Kullanıcı';
 
   return (
@@ -355,7 +316,7 @@ export default function Profile({ navigation }) {
                 { backgroundColor: cardBg, borderColor: borderColor },
               ]}>
               <Text style={[styles.formCardTitle, { color: textColor }]}>
-                {tr('Hesap Bilgileri') || 'Account Information'}
+                {tr('Account Information') || tr('Hesap Bilgileri') || 'Account Information'}
               </Text>
 
               {/* Phone */}
@@ -403,7 +364,7 @@ export default function Profile({ navigation }) {
                   <ActivityIndicator color="#FFFFFF" size="small" />
                 ) : (
                   <Text style={styles.saveBtnText}>
-                    {tr('Değişiklikleri Kaydet') || 'Save Changes'}
+                    {tr('Save Changes') || tr('Değişiklikleri Kaydet') || 'Save Changes'}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -445,7 +406,7 @@ export default function Profile({ navigation }) {
               </View>
             </View>
 
-            {/* Logout and Delete Actions */}
+            {/* Logout Action */}
             <View style={styles.footerActions}>
               <TouchableOpacity
                 activeOpacity={0.8}
@@ -455,17 +416,6 @@ export default function Profile({ navigation }) {
                   {tr('Çıkış Yap') || 'Log Out'}
                 </Text>
               </TouchableOpacity>
-
-              {!state.isGuest ? (
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  style={[styles.footerBtn, { backgroundColor: cardBg, borderColor: '#FEE2E2', marginTop: 10 }]}
-                  onPress={handleDelete}>
-                  <Text style={[styles.footerBtnText, { color: '#DC2626' }]}>
-                    {tr('Hesabı Sil') || 'Delete Account'}
-                  </Text>
-                </TouchableOpacity>
-              ) : null}
             </View>
           </>
         )}
