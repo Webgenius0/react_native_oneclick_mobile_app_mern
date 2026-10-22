@@ -288,14 +288,12 @@ export default function Notifications({ route, navigation }) {
         onBackPress={handleBack}
         title={tr("Notification") || "Notification"}
         style={{
-          borderBottomWidth: 1,
-          borderBottomColor: borderColor,
           backgroundColor: bgColor,
         }}
       />
 
       {/* Subheader: Recent count badge & Clear All button matching Figma */}
-      <View style={[styles.subHeader, { borderBottomColor: borderColor }]}>
+      <View style={styles.subHeader}>
         <View style={styles.recentWrap}>
           <Text style={[styles.recentTitle, { color: textColor }]}>
             {tr("Recent") || "Recent"}
@@ -387,9 +385,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
+    paddingTop: 12,
+    paddingBottom: 8,
   },
   recentWrap: {
     flexDirection: "row",

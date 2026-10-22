@@ -71,16 +71,13 @@ export default function AppHeader({
   );
 }
 
-const statusBarOffset = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 6 : 0;
-
 const styles = StyleSheet.create({
   container: {
-    height: 56 + statusBarOffset,
-    paddingTop: statusBarOffset,
+    height: 54,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     backgroundColor: '#FFFFFF',
   },
   leftContainer: {

@@ -291,150 +291,116 @@ export default function({ route, navigation }) {
     <SafeAreaView style={styles.safeArea}>
 
       <View style={styles.container}>
-
         <AuthHeader navigation={navigation} route={route} />
 
-        <View>
-          <StoryList stories={state.stories} navigation={navigation} />
-        </View>
+        {state.loading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={{ marginTop: 12, color: ctx.color }}>{tr("Yükleniyor")}...</Text>
+          </View>
+        )}
 
-        {
-          state.loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={Colors.primary} />
-              <Text style={{ marginTop: 12, color: ctx.color }}>{tr("Yükleniyor")}...</Text>
-            </View>
-          ) : null
-        }
-        {
-          HOME_PASIF && (
-            <Dump ctx={ctx} />
-          )
-        }
+        {HOME_PASIF && <Dump ctx={ctx} />}
 
-        {
-          <>
-            {
-              !state.loading && !HOME_PASIF && state.sliders.length > 0 ? (
-                <CustomSlider
-                  ctxDil={ctxDil}
-                  state={state}
-                  navigation={navigation}
-                  data={state.sliders}
-                />
-              ) : null
-            }
-          </>
-        }
+        {!state.loading && (
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingBottom: 60 }}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={subLoading}
+                onRefresh={fetchData}
+                colors={[Colors.primary]}
+              />
+            }>
+            {/* Top Stories */}
+            {state.stories && state.stories.length > 0 && (
+              <View style={{ marginBottom: 6 }}>
+                <StoryList stories={state.stories} navigation={navigation} />
+              </View>
+            )}
 
+            {/* Top Sliders */}
+            {!HOME_PASIF && state.sliders && state.sliders.length > 0 && (
+              <CustomSlider
+                ctxDil={ctxDil}
+                state={state}
+                navigation={navigation}
+                data={state.sliders}
+              />
+            )}
 
-        <UlkeBar
-          state={state}
-          ulkeID={ulkeID}
-          loading={state.loading}
-          setUlkeID={setUlkeID} />
+            {/* Country Filter Bar */}
+            <UlkeBar
+              state={state}
+              ulkeID={ulkeID}
+              loading={state.loading}
+              setUlkeID={setUlkeID}
+            />
 
-        {
-          !state.loading && !subLoading && state.hasError && state.banners.length === 0 && state.sliders.length === 0 && (
-            <ScrollView
-              contentContainerStyle={styles.errorContainer}
-              refreshControl={
-                <RefreshControl
-                  refreshing={subLoading}
-                  onRefresh={fetchData}
-                  colors={[Colors.primary]}
-                />
-              }>
-              <Text style={[styles.errorTitle, { color: ctx.color }]}>
-                {tr("Bağlantı Hatası")}
-              </Text>
-              <Text style={[styles.errorSubtitle, { color: ctx.color }]}>
-                {tr("İnternet bağlantınızı kontrol edin veya tekrar deneyin.")}
-              </Text>
-              <TouchableOpacity
-                style={styles.retryButton}
-                onPress={fetchData}>
-                <Text style={styles.retryButtonText}>{tr("Tekrar Dene")}</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          )
-        }
+            {/* Middle Sliders */}
+            {!HOME_PASIF && state.banners_orta && state.banners_orta.length > 0 && (
+              <CustomSlider
+                ctxDil={ctxDil}
+                state={state}
+                navigation={navigation}
+                width={430}
+                height={241}
+                data={state.banners_orta}
+              />
+            )}
 
-        {
-          !HOME_PASIF && (state.banners.length > 0 || state.sliders.length > 0 || state.banners_orta.length > 0) && (
-            <ScrollView
-              contentContainerStyle={{ paddingBottom: 100 }}
-              refreshControl={
-                <RefreshControl
-                  refreshing={subLoading}
-                  onRefresh={fetchData}
-                  colors={[Colors.primary]}
-                />
-              }>
-              {
-                <>
-                  {
-                    state.banners_orta.length > 0 ? (
-                      <CustomSlider
-                        ctxDil={ctxDil}
-                        state={state}
-                        navigation={navigation}
-                        width={430}
-                        height={241}
-                        data={state.banners_orta}
+            {/* Main Banners */}
+            {!HOME_PASIF && state.banners && state.banners.length > 0 && (
+              state.banners.map((item, index) => {
+                let img = item["img_" + ctxDil] ? item["img_" + ctxDil] : item.img_tr;
+                if (!img) return null;
+
+                return (
+                  <View
+                    key={item.id ? `banner-${item.id}` : `banner-${index}`}
+                    style={{
+                      borderBottomWidth: 3,
+                      borderBottomColor: "#EEE",
+                    }}>
+                    <TouchableOpacity
+                      activeOpacity={0.88}
+                      onPress={() => {
+                        navigation.navigate("Webview", { ad: item.ad_tr, url: item.link });
+                      }}>
+                      <FastImage
+                        style={{
+                          width: width,
+                          height: calculatedHeight,
+                        }}
+                        resizeMode={FastImage.resizeMode.contain}
+                        source={{ uri: img }}
                       />
-                    ) : null
-                  }
-                </>
-              }
+                    </TouchableOpacity>
+                  </View>
+                );
+              })
+            )}
 
-              {
-                state.banners.length ?
-                  (
-                    <>
-
-                      {
-                        state.banners.map((item, index) => {
-                          let img = item["img_" + ctxDil] ? item["img_" + ctxDil] : item.img_tr;
-
-                          return (
-                            <View
-                              key={index} style={{
-                              // padding: 10,
-                              borderBottomWidth: 3,
-                              borderBottomColor: "#EEE",
-                              // flex: 1,
-                            }}>
-
-                              {
-                                img !== null && (
-                                  <TouchableOpacity
-                                    onPress={() => {
-                                      navigation.navigate("Webview", { ad: item.ad_tr, url: item.link });
-                                    }}>
-                                    <FastImage
-                                      style={{
-                                        width: width,
-                                        height: calculatedHeight,
-                                        resizeMode: "contain",
-                                      }}
-                                      source={{ uri: img }}
-                                    />
-                                  </TouchableOpacity>
-                                )
-                              }
-
-                            </View>
-                          );
-                        })}
-                    </>
-                  ) : null
-
-              }
-            </ScrollView>
-          )
-        }
-
+            {/* Empty or error state if neither banners nor sliders */}
+            {state.banners.length === 0 && state.sliders.length === 0 && (
+              <View style={[styles.errorContainer, { paddingVertical: 40 }]}>
+                <Text style={[styles.errorTitle, { color: ctx.color }]}>
+                  {tr("Bağlantı Hatası")}
+                </Text>
+                <Text style={[styles.errorSubtitle, { color: ctx.color }]}>
+                  {tr("İnternet bağlantınızı kontrol edin veya tekrar deneyin.")}
+                </Text>
+                <TouchableOpacity
+                  style={styles.retryButton}
+                  onPress={fetchData}>
+                  <Text style={styles.retryButtonText}>{tr("Tekrar Dene")}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </ScrollView>
+        )}
       </View>
     </SafeAreaView>
   );

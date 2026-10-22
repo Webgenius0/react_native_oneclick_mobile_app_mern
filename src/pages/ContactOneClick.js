@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 12,
     paddingBottom: 40,
     gap: 14,
   },
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
   // Hero Card
   heroCard: {
     borderRadius: 18,
-    paddingVertical: 28,
+    paddingVertical: 20,
     paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',

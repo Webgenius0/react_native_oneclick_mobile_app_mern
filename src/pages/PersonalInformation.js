@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 24,
+    paddingTop: 14,
     paddingBottom: 60,
   },
   loadingWrap: {
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
   avatarSection: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 28,
+    marginBottom: 18,
   },
   avatarWrap: {
     width: 110,

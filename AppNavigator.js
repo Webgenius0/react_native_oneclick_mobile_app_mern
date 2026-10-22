@@ -63,6 +63,9 @@ import PaymentMethods from './src/pages/PaymentMethods';
 import PrivacySecurity from './src/pages/PrivacySecurity';
 import Test from './src/pages/Test';
 import Notifications from './src/pages/Notifications';
+import NotificationSettings from './src/pages/NotificationSettings';
+import ChangePassword from './src/pages/ChangePassword';
+import DeleteAccount from './src/pages/DeleteAccount';
 import PaymentStart from './src/pages/PaymentStart';
 import PaymentResponse from './src/pages/PaymentResponse';
 import WaafiPay from './src/pages/WaafiPay';
@@ -363,14 +366,6 @@ export default function AppNavigator() {
         }}
       />
       <Tab.Screen
-        name="Support"
-        component={Support}
-        options={{
-          title: tr('Destek'),
-          headerTitleStyle: headerTitleStyle,
-        }}
-      />
-      <Tab.Screen
         name="Account"
         component={Account}
         options={{
@@ -564,6 +559,11 @@ export default function AppNavigator() {
           options={{ headerShown: false }}
         />
         <Stack.Screen
+          name="NotificationSettings"
+          component={NotificationSettings}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
           name="PaymentMethods"
           component={PaymentMethods}
           options={{ headerShown: false }}
@@ -571,6 +571,16 @@ export default function AppNavigator() {
         <Stack.Screen
           name="PrivacySecurity"
           component={PrivacySecurity}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ChangePassword"
+          component={ChangePassword}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="DeleteAccount"
+          component={DeleteAccount}
           options={{ headerShown: false }}
         />
         <Stack.Screen

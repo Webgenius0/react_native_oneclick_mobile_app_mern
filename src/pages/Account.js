@@ -24,6 +24,8 @@ import { availableLanguages, i18n, tr } from '../translate/i18n';
 import { storageDelete, storageGet, storageSet } from '../helpers/storage';
 import { getFcmToken } from '../helpers/notification';
 import { useUserStore } from '../store/useUserStore';
+import * as RootNavigation from '../services/RootNavigation';
+import { logoutUser } from '../helpers/auth';
 
 // SVG Icons matching Figma design
 import ProfileIcon from '../assets/svg/profile1.svg';
@@ -42,10 +44,16 @@ const { width } = Dimensions.get('window');
 export default function Account({ navigation }) {
   const { ctx, setCtx, ctxDil, setCtxDil } = useContext(EmContext);
 
+  const initialUser = ctx?.user || null;
+  const initialIsGuest =
+    initialUser?.kod === 'GUEST' ||
+    initialUser?.kod === 'HG1000' ||
+    ctx?.token === 'GUEST';
+
   const [state, setState] = useState({
-    s: {},
-    loading: true,
-    isGuest: false,
+    s: initialUser || {},
+    loading: false,
+    isGuest: initialIsGuest,
   });
 
   const [refreshing, setRefreshing] = useState(false);
@@ -56,12 +64,10 @@ export default function Account({ navigation }) {
     try {
       if (isRefresh) {
         setRefreshing(true);
-      } else {
-        setState(prev => ({ ...prev, loading: true }));
       }
 
       const isGuestStorage = (await storageGet('is_guest')) === '1';
-      const currentUser = await storageGet('user');
+      const currentUser = (await storageGet('user')) || ctx?.user;
       const isGuest =
         isGuestStorage ||
         currentUser?.kod === 'GUEST' ||
@@ -80,30 +86,38 @@ export default function Account({ navigation }) {
         return;
       }
 
+      if (currentUser) {
+        setState(prev => ({
+          ...prev,
+          s: currentUser,
+          isGuest: false,
+          loading: false,
+        }));
+      }
+
       const c = await ai.get('profile');
       if (c?.data && c.data.error === false) {
+        const freshUser = c.data.s || currentUser || {};
         setState({
-          s: c.data.s || currentUser || {},
+          s: freshUser,
           loading: false,
           isGuest: false,
         });
-      } else {
+        if (c.data.s) {
+          await storageSet('user', c.data.s);
+        }
+      } else if (!currentUser) {
         setState({
-          s: currentUser || {},
+          s: {},
           loading: false,
           isGuest: false,
         });
       }
     } catch (err) {
       console.log('Account fetchData error:', err);
-      const currentUser = await storageGet('user');
-      setState(prev => ({
-        ...prev,
-        s: currentUser || {},
-        loading: false,
-      }));
     } finally {
       setRefreshing(false);
+      setState(prev => ({ ...prev, loading: false }));
     }
   };
 
@@ -112,39 +126,7 @@ export default function Account({ navigation }) {
   }, []);
 
   const handleLogout = async () => {
-    try {
-      await AsyncStorage.multiRemove([
-        'user',
-        'is_guest',
-        'user-storage',
-        'tokenSend',
-        'has_seen_onboarding',
-      ]);
-      await storageDelete('user');
-      await storageDelete('is_guest');
-      await storageDelete('tokenSend');
-      await storageDelete('has_seen_onboarding');
-
-      try {
-        useUserStore.getState().clearUser?.();
-      } catch (e) {}
-
-      if (setCtx) {
-        setCtx(prev => ({
-          ...prev,
-          user: null,
-          token: null,
-        }));
-      }
-
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Onboarding' }],
-      });
-    } catch (err) {
-      console.log('handleLogout error:', err);
-      navigation.navigate('Onboarding');
-    }
+    await logoutUser(navigation, setCtx);
   };
 
   const handleGoToLogin = async () => {
@@ -155,10 +137,17 @@ export default function Account({ navigation }) {
       if (setCtx) {
         setCtx(prev => ({ ...prev, user: null, token: null }));
       }
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Login' }],
-      });
+      if (RootNavigation.navigationRef.isReady()) {
+        RootNavigation.reset('Login');
+      } else {
+        const rootNav = navigation.getParent() || navigation;
+        rootNav.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+          }),
+        );
+      }
     } catch (e) {
       navigation.navigate('Login');
     }
@@ -457,7 +446,7 @@ export default function Account({ navigation }) {
               {/* Notification Settings */}
               <TouchableOpacity
                 activeOpacity={0.7}
-                onPress={() => navigation.navigate('Notifications')}
+                onPress={() => navigation.navigate('NotificationSettings')}
                 style={[styles.menuItem, { borderBottomColor: borderColor }]}>
                 <View style={styles.menuLeft}>
                   <View style={styles.menuIconWrap}>
@@ -709,7 +698,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 120,
+    paddingBottom: 24,
   },
   loadingWrap: {
     paddingTop: 80,

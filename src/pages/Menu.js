@@ -9,6 +9,7 @@ import { EmContext } from "../contexts/EmContext";
 import * as RootNavigation from "../services/RootNavigation";
 
 import { useUserStore } from "../store/useUserStore";
+import { logoutUser } from "../helpers/auth";
 
 export default function ({navigation}) {
   const { setCtx } = useContext(EmContext);
@@ -43,52 +44,7 @@ export default function ({navigation}) {
   }
 
   const handleLogout = async () => {
-    try {
-      await AsyncStorage.multiRemove([
-        'user',
-        'is_guest',
-        'user-storage',
-        'tokenSend',
-        'has_seen_onboarding',
-      ]);
-      await storageDelete('user');
-      await storageDelete('is_guest');
-      await storageDelete('tokenSend');
-      await storageDelete('has_seen_onboarding');
-      try {
-        useUserStore.getState().clearUser?.();
-      } catch (e) {}
-      if (setCtx) {
-        setCtx(prev => ({
-          ...prev,
-          user: null,
-          token: null,
-        }));
-      }
-      try {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Onboarding' }],
-        });
-      } catch (e1) {
-        try {
-          navigation.dispatch(
-            CommonActions.reset({
-              index: 0,
-              routes: [{ name: 'Onboarding' }],
-            }),
-          );
-        } catch (e2) {
-          try {
-            RootNavigation.reset('Onboarding');
-          } catch (e3) {
-            navigation.navigate('Onboarding');
-          }
-        }
-      }
-    } catch (e) {
-      navigation.navigate('Onboarding');
-    }
+    await logoutUser(navigation, setCtx);
   };
 
 

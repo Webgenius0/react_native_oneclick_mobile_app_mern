@@ -24,6 +24,7 @@ import { getFcmToken } from '../helpers/notification';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUserStore } from '../store/useUserStore';
 import AppHeader from '../components/common/AppHeader';
+import { logoutUser } from '../helpers/auth';
 
 import ProfileIcon from '../assets/svg/profile1.svg';
 import BagIcon from '../assets/svg/bag.svg';
@@ -35,16 +36,21 @@ const { width } = Dimensions.get('window');
 export default function Profile({ navigation }) {
   const { ctx, setCtx, ctxDil, setCtxDil } = useContext(EmContext);
 
+  const initialUser = ctx?.user || {};
+  const isInitialGuest =
+    initialUser?.kod === 'GUEST' ||
+    initialUser?.kod === 'HG1000' ||
+    ctx?.token === 'GUEST';
+
   const [state, setState] = useState({
-    s: {},
-    loading: true,
-    isGuest: false,
+    s: initialUser,
+    loading: !initialUser?.kod && !initialUser?.id,
+    isGuest: isInitialGuest,
     updating: false,
   });
 
-  const [tel, setTel] = useState('');
-  const [adres, setAdres] = useState('');
-  const [newPassword, setNewPassword] = useState('');
+  const [tel, setTel] = useState(initialUser?.tel || '');
+  const [adres, setAdres] = useState(initialUser?.adres || initialUser?.sehir || '');
   const [refreshing, setRefreshing] = useState(false);
 
   const isDark = ctx.isDark;
@@ -59,12 +65,10 @@ export default function Profile({ navigation }) {
     try {
       if (isRefresh) {
         setRefreshing(true);
-      } else {
-        setState(prev => ({ ...prev, loading: true }));
       }
 
       const isGuestStorage = (await storageGet('is_guest')) === '1';
-      const currentUser = await storageGet('user');
+      const currentUser = (await storageGet('user')) || ctx?.user;
       const isGuest =
         isGuestStorage ||
         currentUser?.kod === 'GUEST' ||
@@ -82,10 +86,23 @@ export default function Profile({ navigation }) {
         return;
       }
 
+      if (currentUser) {
+        setState(prev => ({
+          ...prev,
+          s: currentUser,
+          loading: false,
+        }));
+        if (!tel && currentUser.tel) setTel(currentUser.tel);
+        if (!adres && (currentUser.adres || currentUser.sehir)) {
+          setAdres(currentUser.adres || currentUser.sehir);
+        }
+      }
+
       const c = await ai.get('profile');
       let userData = currentUser || {};
       if (c?.data && c.data.error === false && c.data.s) {
         userData = c.data.s;
+        await storageSet('user', userData);
       }
 
       setState({
@@ -95,21 +112,13 @@ export default function Profile({ navigation }) {
         updating: false,
       });
 
-      setTel(userData.tel || '');
-      setAdres(userData.adres || userData.sehir || '');
+      if (userData.tel) setTel(userData.tel);
+      if (userData.adres || userData.sehir) setAdres(userData.adres || userData.sehir);
     } catch (err) {
       console.log('Profile fetchData error:', err);
-      const currentUser = await storageGet('user');
-      setState(prev => ({
-        ...prev,
-        s: currentUser || {},
-        loading: false,
-        updating: false,
-      }));
-      setTel(currentUser?.tel || '');
-      setAdres(currentUser?.adres || '');
     } finally {
       setRefreshing(false);
+      setState(prev => ({ ...prev, loading: false }));
     }
   };
 
@@ -128,7 +137,6 @@ export default function Profile({ navigation }) {
       const payload = {
         tel: tel,
         adres: adres,
-        new_password: newPassword,
       };
 
       const res = await ai.post('profile-update', payload);
@@ -146,7 +154,6 @@ export default function Profile({ navigation }) {
         if (setCtx) {
           setCtx(prev => ({ ...prev, user: updated }));
         }
-        setNewPassword('');
       } else {
         Alert.alert(
           tr('Hata') || 'Error',
@@ -180,35 +187,7 @@ export default function Profile({ navigation }) {
   };
 
   const handleLogout = async () => {
-    try {
-      await AsyncStorage.multiRemove([
-        'user',
-        'is_guest',
-        'user-storage',
-        'tokenSend',
-        'has_seen_onboarding',
-      ]);
-      await storageDelete('user');
-      await storageDelete('is_guest');
-      await storageDelete('tokenSend');
-      await storageDelete('has_seen_onboarding');
-
-      try {
-        useUserStore.getState().clearUser?.();
-      } catch (e) {}
-
-      if (setCtx) {
-        setCtx(prev => ({ ...prev, user: null, token: null }));
-      }
-
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Onboarding' }],
-      });
-    } catch (err) {
-      console.log('handleLogout error:', err);
-      navigation.navigate('Onboarding');
-    }
+    await logoutUser(navigation, setCtx);
   };
 
   const handleDelete = () => {
@@ -411,24 +390,6 @@ export default function Profile({ navigation }) {
                   onChangeText={setAdres}
                   placeholder={tr('Teslimat adresiniz') || 'Your delivery address'}
                   placeholderTextColor={subTextColor}
-                />
-              </View>
-
-              {/* New Password */}
-              <View style={styles.formGroup}>
-                <Text style={[styles.formLabel, { color: subTextColor }]}>
-                  {tr('Yeni Parola') || 'New Password'}
-                </Text>
-                <TextInput
-                  style={[
-                    styles.formInput,
-                    { backgroundColor: inputBg, borderColor: borderColor, color: textColor },
-                  ]}
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                  placeholder={tr('Değiştirmek için giriniz') || 'Enter to change'}
-                  placeholderTextColor={subTextColor}
-                  secureTextEntry={true}
                 />
               </View>
 

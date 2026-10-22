@@ -1,6 +1,7 @@
 import React, { useContext } from 'react';
 import {
   Dimensions,
+  Image,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -12,42 +13,38 @@ import { EmContext } from '../contexts/EmContext';
 import { tr } from '../translate/i18n';
 import AppHeader from '../components/common/AppHeader';
 
-import CreditIcon from '../assets/svg/credit.svg';
-import ShieldIcon from '../assets/svg/menu_shield.svg';
+const { width } = Dimensions.get('window');
 
 const PAYMENT_OPTIONS = [
   {
-    id: 'cards',
-    title: 'Credit / Debit Cards',
-    subtitle: 'Visa, MasterCard & Troy',
-    desc: 'Pay securely using any international credit or debit card with 3D Secure protection.',
-    badge: 'Active',
-    iconType: 'credit',
-  },
-  {
     id: 'edahab',
-    title: 'E-Dahab Mobile Wallet',
-    subtitle: 'Telesom mobile money',
-    desc: 'Instant direct checkout with your registered E-Dahab wallet and zero transaction surcharges.',
+    title: 'E-Dahab Mobile Money',
+    subtitle: 'Telesom Mobile Money',
+    desc: 'Instant direct checkout with your registered E-Dahab wallet. Fast, secure, and fee-free payment for international orders.',
     badge: 'Active',
-    iconType: 'wallet',
+    logo: require('../assets/img/edahab.png'),
+    logoWidth: 100,
+    logoHeight: 46,
   },
   {
     id: 'waafipay',
     title: 'WaafiPay / ZAAD Service',
-    subtitle: 'Mobile Wallet & regional checkout',
-    desc: 'Seamless local mobile payment for fast international order processing.',
+    subtitle: 'Mobile Wallet & Regional Checkout',
+    desc: 'Seamless local mobile payment with WaafiPay and ZAAD. Fast order processing and instant verification.',
     badge: 'Active',
-    iconType: 'waafi',
+    logo: require('../assets/img/waafipay.png'),
+    logoWidth: 120,
+    logoHeight: 44,
   },
 ];
 
 export default function PaymentMethods({ navigation }) {
   const { ctx } = useContext(EmContext);
+
   const isDark = ctx.isDark;
   const pageBg = isDark ? '#111827' : '#F8FAFC';
   const cardBg = isDark ? '#1F2937' : '#FFFFFF';
-  const textColor = isDark ? '#F9FAFB' : '#252C34';
+  const textColor = isDark ? '#F9FAFB' : '#1E293B';
   const subTextColor = isDark ? '#9CA3AF' : '#64748B';
   const borderColor = isDark ? '#374151' : '#E5E7EB';
 
@@ -94,22 +91,15 @@ export default function PaymentMethods({ navigation }) {
               ]}>
               <View style={styles.cardHeader}>
                 <View style={styles.cardHeaderLeft}>
-                  <View style={styles.iconBadge}>
-                    {opt.iconType === 'credit' ? (
-                      <CreditIcon width={24} height={24} fill="#F67922" />
-                    ) : opt.iconType === 'wallet' ? (
-                      <Text style={{ fontSize: 20 }}>📱</Text>
-                    ) : (
-                      <Text style={{ fontSize: 20 }}>💳</Text>
-                    )}
-                  </View>
-                  <View style={styles.cardTitles}>
-                    <Text style={[styles.cardTitle, { color: textColor }]}>
-                      {opt.title}
-                    </Text>
-                    <Text style={[styles.cardSub, { color: subTextColor }]}>
-                      {opt.subtitle}
-                    </Text>
+                  <View style={styles.logoWrap}>
+                    <Image
+                      source={opt.logo}
+                      style={{
+                        width: opt.logoWidth,
+                        height: opt.logoHeight,
+                      }}
+                      resizeMode="contain"
+                    />
                   </View>
                 </View>
 
@@ -121,30 +111,20 @@ export default function PaymentMethods({ navigation }) {
                 </View>
               </View>
 
+              <View style={styles.cardTitles}>
+                <Text style={[styles.cardTitle, { color: textColor }]}>
+                  {opt.title}
+                </Text>
+                <Text style={[styles.cardSub, { color: subTextColor }]}>
+                  {opt.subtitle}
+                </Text>
+              </View>
+
               <Text style={[styles.cardDesc, { color: subTextColor }]}>
                 {opt.desc}
               </Text>
             </View>
           ))}
-        </View>
-
-        {/* Bank Level Security Notice Card */}
-        <View
-          style={[
-            styles.securityCard,
-            { backgroundColor: cardBg, borderColor: borderColor },
-          ]}>
-          <View style={styles.securityIconWrap}>
-            <ShieldIcon width={22} height={22} />
-          </View>
-          <View style={styles.securityInfo}>
-            <Text style={[styles.securityTitle, { color: textColor }]}>
-              Bank-Grade Encryption
-            </Text>
-            <Text style={[styles.securitySub, { color: subTextColor }]}>
-              All transactions are encrypted with 256-bit SSL security. Your financial information is never stored directly on our servers.
-            </Text>
-          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -161,112 +141,90 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 20,
+    paddingTop: 14,
     paddingBottom: 40,
   },
   introWrap: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   introTitle: {
     fontSize: 18,
     fontWeight: '700',
+    color: '#1E293B',
     marginBottom: 4,
   },
   introSub: {
     fontSize: 13,
     lineHeight: 18,
+    color: '#64748B',
   },
   cardsList: {
     gap: 14,
-    marginBottom: 24,
   },
   paymentCard: {
-    borderRadius: 18,
-    padding: 18,
+    borderRadius: 16,
     borderWidth: 1,
+    padding: 18,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
+    shadowOpacity: 0.04,
     shadowRadius: 3,
-    elevation: 1,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 14,
   },
   cardHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
-    marginRight: 8,
   },
-  iconBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#FFF4EB',
-    alignItems: 'center',
+  logoWrap: {
+    height: 48,
     justifyContent: 'center',
-    marginRight: 12,
-  },
-  cardTitles: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  cardSub: {
-    fontSize: 12.5,
-    marginTop: 2,
+    alignItems: 'flex-start',
   },
   activeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#DCFCE7',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-    gap: 5,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
   },
   activeDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#16A34A',
+    backgroundColor: '#10B981',
+    marginRight: 6,
   },
   activeBadgeText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#15803D',
+    color: '#059669',
+  },
+  cardTitles: {
+    marginBottom: 8,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  cardSub: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+    fontWeight: '500',
   },
   cardDesc: {
     fontSize: 13,
     lineHeight: 18,
-  },
-  securityCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  securityIconWrap: {
-    marginRight: 12,
-    marginTop: 2,
-  },
-  securityInfo: {
-    flex: 1,
-  },
-  securityTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  securitySub: {
-    fontSize: 12.5,
-    lineHeight: 18,
+    color: '#64748B',
   },
 });
