@@ -1,6 +1,6 @@
-import { createNavigationContainerRef } from '@react-navigation/native';
+import { CommonActions, createNavigationContainerRef } from '@react-navigation/native';
 
-export const navigationRef = createNavigationContainerRef()
+export const navigationRef = createNavigationContainerRef();
 
 export function navigate(name, params) {
   if (navigationRef.isReady()) {
@@ -10,16 +10,39 @@ export function navigate(name, params) {
 
 export function reset(name, params) {
   if (navigationRef.isReady()) {
-    navigationRef.reset({
-      index: 0,
-      routes: params !== undefined ? [{ name, params }] : [{ name }],
-    });
+    const route = params !== undefined ? { name, params } : { name };
+    try {
+      navigationRef.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [route],
+        }),
+      );
+    } catch (e) {
+      try {
+        navigationRef.navigate(name, params);
+      } catch (err) {}
+    }
+  }
+}
+
+export function resetRoot(state) {
+  if (navigationRef.isReady()) {
+    try {
+      if (typeof navigationRef.resetRoot === 'function') {
+        navigationRef.resetRoot(state);
+        return;
+      }
+    } catch (e) {}
+
+    try {
+      navigationRef.dispatch(CommonActions.reset(state));
+    } catch (e) {}
   }
 }
 
 export function resetStack(state) {
-  if (navigationRef.isReady()) {
-    navigationRef.reset(state);
-  }
+  resetRoot(state);
 }
+
 

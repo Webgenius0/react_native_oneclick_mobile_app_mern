@@ -76,135 +76,19 @@ import HomeNew from './src/pages/HomeNew.js';
 import { EXPRESS } from './config.js';
 import BannerList from './src/pages/BannerList.js';
 
-export default function AppNavigator() {
-  const { ctx, ctxDil, setCtxDil } = useContext(EmContext);
-  const { addItem } = useCartStore();
-
-  const [state, setState] = useState({
-    token: null,
-    loading: true,
-  });
-  let initialRouteName;
-  let authAfterInitialRouteName;
-
-  initialRouteName = 'Splash';
-  //initialRouteName = "Orders";
-  // initialRouteName = "Profile";
-  authAfterInitialRouteName = "Home";
-  authAfterInitialRouteName = 'Categories';
-
-  if (EXPRESS) {
-    // authAfterInitialRouteName = 'Home';
-  }
-
-  if (__DEV__) {
-    // authAfterInitialRouteName = "Orders";
-    // authAfterInitialRouteName = 'Cart';
-    // initialRouteName = 'AuthAfter';
-    // authAfterInitialRouteName = 'Webview';
-    //initialRouteName = 'Webview';
-  }
-
-  const loadLanguage = async () => {
-    try {
-      const lang = await storageGet('language');
-      const activeLang = lang && ['en', 'tr', 'som'].includes(lang) ? lang : 'en';
-      i18n.defaultLocale = 'en';
-      i18n.locale = activeLang;
-      setCtxDil(activeLang);
-
-      const isRTL = i18n.locale === 'ar' || i18n.locale === 'ckb';
-      ReactNative.I18nManager.allowRTL(isRTL);
-      ReactNative.I18nManager.forceRTL(false);
-    } catch (err) {
-      console.log('loadLanguage error:', err);
-    } finally {
-      setState(prev => ({ ...prev, loading: false }));
-    }
-  };
-
-  useEffect(() => {
-    loadLanguage();
-
-    // Handle shared links
-    try {
-      ReceiveSharingIntent.getReceivedFiles(
-        files => {
-          if (files && files.length > 0) {
-            const sharedText = files[0].text;
-            if (sharedText) {
-              // Extract product info and add to cart
-              const productTitle = 'Product';
-              const productImage = '';
-
-              addItem({
-                title: productTitle,
-                url: sharedText,
-                count: 1,
-                checked: true,
-                image: productImage,
-              });
-
-              ReceiveSharingIntent.clearReceivedFiles();
-              // Navigate to cart
-              setTimeout(() => {
-                navigationRef.current?.navigate('Cart');
-              }, 1000);
-            }
-          }
-        },
-        error => {
-          // Normal on cold launch when no shared content is present
-        },
-      );
-    } catch (e) {
-      // Ignored
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  if (state.loading) {
-    return null;
-  }
-
+function AuthAfterTabNavigator() {
+  const { ctx } = useContext(EmContext);
   const headerTitleStyle = {
-    color: ctx.isDark ? '#FFF' : '#000',
+    color: ctx?.isDark ? '#FFF' : '#000',
   };
 
-  const CategoryStack = () => {
-    return (
-      <Stack.Navigator
-        initialRouteName="CategoryList"
-        screenOptions={{
-          headerShown: false,
-          headerBackTitle: tr('Geri'),
-        }}>
-        <Stack.Screen
-          name="CategoryList"
-          component={CategoryList}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="CategoryDetail"
-          component={CategoryDetail}
-          options={{
-            headerShown: true,
-            headerTitleStyle: headerTitleStyle,
-          }}
-        />
-      </Stack.Navigator>
-    );
-  };
-
-  const AuthAfterTabNavigator = () => (
+  return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarIcon: ({ focused, color, size }) => {
-          // color = focused ? '#000' : '#ccc';
           let width = 30, height = 30;
-          let fill = focused ? Colors.primary : !ctx.isDark ? '#666' : '#FFF';
-          let r = route.name;
+          let fill = focused ? Colors.primary : !ctx?.isDark ? '#666' : '#FFF';
           switch (route.name) {
             case 'Home':
               if (EXPRESS) {
@@ -226,14 +110,6 @@ export default function AppNavigator() {
                 />
               );
             case 'Categories':
-              return (
-                <DotsIcon
-                  width={width}
-                  height={height}
-                  size={size}
-                  fill={fill}
-                />
-              );
             case 'CategoryList':
               return (
                 <DotsIcon
@@ -307,47 +183,39 @@ export default function AppNavigator() {
                 />
               );
           }
-
-          // return <Icon name="information-circle-outline" color={"#000000"} />
-          // return <Icon name={iconName} size={size} color={color} />;
-          // return <Ionicons name={iconName} size={size} color={color} />;
           return null;
         },
-        tabBarActiveBackgroundColor: ctx.bgColor,
+        tabBarActiveBackgroundColor: ctx?.bgColor,
         tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: ctx.color,
-        tabBarInactiveBackgroundColor: ctx.bgColor,
+        tabBarInactiveTintColor: ctx?.color,
+        tabBarInactiveBackgroundColor: ctx?.bgColor,
       })}
-      initialRouteName={authAfterInitialRouteName}>
-      {
-        EXPRESS ? (
-          <Tab.Screen
-            name="Home"
-            component={HomeNew}
-            options={{
-              title: tr('Express'),
-              headerTitleStyle: headerTitleStyle,
-              headerShown: true
-            }}
-          />
-        ) : (
-          <Tab.Screen
-            name="Home"
-            component={Home}
-            options={{ title: tr('Anasayfa'), headerTitleStyle: headerTitleStyle }}
-          />
-        )}
+      initialRouteName="Categories">
+      {EXPRESS ? (
+        <Tab.Screen
+          name="Home"
+          component={HomeNew}
+          options={{
+            title: tr('Express'),
+            headerTitleStyle: headerTitleStyle,
+            headerShown: true,
+          }}
+        />
+      ) : (
+        <Tab.Screen
+          name="Home"
+          component={Home}
+          options={{ title: tr('Anasayfa'), headerTitleStyle: headerTitleStyle }}
+        />
+      )}
       <Tab.Screen
         name="Categories"
         component={BannerList}
         options={{
           title: 'Market',
-          // title: tr('Kategoriler'),
           headerTitleStyle: headerTitleStyle,
         }}
       />
-      {/*<Tab.Screen name='Arrivals' component={Arrivals} options={{title: tr('Gelenler'), headerTitleStyle:headerTitleStyle}}/>*/}
-      {/*<Tab.Screen name='Balance' component={Balance} options={{title: tr('Hareketler'), headerTitleStyle:headerTitleStyle}}/>*/}
       <Tab.Screen
         name="Cart"
         component={Cart}
@@ -369,13 +237,83 @@ export default function AppNavigator() {
         name="Account"
         component={Account}
         options={{
-          title: tr('Hesabım'),
+          title: tr('Account') || 'Account',
           headerTitleStyle: headerTitleStyle,
           headerShown: false,
         }}
       />
     </Tab.Navigator>
   );
+}
+
+export default function AppNavigator() {
+  const { ctx, ctxDil, setCtxDil } = useContext(EmContext);
+  const { addItem } = useCartStore();
+
+  const [state, setState] = useState({
+    token: null,
+    loading: true,
+  });
+
+  const initialRouteName = 'Splash';
+
+  const loadLanguage = async () => {
+    try {
+      const lang = await storageGet('language');
+      const activeLang = lang && ['en', 'tr', 'som'].includes(lang) ? lang : 'en';
+      i18n.defaultLocale = 'en';
+      i18n.locale = activeLang;
+      setCtxDil(activeLang);
+
+      const isRTL = i18n.locale === 'ar' || i18n.locale === 'ckb';
+      ReactNative.I18nManager.allowRTL(isRTL);
+      ReactNative.I18nManager.forceRTL(false);
+    } catch (err) {
+      console.log('loadLanguage error:', err);
+    } finally {
+      setState(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  useEffect(() => {
+    loadLanguage();
+
+    try {
+      ReceiveSharingIntent.getReceivedFiles(
+        files => {
+          if (files && files.length > 0) {
+            const sharedText = files[0].text;
+            if (sharedText) {
+              const productTitle = 'Product';
+              const productImage = '';
+
+              addItem({
+                title: productTitle,
+                url: sharedText,
+                count: 1,
+                checked: true,
+                image: productImage,
+              });
+
+              ReceiveSharingIntent.clearReceivedFiles();
+              setTimeout(() => {
+                navigationRef.current?.navigate('Cart');
+              }, 1000);
+            }
+          }
+        },
+        () => {},
+      );
+    } catch (e) {}
+  }, []);
+
+  if (state.loading) {
+    return null;
+  }
+
+  const headerTitleStyle = {
+    color: ctx?.isDark ? '#FFF' : '#000',
+  };
 
   const headerOption = (title, headerShow) => {
     return {

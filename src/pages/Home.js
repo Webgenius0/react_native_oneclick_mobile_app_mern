@@ -21,6 +21,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import CustomSlider from "../components/CustomSlider";
 import { tr } from "../translate/i18n";
 import UlkeBar from "../components/UlkeBar";
+import { storageGet, storageSet } from "../helpers/storage";
 
 const { width } = Dimensions.get("window");
 
@@ -74,7 +75,7 @@ export default function Home({ route, navigation }) {
     ulkes: [],
     kur: "",
     firstLoad: false,
-    loading: true,
+    loading: false,
     token: "",
     storageAllKeys: {},
   });
@@ -87,8 +88,28 @@ export default function Home({ route, navigation }) {
     try {
       if (isRefresh) {
         setRefreshing(true);
-      } else {
-        setSubLoading(true);
+      }
+
+      // Check cached data if currently empty
+      if (!state.sliders?.length && !state.banners?.length) {
+        try {
+          const cached = await storageGet('cached_home_data');
+          if (cached && (cached.banners?.length || cached.sliders?.length)) {
+            setState(prev => ({
+              ...prev,
+              banners: cached.banners || [],
+              sliders: cached.sliders || [],
+              banners_orta: cached.banners_orta || [],
+              ulkes: cached.ulkes || [],
+              kur: cached.kur ?? "",
+            }));
+          }
+        } catch (e) {}
+      }
+      const token = await getToken();
+      if (!token) {
+        setState(prev => ({ ...prev, loading: false }));
+        return;
       }
 
       const c = await ai.post("home", {
@@ -105,8 +126,9 @@ export default function Home({ route, navigation }) {
           ulkes: c.data.ulkes || [],
           kur: c.data?.kur ?? "",
         };
-      } else {
-        ns = { ...ns, banners: [], sliders: [] };
+        try {
+          await storageSet('cached_home_data', c.data);
+        } catch (e) {}
       }
 
       ns.loading = false;

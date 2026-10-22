@@ -27,9 +27,11 @@ const { width } = Dimensions.get('window');
 export default function PersonalInformation({ navigation }) {
   const { ctx, setCtx } = useContext(EmContext);
 
+  const initialUser = ctx?.user || {};
+
   const [state, setState] = useState({
-    s: {},
-    loading: true,
+    s: initialUser,
+    loading: false,
   });
 
   const [isEditing, setIsEditing] = useState(false);
@@ -37,25 +39,35 @@ export default function PersonalInformation({ navigation }) {
   const [saving, setSaving] = useState(false);
 
   // Form state
-  const [fullName, setFullName] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [emailAddress, setEmailAddress] = useState('');
-  const [city, setCity] = useState('');
+  const [fullName, setFullName] = useState(initialUser.ad || initialUser.name || '');
+  const [phoneNumber, setPhoneNumber] = useState(initialUser.tel || '');
+  const [emailAddress, setEmailAddress] = useState(initialUser.email || '');
+  const [city, setCity] = useState(initialUser.sehir || initialUser.adres || '');
 
   const fetchData = async (isRefresh = false) => {
     try {
       if (isRefresh) {
         setRefreshing(true);
-      } else {
-        setState(prev => ({ ...prev, loading: true }));
       }
 
-      const currentUser = await storageGet('user');
+      const currentUser = (await storageGet('user')) || ctx?.user;
+      if (currentUser && !state.s?.ad) {
+        setState(prev => ({ ...prev, s: currentUser }));
+        setFullName(prev => prev || currentUser.ad || currentUser.name || '');
+        setPhoneNumber(prev => prev || currentUser.tel || '');
+        setEmailAddress(prev => prev || currentUser.email || '');
+        setCity(prev => prev || currentUser.sehir || currentUser.adres || '');
+      }
+
       const c = await ai.get('profile');
 
       let userData = currentUser || {};
       if (c?.data && c.data.error === false && c.data.s) {
         userData = c.data.s;
+        await storageSet('user', userData);
+        if (setCtx) {
+          setCtx(prev => ({ ...prev, user: userData }));
+        }
       }
 
       setState({
@@ -63,21 +75,12 @@ export default function PersonalInformation({ navigation }) {
         loading: false,
       });
 
-      setFullName(userData.ad || 'Fatima Nour');
-      setPhoneNumber(userData.tel || '+887315611353');
-      setEmailAddress(userData.email || 'fatimanour0930@gmail.com');
-      setCity(userData.sehir || userData.adres || 'Borama');
+      if (userData.ad || userData.name) setFullName(userData.ad || userData.name);
+      if (userData.tel) setPhoneNumber(userData.tel);
+      if (userData.email) setEmailAddress(userData.email);
+      if (userData.sehir || userData.adres) setCity(userData.sehir || userData.adres);
     } catch (err) {
       console.log('PersonalInformation fetch error:', err);
-      const currentUser = await storageGet('user');
-      setState({
-        s: currentUser || {},
-        loading: false,
-      });
-      setFullName(currentUser?.ad || 'Fatima Nour');
-      setPhoneNumber(currentUser?.tel || '+887315611353');
-      setEmailAddress(currentUser?.email || 'fatimanour0930@gmail.com');
-      setCity(currentUser?.sehir || currentUser?.adres || 'Borama');
     } finally {
       setRefreshing(false);
     }

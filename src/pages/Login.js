@@ -17,7 +17,8 @@ import KeyboardAvoidingComponent from '../components/KeyboardAvoidingComponent';
 import { EmContext } from '../contexts/EmContext';
 import { setUser } from '../helpers/auth';
 import ai from '../helpers/ai';
-import { storageGet, storageSet } from '../helpers/storage';
+import { storageDelete, storageGet, storageSet } from '../helpers/storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { i18n, tr } from '../translate/i18n';
 import { CommonActions } from '@react-navigation/native';
 import { getFcmToken } from '../helpers/notification';
@@ -69,6 +70,10 @@ export default function Login({ navigation }) {
       });
 
       if (res?.data && res.data.error === false) {
+        try {
+          await storageDelete('is_guest');
+          await AsyncStorage.removeItem('is_guest');
+        } catch (e) {}
         await setUser(res.data.s);
         setCtx(prev => ({
           ...prev,
@@ -123,6 +128,10 @@ export default function Login({ navigation }) {
           {
             text: 'OK',
             onPress: async () => {
+              try {
+                await storageDelete('is_guest');
+                await AsyncStorage.removeItem('is_guest');
+              } catch (e) {}
               const mockUser = {
                 name: 'Guest User',
                 token: 'mock-token-' + Date.now(),

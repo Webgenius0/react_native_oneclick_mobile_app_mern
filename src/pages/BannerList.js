@@ -138,9 +138,36 @@ export default function({ route, navigation }) {
     // setCtx({ ...ctx, notifications: localNotifications, lastNotifID: lastNotifID });
   };
 
-  const fetchData = async () => {
+  const fetchData = async (isRefresh = false) => {
     try {
-      setSubLoading(true);
+      if (isRefresh) {
+        setSubLoading(true);
+      }
+      const token = await getToken();
+      if (!token) {
+        const cached = await storageGet('cached_home_data');
+        if (cached && (cached.banners?.length || cached.sliders?.length)) {
+          setState(prev => ({
+            ...prev,
+            banners: cached.banners || [],
+            sliders: cached.sliders || [],
+            banners_orta: cached.banners_orta || [],
+            stories: cached.stories || [],
+            ulkes: cached.ulkes || [],
+            kur: cached.kur ?? "",
+            hasError: false,
+            loading: false,
+          }));
+        } else {
+          setState(prev => ({
+            ...prev,
+            ...DEFAULT_MARKET_DATA,
+            hasError: false,
+            loading: false,
+          }));
+        }
+        return;
+      }
       console.log("BannerList fetchData:home ulkeID", ulkeID);
       const c = await ai.post("home", {
         ulkeID: ulkeID,
@@ -214,7 +241,7 @@ export default function({ route, navigation }) {
 
   useFocusEffect(
     useCallback(() => {
-      fetchData();
+      fetchData(false);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [ulkeID]),
   );
@@ -310,7 +337,7 @@ export default function({ route, navigation }) {
             refreshControl={
               <RefreshControl
                 refreshing={subLoading}
-                onRefresh={fetchData}
+                onRefresh={() => fetchData(true)}
                 colors={[Colors.primary]}
               />
             }>

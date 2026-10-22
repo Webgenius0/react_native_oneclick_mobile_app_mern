@@ -113,7 +113,9 @@ export default function ({route, navigation}) {
   const fetchData = async () => {
     // lb('FETCH ORDERS '+trDate());
 
-    setLoading(true);
+    if (grups.length === 0) {
+      setLoading(true);
+    }
     // await delay(100);
 
     const c = await ai.post('orders', {

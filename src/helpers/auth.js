@@ -66,40 +66,23 @@ export const logoutUser = async (navigation, setCtx) => {
     } catch (e) {}
   }
 
-  // Redirect to Login page using RootNavigation
+  // Navigate cleanly and directly to Login
   try {
-    if (RootNavigation.navigationRef.isReady()) {
-      RootNavigation.navigationRef.dispatch(
-        CommonActions.reset({
-          index: 0,
-          routes: [{ name: 'Login' }],
-        }),
-      );
+    const parentNav = navigation?.getParent ? navigation.getParent() : null;
+    if (parentNav && typeof parentNav.navigate === 'function') {
+      parentNav.navigate('Login');
       return;
     }
-  } catch (e) {
-    console.log('RootNavigation reset to Login failed:', e);
-  }
-
-  // Fallback via navigation prop
-  try {
-    if (navigation) {
-      const rootNav = navigation.getParent ? navigation.getParent() || navigation : navigation;
-      rootNav.dispatch(
-        CommonActions.reset({
-          index: 0,
-          routes: [{ name: 'Login' }],
-        }),
-      );
-      return;
-    }
-  } catch (e) {
-    console.log('navigation dispatch to Login failed:', e);
-  }
+  } catch (e) {}
 
   try {
     if (navigation?.navigate) {
       navigation.navigate('Login');
+      return;
     }
+  } catch (e) {}
+
+  try {
+    RootNavigation.navigate('Login');
   } catch (e) {}
 };

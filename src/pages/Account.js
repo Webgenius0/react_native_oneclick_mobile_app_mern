@@ -77,7 +77,7 @@ export default function Account({ navigation }) {
         ctx?.user?.kod === 'HG1000' ||
         ctx?.token === 'GUEST';
 
-      if (isGuest) {
+      if (isGuest || !currentUser || (!currentUser.token && !ctx?.token)) {
         setState({
           s: currentUser || { kod: 'HG1000', ad: 'Guest' },
           loading: false,
@@ -86,14 +86,12 @@ export default function Account({ navigation }) {
         return;
       }
 
-      if (currentUser) {
-        setState(prev => ({
-          ...prev,
-          s: currentUser,
-          isGuest: false,
-          loading: false,
-        }));
-      }
+      setState(prev => ({
+        ...prev,
+        s: currentUser,
+        isGuest: false,
+        loading: false,
+      }));
 
       const c = await ai.get('profile');
       if (c?.data && c.data.error === false) {
@@ -131,42 +129,39 @@ export default function Account({ navigation }) {
 
   const handleGoToLogin = async () => {
     try {
-      await AsyncStorage.multiRemove(['user', 'is_guest', 'user-storage']);
-      await storageDelete('user');
       await storageDelete('is_guest');
-      if (setCtx) {
-        setCtx(prev => ({ ...prev, user: null, token: null }));
+      await AsyncStorage.removeItem('is_guest');
+    } catch (e) {}
+    try {
+      const parentNav = navigation?.getParent ? navigation.getParent() : null;
+      if (parentNav && typeof parentNav.navigate === 'function') {
+        parentNav.navigate('Login');
+        return;
       }
-      if (RootNavigation.navigationRef.isReady()) {
-        RootNavigation.reset('Login');
-      } else {
-        const rootNav = navigation.getParent() || navigation;
-        rootNav.dispatch(
-          CommonActions.reset({
-            index: 0,
-            routes: [{ name: 'Login' }],
-          }),
-        );
-      }
-    } catch (e) {
+    } catch (e) {}
+    try {
       navigation.navigate('Login');
+    } catch (e) {
+      RootNavigation.navigate('Login');
     }
   };
 
   const handleGoToRegister = async () => {
     try {
-      await AsyncStorage.multiRemove(['user', 'is_guest', 'user-storage']);
-      await storageDelete('user');
       await storageDelete('is_guest');
-      if (setCtx) {
-        setCtx(prev => ({ ...prev, user: null, token: null }));
+      await AsyncStorage.removeItem('is_guest');
+    } catch (e) {}
+    try {
+      const parentNav = navigation?.getParent ? navigation.getParent() : null;
+      if (parentNav && typeof parentNav.navigate === 'function') {
+        parentNav.navigate('Register');
+        return;
       }
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Register' }],
-      });
-    } catch (e) {
+    } catch (e) {}
+    try {
       navigation.navigate('Register');
+    } catch (e) {
+      RootNavigation.navigate('Register');
     }
   };
 

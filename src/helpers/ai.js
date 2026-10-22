@@ -120,7 +120,7 @@ ai.interceptors.response.use(
               'SetNewPassword',
             ];
             if (currentRoute && !authRoutes.includes(currentRoute.name)) {
-              RootNavigation.reset('Onboarding');
+              RootNavigation.reset('Login');
             }
           }
         }

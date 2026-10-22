@@ -44,7 +44,7 @@ export default function Profile({ navigation }) {
 
   const [state, setState] = useState({
     s: initialUser,
-    loading: !initialUser?.kod && !initialUser?.id,
+    loading: false,
     isGuest: isInitialGuest,
     updating: false,
   });
@@ -76,7 +76,7 @@ export default function Profile({ navigation }) {
         ctx?.user?.kod === 'GUEST' ||
         ctx?.user?.kod === 'HG1000';
 
-      if (isGuest) {
+      if (isGuest || !currentUser || (!currentUser.token && !ctx?.token)) {
         setState({
           s: currentUser || { kod: 'HG1000', ad: tr('Misafir') || 'Guest' },
           loading: false,
