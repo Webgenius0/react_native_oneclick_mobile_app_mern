@@ -1,118 +1,186 @@
-import ReactNative, {
+import React, { useContext, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
   Alert,
   Dimensions,
-  Image,
-  Linking,
+  Platform,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import {createRef, useContext, useEffect, useState} from 'react';
-
-import {EmContext} from '../contexts/EmContext';
+import ReactNative from 'react-native';
+import { EmContext } from '../contexts/EmContext';
 import ai from '../helpers/ai';
-import GlobalStyle from '../assets/GlobalStyle';
 import Colors from '../assets/Colors';
-import Logo from '../components/Logo';
+import { availableLanguages, i18n, tr } from '../translate/i18n';
+import { storageDelete, storageGet, storageSet } from '../helpers/storage';
+import { getFcmToken } from '../helpers/notification';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CommonActions } from '@react-navigation/native';
-import {availableLanguages, i18n, t, tr} from '../translate/i18n';
-import {storageDelete, storageGet, storageSet} from '../helpers/storage';
-import * as RootNavigation from '../services/RootNavigation';
-import Phone from '../assets/svg/phone.svg';
-import Facebook from '../assets/svg/facebook.svg';
-import Instagram from '../assets/svg/instagram.svg';
-import Whatsapp from '../assets/svg/whatsapp.svg';
-import Youtube from '../assets/svg/youtube.svg';
-import Snapchat from '../assets/svg/snapchat.svg';
+import { useUserStore } from '../store/useUserStore';
+import AppHeader from '../components/common/AppHeader';
+
 import ProfileIcon from '../assets/svg/profile1.svg';
-import {getFcmToken} from '../helpers/notification';
-import CopyItem from '../components/CopyItem';
-import {themeParams} from '../helpers/theme';
-import BankaItem from '../components/BankaItem';
-import {SelectList} from 'react-native-dropdown-select-list/index';
-import Loading from '../components/Loading';
-import RNPickerSelect from 'react-native-picker-select';
+import BagIcon from '../assets/svg/bag.svg';
+import NotificationBingIcon from '../assets/svg/notification_bing.svg';
+import CartIcon from '../assets/svg/cart.svg';
 
-import {useUserStore} from '../store/useUserStore';
-import TeslimatSehirPicker from '../components/TeslimatSehirPicker';
+const { width } = Dimensions.get('window');
 
-export default function ({route, navigation}) {
-  const {ctx, setCtx, ctxDil, setCtxDil} = useContext(EmContext);
-  const {width, height} = Dimensions.get('window');
-  const [showBox, setShowBox] = useState(true);
-  const [adres, setAdres] = useState('');
-  const [tel, setTel] = useState('');
-  const [newPassword, setNewPassword] = useState('');
+export default function Profile({ navigation }) {
+  const { ctx, setCtx, ctxDil, setCtxDil } = useContext(EmContext);
 
   const [state, setState] = useState({
-    s: [],
-    firstLoad: false,
+    s: {},
     loading: true,
-    update: false,
     isGuest: false,
-    token: '',
-    dils: availableLanguages,
-    language: null,
-    theme: ctx.theme,
-    themes: [
-      {id: 'light', ad: 'Açık Tema'},
-      {id: 'dark', ad: 'Koyu Tema'},
-    ],
-    fields: [],
-
-    iletisim: [{tel: '+90 555 666 44 33'}],
-    sosyal: [
-    ],
-    banka: [],
+    updating: false,
   });
 
-  // const {teslimatSehirID, setTeslimatSehirID} = useUserStore();
-  const [teslimatSehirID, setTeslimatSehirID] = useState(0);
-  const [teslimatSehirs, setTeslimatSehirs] = useState([]);
+  const [tel, setTel] = useState('');
+  const [adres, setAdres] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
-  const teslimatRef = createRef();
+  const isDark = ctx.isDark;
+  const pageBg = isDark ? '#111827' : '#F8FAFC';
+  const cardBg = isDark ? '#1F2937' : '#FFFFFF';
+  const textColor = isDark ? '#F9FAFB' : '#252C34';
+  const subTextColor = isDark ? '#9CA3AF' : '#64748B';
+  const borderColor = isDark ? '#374151' : '#E5E7EB';
+  const inputBg = isDark ? '#1F2937' : '#F8FAFC';
 
-  const handleSubmit = async () => {
-    if (state.isGuest || state.s?.kod === 'GUEST' || state.s?.kod === 'HG1000') {
-      Alert.alert(tr('Misafir hesabında değişiklik yapılamaz'));
+  const fetchData = async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setState(prev => ({ ...prev, loading: true }));
+      }
+
+      const isGuestStorage = (await storageGet('is_guest')) === '1';
+      const currentUser = await storageGet('user');
+      const isGuest =
+        isGuestStorage ||
+        currentUser?.kod === 'GUEST' ||
+        currentUser?.kod === 'HG1000' ||
+        ctx?.user?.kod === 'GUEST' ||
+        ctx?.user?.kod === 'HG1000';
+
+      if (isGuest) {
+        setState({
+          s: currentUser || { kod: 'HG1000', ad: tr('Misafir') || 'Guest' },
+          loading: false,
+          isGuest: true,
+          updating: false,
+        });
+        return;
+      }
+
+      const c = await ai.get('profile');
+      let userData = currentUser || {};
+      if (c?.data && c.data.error === false && c.data.s) {
+        userData = c.data.s;
+      }
+
+      setState({
+        s: userData,
+        loading: false,
+        isGuest: false,
+        updating: false,
+      });
+
+      setTel(userData.tel || '');
+      setAdres(userData.adres || userData.sehir || '');
+    } catch (err) {
+      console.log('Profile fetchData error:', err);
+      const currentUser = await storageGet('user');
+      setState(prev => ({
+        ...prev,
+        s: currentUser || {},
+        loading: false,
+        updating: false,
+      }));
+      setTel(currentUser?.tel || '');
+      setAdres(currentUser?.adres || '');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleSave = async () => {
+    if (state.isGuest) {
+      Alert.alert(tr('Misafir hesabında değişiklik yapılamaz') || 'Cannot edit guest account');
       return;
     }
 
-    /*if (state.newPassword.length < 3) {
-      alert(tr("Şifreniz en az 3 karakter olmalıdır"));
-      return;
-    }*/
-    setState({...state, update: true});
+    setState(prev => ({ ...prev, updating: true }));
+    try {
+      const payload = {
+        tel: tel,
+        adres: adres,
+        new_password: newPassword,
+      };
 
-    console.log('Teslimat Şehir ID', teslimatSehirID);
-
-    const res = await ai.post('profile-update', {
-      token: state.token,
-      new_password: newPassword,
-      adres: state.adres,
-      tel: state.tel,
-      teslimatSehirID: teslimatSehirID,
-    });
-    let ns = {...state};
-    if (res?.data?.error === false) {
-      Alert.alert(tr('Güncellendi'));
-      ns.newPassword = '';
-    } else {
-      Alert.alert(tr('Hata Oluştu'), res?.data?.msg || '');
+      const res = await ai.post('profile-update', payload);
+      if (res?.data && res.data.error === false) {
+        Alert.alert(
+          tr('Başarılı') || 'Success',
+          tr('Bilgileriniz başarıyla güncellendi') || 'Profile updated successfully',
+        );
+        const updated = {
+          ...(state.s || {}),
+          tel: tel,
+          adres: adres,
+        };
+        await storageSet('user', updated);
+        if (setCtx) {
+          setCtx(prev => ({ ...prev, user: updated }));
+        }
+        setNewPassword('');
+      } else {
+        Alert.alert(
+          tr('Hata') || 'Error',
+          res?.data?.msg || tr('Hata Oluştu') || 'Update failed',
+        );
+      }
+    } catch (e) {
+      console.log('Profile update error:', e);
+      Alert.alert(tr('Hata') || 'Error', tr('Hata Oluştu') || 'Update failed');
+    } finally {
+      setState(prev => ({ ...prev, updating: false }));
     }
-    ns.update = false;
+  };
 
-    setState(ns);
+  const handleDilUpdate = async dil => {
+    try {
+      await storageSet('language', dil);
+      i18n.locale = dil;
+      const isRTL = dil === 'ar' || dil === 'ckb';
+      ReactNative.I18nManager.allowRTL(isRTL);
+      setCtxDil(dil);
+
+      const fcmToken = await getFcmToken();
+      await ai.post('update-language', {
+        dil: dil,
+        fcmToken: fcmToken,
+      });
+    } catch (e) {
+      console.log('Language update error:', e);
+    }
   };
 
   const handleLogout = async () => {
     try {
-      // 1. Immediately remove all auth tokens and keys from storage
       await AsyncStorage.multiRemove([
         'user',
         'is_guest',
@@ -125,863 +193,519 @@ export default function ({route, navigation}) {
       await storageDelete('tokenSend');
       await storageDelete('has_seen_onboarding');
 
-      // 2. Clear zustand store
       try {
         useUserStore.getState().clearUser?.();
-      } catch (storeErr) {
-        console.log('User store clear error:', storeErr);
-      }
+      } catch (e) {}
 
-      // 3. Clear context
       if (setCtx) {
-        setCtx(prev => ({
-          ...prev,
-          user: null,
-          token: null,
-        }));
+        setCtx(prev => ({ ...prev, user: null, token: null }));
       }
 
-      // 4. Reset navigation to Onboarding (if not logged in, always show Onboarding)
-      try {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Onboarding' }],
-        });
-      } catch (e1) {
-        try {
-          navigation.dispatch(
-            CommonActions.reset({
-              index: 0,
-              routes: [{ name: 'Onboarding' }],
-            }),
-          );
-        } catch (e2) {
-          try {
-            RootNavigation.reset('Onboarding');
-          } catch (e3) {
-            navigation.navigate('Onboarding');
-          }
-        }
-      }
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Onboarding' }],
+      });
     } catch (err) {
       console.log('handleLogout error:', err);
-      try {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Onboarding' }],
-        });
-      } catch (navErr) {
-        try {
-          navigation.dispatch(
-            CommonActions.reset({
-              index: 0,
-              routes: [{ name: 'Onboarding' }],
-            }),
-          );
-        } catch (dErr) {
-          navigation.navigate('Onboarding');
-        }
-      }
+      navigation.navigate('Onboarding');
     }
   };
 
-  const handleGoToLogin = async () => {
-    try {
-      await AsyncStorage.multiRemove(['user', 'is_guest', 'user-storage']);
-      await storageDelete('user');
-      await storageDelete('is_guest');
-      try {
-        useUserStore.getState().clearUser?.();
-      } catch (e) {}
-      if (setCtx) {
-        setCtx(prev => ({ ...prev, user: null, token: null }));
-      }
-      try {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Login' }],
-        });
-      } catch (e1) {
-        navigation.dispatch(
-          CommonActions.reset({
-            index: 0,
-            routes: [{ name: 'Login' }],
-          }),
-        );
-      }
-    } catch (e) {
-      navigation.navigate('Login');
-    }
-  };
-
-  const handleGoToRegister = async () => {
-    try {
-      await AsyncStorage.multiRemove(['user', 'is_guest', 'user-storage']);
-      await storageDelete('user');
-      await storageDelete('is_guest');
-      try {
-        useUserStore.getState().clearUser?.();
-      } catch (e) {}
-      if (setCtx) {
-        setCtx(prev => ({ ...prev, user: null, token: null }));
-      }
-      try {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Register' }],
-        });
-      } catch (e1) {
-        navigation.dispatch(
-          CommonActions.reset({
-            index: 0,
-            routes: [{ name: 'Register' }],
-          }),
-        );
-      }
-    } catch (e) {
-      navigation.navigate('Register');
-    }
-  };
-
-  const handleDelete = async () => {
-    if (state.isGuest || state.s?.kod === 'GUEST' || state.s?.kod === 'HG1000') {
-      Alert.alert(tr('Misafir hesabı silinemez'));
+  const handleDelete = () => {
+    if (state.isGuest) {
+      Alert.alert(tr('Misafir hesabı silinemez') || 'Cannot delete guest account');
       return;
     }
 
-    return Alert.alert(
-      tr('Hesabı Sil'),
-      tr('Hesabınızı silmek istediğinize emin misiniz?'),
+    Alert.alert(
+      tr('Hesabı Sil') || 'Delete Account',
+      tr('Hesabınızı silmek istediğinize emin misiniz?') ||
+        'Are you sure you want to delete your account?',
       [
         {
-          text: tr('Hesabı Sil') + '!',
+          text: tr('İptal') || 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: tr('Hesabı Sil') || 'Delete Account',
+          style: 'destructive',
           onPress: async () => {
             try {
               const res = await ai.get('delete-account');
               if (res?.data?.error === false) {
-                Alert.alert(tr('Hesabınız 24 saat içinde silinecektir'));
-                await AsyncStorage.multiRemove([
-                  'user',
-                  'is_guest',
-                  'user-storage',
-                  'tokenSend',
-                  'has_seen_onboarding',
-                ]);
-                await storageDelete('user');
-                await storageDelete('is_guest');
-                await storageDelete('tokenSend');
-                await storageDelete('has_seen_onboarding');
-                try {
-                  useUserStore.getState().clearUser?.();
-                } catch (storeErr) {}
-                if (setCtx) {
-                  setCtx(prev => ({
-                    ...prev,
-                    user: null,
-                    token: null,
-                  }));
-                }
-                try {
-                  navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'Onboarding' }],
-                  });
-                } catch (e1) {
-                  try {
-                    navigation.dispatch(
-                      CommonActions.reset({
-                        index: 0,
-                        routes: [{ name: 'Onboarding' }],
-                      }),
-                    );
-                  } catch (e2) {
-                    RootNavigation.reset('Onboarding');
-                  }
-                }
+                Alert.alert(
+                  tr('Hesabınız 24 saat içinde silinecektir') ||
+                    'Your account will be deleted within 24 hours',
+                );
+                await handleLogout();
               } else {
-                Alert.alert(tr('Hesap silme işlemi başarısız oldu'));
+                Alert.alert(tr('Hata') || 'Error', tr('Hesap silme işlemi başarısız oldu') || 'Failed');
               }
             } catch (delErr) {
-              Alert.alert(tr('Hesap silme işlemi başarısız oldu'));
+              Alert.alert(tr('Hata') || 'Error', tr('Hesap silme işlemi başarısız oldu') || 'Failed');
             }
           },
-        },
-        {
-          text: tr('Hayır'),
         },
       ],
     );
   };
-  const handleDilUpdate = async dil => {
-    console.log('dil güncelleniyor...', dil);
-    await storageSet('language', dil);
-    i18n.locale = dil;
-    const isRTL = dil === 'ar' || dil === 'ckb';
-    ReactNative.I18nManager.allowRTL(isRTL);
-    const fcmToken = await getFcmToken();
-    const upr = await ai.post('update-language', {
-      dil: dil,
-      fcmToken: fcmToken,
-    });
-    console.log('dil api update', upr?.data);
-    setCtxDil(dil);
-  };
-  const handleThemeUpdate = async theme => {
-    await storageSet('theme', theme);
-    setState({...state, theme: theme});
-    const {bgColor, color, isDark, isLight} = themeParams(theme);
-    setCtx({...ctx, theme, bgColor, color, isDark, isLight});
-  };
-  const fetchData = async () => {
-    try {
-      console.log('fetchData', +new Date());
-      const isGuestStorage = (await storageGet('is_guest')) === '1';
-      const currentUser = await storageGet('user');
-      const isGuest =
-        isGuestStorage ||
-        currentUser?.kod === 'GUEST' ||
-        currentUser?.kod === 'HG1000' ||
-        currentUser?.token === 'GUEST' ||
-        ctx?.user?.kod === 'GUEST' ||
-        ctx?.user?.kod === 'HG1000' ||
-        ctx?.token === 'GUEST';
 
-      let language = await storageGet('language');
-      let theme = await storageGet('theme');
-
-      if (isGuest) {
-        setState(prev => ({
-          ...prev,
-          s: currentUser || { kod: 'HG1000', ad: tr('Misafir') },
-          language: language || 'en',
-          theme: theme || 'light',
-          loading: false,
-          isGuest: true,
-        }));
-        return;
-      }
-
-      const c = await ai.get('profile');
-      let ns = {...state, isGuest: false};
-      if (c?.data && c.data.error === false) {
-        ns = {
-          ...state,
-          s: c.data.s || {},
-          fields: Array.isArray(c.data.require_fields) ? c.data.require_fields : ['tel', 'adres'],
-          sosyal: Array.isArray(c.data.sosyal) ? c.data.sosyal : [],
-          banka: Array.isArray(c.data.banka) ? c.data.banka : [],
-          isGuest: false,
-        };
-
-        if (c.data.teslimatSehirs) {
-          setTeslimatSehirs(c.data.teslimatSehirs);
-        }
-        if (c.data.teslimatSehirID) {
-          setTeslimatSehirID(c.data.teslimatSehirID);
-        }
-      } else {
-        ns = {
-          ...state,
-          s: currentUser || {},
-          fields: ['tel', 'adres'],
-          isGuest: false,
-        };
-      }
-
-      ns.language = language;
-      ns.theme = theme ? theme : 'light';
-      ns.loading = false;
-      setState(ns);
-    } catch (err) {
-      console.log('Profile fetch error fallback:', err);
-      const currentUser = await storageGet('user');
-      let language = await storageGet('language');
-      let theme = await storageGet('theme');
-      setState(prev => ({
-        ...prev,
-        s: currentUser || {},
-        fields: ['tel', 'adres'],
-        language: language || 'en',
-        theme: theme || 'light',
-        loading: false,
-      }));
-    }
-  };
-
-  const styles = StyleSheet.create({
-    borderedBox: {
-      padding: 20,
-      borderWidth: 1,
-      borderColor: '#EEE',
-      borderRadius: 10,
-      marginBottom: 20,
-    },
-    paymentItem: {
-      padding: 10,
-      borderBottomWidth: 1,
-      borderColor: '#EEE',
-      borderRadius: 10,
-      width: '100%',
-      alignItems: 'center',
-      justifyContent: 'center',
-      // justifyContent  : "space-between",
-      flexDirection: 'column',
-    },
-    paymentItemText: {
-      color: ctx.color,
-      fontSize: 16,
-      textAlign: 'center',
-    },
-    dil: {
-      backgroundColor: Colors.primary,
-      padding: 10,
-      borderRadius: 5,
-      margin: 5,
-    },
-    dilText: {
-      color: ctx.isLight ? '#FFF' : '#000',
-      fontWeight: 'bold',
-    },
-    aktifDil: {
-      backgroundColor: ctx.isLight ? '#333' : '#FFF',
-    },
-    container: {
-      flex: 1,
-      backgroundColor: ctx.bgColor,
-      // alignItems: "center",
-      // justifyContent: "center",
-      flexDirection: 'column',
-    },
-    logoContainer: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    scroll: {
-      paddingHorizontal: 10,
-      paddingBottom: 10,
-    },
-    row: {
-      flexDirection: 'row',
-      marginBottom: 20,
-    },
-    column: {
-      flexDirection: 'column',
-      marginBottom: 15,
-    },
-    label: {
-      width: 110,
-      fontWeight: 'bold',
-      color: ctx.color,
-    },
-    labelw100: {
-      width: '100%',
-      fontWeight: 'bold',
-      color: ctx.color,
-    },
-    text: {
-      color: ctx.color,
-    },
-    input: {
-      borderWidth: 1,
-      borderColor: '#ccc',
-      padding: 5,
-      borderRadius: 5,
-      width: '60%',
-      color: ctx.color || '#000000',
-      // placeholderTextColor: "black" || ctx.color,
-    },
-    button: {
-      backgroundColor: Colors.btnColor,
-      padding: 10,
-      borderRadius: 5,
-      maxWidth: 220,
-      textAlign: 'center',
-      flexDirection: 'row',
-    },
-    logoutBtn: {
-      backgroundColor: '#333',
-      padding: 10,
-      borderRadius: 5,
-      maxWidth: 220,
-      textAlign: 'center',
-      marginHorizontal: 15,
-    },
-    deleteBtn: {
-      backgroundColor: '#e14646',
-      padding: 10,
-      borderRadius: 5,
-      maxWidth: 220,
-      textAlign: 'center',
-      marginHorizontal: 15,
-    },
-    buttonText: {
-      color: ctx.isLight ? '#fff' : '#000',
-      textAlign: 'center',
-      fontWeight: 'bold',
-    },
-
-    guestCard: {
-      padding: 24,
-      backgroundColor: ctx.isLight ? '#F9FAFB' : '#1F2937',
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: ctx.isLight ? '#E5E7EB' : '#374151',
-      alignItems: 'center',
-      marginBottom: 20,
-    },
-    guestAvatar: {
-      width: 72,
-      height: 72,
-      borderRadius: 36,
-      backgroundColor: ctx.isLight ? '#FFF3E8' : '#2D1F15',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 16,
-    },
-    guestTitle: {
-      fontSize: 20,
-      fontWeight: 'bold',
-      color: ctx.color,
-      marginBottom: 8,
-      textAlign: 'center',
-    },
-    guestSubtitle: {
-      fontSize: 14,
-      color: ctx.isLight ? '#6B7280' : '#9CA3AF',
-      textAlign: 'center',
-      lineHeight: 20,
-      marginBottom: 20,
-      paddingHorizontal: 10,
-    },
-    guestActionRow: {
-      flexDirection: 'row',
-      width: '100%',
-      justifyContent: 'space-between',
-    },
-    guestLoginBtn: {
-      flex: 1,
-      backgroundColor: Colors.primary,
-      paddingVertical: 14,
-      borderRadius: 10,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: 6,
-    },
-    guestLoginBtnText: {
-      color: '#FFFFFF',
-      fontWeight: 'bold',
-      fontSize: 15,
-    },
-    guestRegisterBtn: {
-      flex: 1,
-      backgroundColor: 'transparent',
-      borderWidth: 1.5,
-      borderColor: Colors.primary,
-      paddingVertical: 14,
-      borderRadius: 10,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginLeft: 6,
-    },
-    guestRegisterBtnText: {
-      color: Colors.primary,
-      fontWeight: 'bold',
-      fontSize: 15,
-    },
-    logoutBtnFull: {
-      backgroundColor: '#DC2626',
-      paddingVertical: 14,
-      borderRadius: 10,
-      width: '100%',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    logoutBtnFullText: {
-      color: '#FFFFFF',
-      fontWeight: 'bold',
-      fontSize: 16,
-    },
-
-    safeArea: {
-      flex: 1,
-      backgroundColor: ctx.bgColor,
-    },
-  });
-
-  useEffect(() => {
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const displayName = state.s.ad || state.s.name || tr('Kullanıcı') || 'Kullanıcı';
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <ScrollView
-          contentContainerStyle={{paddingBottom: 40, paddingTop: 20}}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled">
-          {/*<AuthHeader navigation={navigation} route={route} />*/}
-          {/*<View style={styles.logoContainer}>
-          <Logo maxWidth={120} />
-        </View>*/}
-          {state.loading ? (
-            <View>
-              <Text>{tr('Yükleniyor')}...</Text>
-            </View>
-          ) : null}
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: cardBg }]}>
+      <StatusBar
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={cardBg}
+      />
 
-          {state.loading === false && (
-            state.isGuest ? (
-              <View style={styles.scroll}>
-                {/* Guest Profile Card */}
-                <View style={styles.guestCard}>
-                  <View style={styles.guestAvatar}>
-                    <ProfileIcon fill={Colors.primary} width={38} height={38} />
-                  </View>
-                  <Text style={styles.guestTitle}>
-                    {tr('Misafir Kullanıcı')}
-                  </Text>
-                  <Text style={styles.guestSubtitle}>
-                    {i18n.locale === 'tr'
-                      ? 'Daha iyi bir alışveriş deneyimi ve sipariş takibi için giriş yapın veya hesap oluşturun.'
-                      : i18n.locale === 'som'
-                      ? 'Gal akoonkaaga ama sameyso akoon cusub si aad u hesho adeeg buuxa.'
-                      : 'Log in or create an account for a better shopping experience and order tracking.'}
-                  </Text>
+      {/* Header */}
+      <AppHeader
+        navigation={navigation}
+        showBack={true}
+        title={tr('Profil') || 'Profile'}
+        style={{
+          borderBottomWidth: 1,
+          borderBottomColor: borderColor,
+          backgroundColor: cardBg,
+        }}
+      />
 
-                  <View style={styles.guestActionRow}>
-                    <TouchableOpacity
-                      style={styles.guestLoginBtn}
-                      onPress={handleGoToLogin}>
-                      <Text style={styles.guestLoginBtnText}>{tr('Giriş Yap')}</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.guestRegisterBtn}
-                      onPress={handleGoToRegister}>
-                      <Text style={styles.guestRegisterBtnText}>{tr('Kayıt Ol')}</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Language Selection */}
-                <View style={[styles.borderedBox, GlobalStyle.pb5]}>
-                  <View style={styles.row}>
-                    <Text style={[styles.labelw100, GlobalStyle.textCenter]}>
-                      {tr('Uygulama Dili')}
-                    </Text>
-                  </View>
-
-                  <View style={[styles.row, {justifyContent: 'center'}]}>
-                    {availableLanguages.map((dil, i) => (
-                      <TouchableOpacity
-                        key={i}
-                        onPress={() => handleDilUpdate(dil.id)}
-                        style={[
-                          styles.dil,
-                          dil.id === ctxDil ? styles.aktifDil : null,
-                        ]}>
-                        <Text style={styles.dilText}>{dil.ad.toUpperCase()}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                {/* Theme Selection */}
-                <View style={[styles.borderedBox, GlobalStyle.pb5]}>
-                  <View style={styles.row}>
-                    <Text style={[styles.labelw100, GlobalStyle.textCenter]}>
-                      {tr('Tema')}
-                    </Text>
-                  </View>
-
-                  <View style={[styles.row, {justifyContent: 'center'}]}>
-                    {state.themes.map((x, i) => (
-                      <TouchableOpacity
-                        key={i}
-                        onPress={() => handleThemeUpdate(x.id)}
-                        style={[
-                          styles.dil,
-                          x.id === state.theme ? styles.aktifDil : null,
-                        ]}>
-                        <Text style={styles.dilText}>
-                          {tr(x.ad).toUpperCase()}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                {/* Exit Guest Mode / Logout Button */}
-                <View style={{marginVertical: 15, width: '100%'}}>
-                  <TouchableOpacity
-                    style={styles.logoutBtnFull}
-                    onPress={handleLogout}>
-                    <Text style={styles.logoutBtnFullText}>
-                      {tr('Çıkış Yap')}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+      <ScrollView
+        style={[styles.container, { backgroundColor: pageBg }]}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => fetchData(true)}
+            colors={['#F67922']}
+            tintColor="#F67922"
+          />
+        }>
+        {state.loading && !refreshing ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="large" color="#F67922" />
+          </View>
+        ) : (
+          <>
+            {/* Top Card: Big User Icon & Name */}
+            <View
+              style={[
+                styles.topUserCard,
+                { backgroundColor: cardBg, borderColor: borderColor },
+              ]}>
+              <View style={styles.topAvatarCircle}>
+                <ProfileIcon fill="#F67922" width={48} height={48} />
               </View>
-            ) : (
-            <View style={styles.scroll}>
-              <View style={styles.borderedBox}>
-                <View style={styles.row}>
-                  <Text style={styles.label}>{tr('Müşteri Kodu')}</Text>
-                  <Text style={styles.text}>{state.s.kod}</Text>
-                </View>
-
-                <View style={styles.row}>
-                  <Text style={styles.label}>{tr('Ad')}</Text>
-                  <Text style={styles.text}>{state.s.ad}</Text>
-                </View>
-
-                {state.fields?.includes('tel') && (
-                  <View style={styles.row}>
-                    <Text style={styles.label}>{tr('Telefon')}</Text>
-                    <Text style={styles.text}>{state.s.tel}</Text>
-                  </View>
-                )}
-
-                {state.fields?.includes('adres') && (
-                  <View style={styles.row}>
-                    <Text style={styles.label}>{tr('Adres')}</Text>
-                    <Text style={styles.text}>{state.s.adres}</Text>
-                  </View>
-                )}
-
-                <View style={styles.row}>
-                  <Text style={styles.label}>{tr('Yeni Parola')}</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={newPassword}
-                    onChangeText={e => setNewPassword(e)}
-                  />
-                </View>
-
-                <View style={styles.row}>
-                  <Text style={styles.label}>{tr('Teslimat Şehri')}</Text>
-                  <TeslimatSehirPicker
-                    teslimatSehirID={teslimatSehirID}
-                    setTeslimatSehirID={setTeslimatSehirID}
-                    teslimatSehirs={teslimatSehirs}
-                    changeText={true}
-                  />
-
-
-
-                    {/*
-                  <View style={{flexDirection: 'row', display: 'flex'}}>
-
-                    <TouchableOpacity
-                      onPress={() => teslimatRef.current.togglePicker(true)}>
-                      <Text
-                        style={{
-                          color: ctx.color,
-                          fontSize: 12,
-                          textAlign: 'center',
-                          marginStart: 10,
-                        }}>
-                        {tr('Değiştir')}
-                      </Text>
-                    </TouchableOpacity>
-                    */}
-                    {/*<SelectList
-                      setSelected={(val) => setTeslimatSehirID(val)}
-                      data={teslimatSehirs}
-                      selected={state.ilID}
-                      placeholder={tr("Şehir Seçiniz")}
-                      label={tr("Teslimat Şehri")}
-                      search={false}
-                      save="key"
-                      boxStyles={{ color: "#333", height: 40,}}
-                      inputStyles={{ color: "#333",  }}
-                      dropdownTextStyles={{ color: "#333",   }}
-                      defaultOption={teslimatSehirID}
-                    />
-                  </View>
-
-                    */}
-
-                </View>
-
-                <View style={[GlobalStyle.pt10, GlobalStyle.alignCenter]}>
-                  <TouchableOpacity
-                    style={styles.button}
-                    onPress={handleSubmit}
-                    disabled={state.update}>
-                    {state.update ? (
-                      <Loading status={true} color="#FFFFFF" />
-                    ) : null}
-                    <Text style={styles.buttonText}>
-                      {state.update
-                        ? tr('Güncelleniyor').toUpperCase() + '...'
-                        : tr('Güncelle').toUpperCase()}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {state.banka.length > 0 ? (
-                <View style={[styles.borderedBox, GlobalStyle.pb5]}>
-                  <View style={styles.row}>
-                    <Text style={[styles.labelw100, GlobalStyle.textCenter]}>
-                      {tr('Ödeme Yöntemleri')}
-                    </Text>
-                  </View>
-                  <View style={[styles.column, GlobalStyle.p0]}>
-                    {state.banka.map((item, i) => (
-                      <BankaItem key={i} item={item} />
-                    ))}
-                  </View>
-                </View>
+              <Text style={[styles.userNameText, { color: textColor }]}>
+                {displayName}
+              </Text>
+              {state.s.kod && state.s.kod !== 'GUEST' && state.s.kod !== 'HG1000' ? (
+                <Text style={[styles.userCodeText, { color: subTextColor }]}>
+                  {state.s.kod}
+                </Text>
               ) : null}
+            </View>
 
-              <View style={[styles.borderedBox, GlobalStyle.pb5]}>
-                <View style={styles.row}>
-                  <Text style={[styles.labelw100, GlobalStyle.textCenter]}>
-                    {tr('Uygulama Dili')}
-                  </Text>
+            {/* 3 Action Cards Row (Orders, Notifications, Cart) */}
+            <View style={styles.threeCardsRow}>
+              {/* Orders */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[
+                  styles.quickCard,
+                  { backgroundColor: cardBg, borderColor: borderColor },
+                ]}
+                onPress={() => navigation.navigate('Orders')}>
+                <View style={[styles.quickIconWrap, { backgroundColor: '#FFF7ED' }]}>
+                  <BagIcon width={22} height={22} fill="#F67922" />
                 </View>
+                <Text style={[styles.quickTitle, { color: textColor }]}>
+                  {tr('Orders') || 'Orders'}
+                </Text>
+                <Text style={[styles.quickSub, { color: subTextColor }]}>
+                  {tr('Geçmiş & Takip') || 'Track & History'}
+                </Text>
+              </TouchableOpacity>
 
-                <View style={[styles.row, {justifyContent: 'center'}]}>
-                  {availableLanguages.map((dil, i) => (
+              {/* Notifications */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[
+                  styles.quickCard,
+                  { backgroundColor: cardBg, borderColor: borderColor },
+                ]}
+                onPress={() => navigation.navigate('Notifications')}>
+                <View style={[styles.quickIconWrap, { backgroundColor: '#FFF1F2' }]}>
+                  <NotificationBingIcon width={22} height={22} stroke="#F43F5E" />
+                </View>
+                <Text style={[styles.quickTitle, { color: textColor }]}>
+                  {tr('Notifications') || 'Notifications'}
+                </Text>
+                <Text style={[styles.quickSub, { color: subTextColor }]}>
+                  {tr('Güncellemeler') || 'Updates'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Cart */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[
+                  styles.quickCard,
+                  { backgroundColor: cardBg, borderColor: borderColor },
+                ]}
+                onPress={() => navigation.navigate('Cart')}>
+                <View style={[styles.quickIconWrap, { backgroundColor: '#F0FDF4' }]}>
+                  <CartIcon width={22} height={22} fill="#10B981" />
+                </View>
+                <Text style={[styles.quickTitle, { color: textColor }]}>
+                  {tr('Cart') || 'Cart'}
+                </Text>
+                <Text style={[styles.quickSub, { color: subTextColor }]}>
+                  {tr('Ürünler') || 'Items'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Hesap Bilgileri Card */}
+            <View
+              style={[
+                styles.formCard,
+                { backgroundColor: cardBg, borderColor: borderColor },
+              ]}>
+              <Text style={[styles.formCardTitle, { color: textColor }]}>
+                {tr('Hesap Bilgileri') || 'Account Information'}
+              </Text>
+
+              {/* Phone */}
+              <View style={styles.formGroup}>
+                <Text style={[styles.formLabel, { color: subTextColor }]}>
+                  {tr('Telefon') || 'Phone'}
+                </Text>
+                <TextInput
+                  style={[
+                    styles.formInput,
+                    { backgroundColor: inputBg, borderColor: borderColor, color: textColor },
+                  ]}
+                  value={tel}
+                  onChangeText={setTel}
+                  placeholder={tr('Telefon numaranız') || 'Your phone number'}
+                  placeholderTextColor={subTextColor}
+                  keyboardType="phone-pad"
+                />
+              </View>
+
+              {/* Address */}
+              <View style={styles.formGroup}>
+                <Text style={[styles.formLabel, { color: subTextColor }]}>
+                  {tr('Adres') || 'Address'}
+                </Text>
+                <TextInput
+                  style={[
+                    styles.formInput,
+                    { backgroundColor: inputBg, borderColor: borderColor, color: textColor },
+                  ]}
+                  value={adres}
+                  onChangeText={setAdres}
+                  placeholder={tr('Teslimat adresiniz') || 'Your delivery address'}
+                  placeholderTextColor={subTextColor}
+                />
+              </View>
+
+              {/* New Password */}
+              <View style={styles.formGroup}>
+                <Text style={[styles.formLabel, { color: subTextColor }]}>
+                  {tr('Yeni Parola') || 'New Password'}
+                </Text>
+                <TextInput
+                  style={[
+                    styles.formInput,
+                    { backgroundColor: inputBg, borderColor: borderColor, color: textColor },
+                  ]}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  placeholder={tr('Değiştirmek için giriniz') || 'Enter to change'}
+                  placeholderTextColor={subTextColor}
+                  secureTextEntry={true}
+                />
+              </View>
+
+              {/* Save Button */}
+              <TouchableOpacity
+                activeOpacity={0.88}
+                style={styles.saveBtn}
+                onPress={handleSave}
+                disabled={state.updating}>
+                {state.updating ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.saveBtnText}>
+                    {tr('Değişiklikleri Kaydet') || 'Save Changes'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* App Language Card */}
+            <View
+              style={[
+                styles.settingsCard,
+                { backgroundColor: cardBg, borderColor: borderColor },
+              ]}>
+              <Text style={[styles.settingsCardTitle, { color: textColor }]}>
+                {tr('Uygulama Dili') || 'App Language'}
+              </Text>
+              <View style={styles.langPillsRow}>
+                {availableLanguages.map(dil => {
+                  const isSelected = dil.id === ctxDil;
+                  return (
                     <TouchableOpacity
-                      key={i}
+                      key={dil.id}
+                      activeOpacity={0.8}
                       onPress={() => handleDilUpdate(dil.id)}
                       style={[
-                        styles.dil,
-                        dil.id === ctxDil ? styles.aktifDil : null,
+                        styles.langPill,
+                        { borderColor: borderColor },
+                        isSelected && styles.langPillActive,
                       ]}>
-                      <Text style={styles.dilText}>{dil.ad.toUpperCase()}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <View style={[styles.borderedBox, GlobalStyle.pb5]}>
-                <View style={styles.row}>
-                  <Text style={[styles.labelw100, GlobalStyle.textCenter]}>
-                    {tr('Tema')}
-                  </Text>
-                </View>
-
-                <View style={[styles.row, {justifyContent: 'center'}]}>
-                  {state.themes.map((x, i) => (
-                    <TouchableOpacity
-                      key={i}
-                      onPress={() => handleThemeUpdate(x.id)}
-                      style={[
-                        styles.dil,
-                        x.id === state.theme ? styles.aktifDil : null,
-                      ]}>
-                      <Text style={styles.dilText}>
-                        {tr(x.ad).toUpperCase()}
+                      <Text
+                        style={[
+                          styles.langPillText,
+                          { color: textColor },
+                          isSelected && styles.langPillTextActive,
+                        ]}>
+                        {dil.ad}
                       </Text>
                     </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/*
-                <View
-                  style={{
-                    borderWidth: 1,
-                    borderColor: "#EEE",
-                    backgroundColor: ctx.bgColor,
-                    borderRadius: 10,
-                    overflow: "hidden",
-                  }}>
-
-
-                  <View
-                    style={{
-                      backgroundColor: Colors.primary, padding: 10,
-                      borderTopRightWidth: 1, borderTopLeftWidth: 1,
-                      borderColor: Colors.primary,
-                      borderTopRightRadius: 10, borderTopLeftRadius: 10,
-                    }}>
-                    <Text
-                      style={{
-                        textAlign: "center",
-                        color: "#FFF",
-                        fontWeight: "500",
-                        fontSize: 20,
-                      }}>{tr("İletişim")}</Text>
-                  </View>
-
-
-                </View>
-
-                {
-                  state.sosyal.length > 0 ? (
-                <View style={{ marginVertical: 20, borderWidth: 1, borderColor: "#EEE", padding: 20 }}>
-                  <Text style={{ textAlign: "center", color: ctx.color, fontWeight: "400", fontSize: 22 }}>
-                    {tr("Bizi Takip Edin")}
-                  </Text>
-                  <View style={{ flexDirection: "row", justifyContent: "center" }}>
-                    {
-                      state.sosyal.map((item, i) => (
-                        <TouchableOpacity
-                          key={i} style={{
-                          marginVertical: 10,
-                          marginHorizontal: 10,
-                          flexDirection: "row",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }} onPress={() => Linking.openURL(item.link)}>
-                          <View
-                            style={{
-                              width: 40,
-                              height: 40,
-                              borderRadius: 20,
-                              // backgroundColor: "#EEE",
-                              justifyContent: "center",
-                              alignItems: "center",
-                            }}>
-                            {item.ad === "facebook" ? <Facebook width={30} height={30} /> : null}
-                            {item.ad === "instagram" ? <Instagram width={30} height={30} /> : null}
-                            {item.ad === "whatsapp" ? <Whatsapp width={44} height={44} /> : null}
-                            {item.ad === "youtube" ? <Youtube width={44} height={44} /> : null}
-                            {item.ad === "snapchat" ? <Snapchat width={44} height={44} /> : null}
-                          </View>
-                          <Text style={{ marginLeft: 10, color: "#333", fontWeight: "500", fontSize: 22 }}>{item.ad}</Text>
-                        </TouchableOpacity>
-                      ))
-                    }
-                  </View>
-                </View>
-                  ) : null
-                }*/}
-
-              <View
-                style={{
-                  flex: 1,
-                  width: '100%',
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginVertical: 20,
-                }}>
-                <TouchableOpacity
-                  style={styles.deleteBtn}
-                  onPress={handleDelete}
-                  disabled={state.update}>
-                  <Text style={styles.buttonText}>{tr('Hesabı Sil')}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.logoutBtn}
-                  onPress={handleLogout}
-                  disabled={state.update}>
-                  <Text style={styles.buttonText}>{tr('Çıkış Yap')}</Text>
-                </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
-            )
-          )}
-        </ScrollView>
-      </View>
+
+            {/* Logout and Delete Actions */}
+            <View style={styles.footerActions}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[styles.footerBtn, { backgroundColor: cardBg, borderColor: borderColor }]}
+                onPress={handleLogout}>
+                <Text style={[styles.footerBtnText, { color: '#EF4444' }]}>
+                  {tr('Çıkış Yap') || 'Log Out'}
+                </Text>
+              </TouchableOpacity>
+
+              {!state.isGuest ? (
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  style={[styles.footerBtn, { backgroundColor: cardBg, borderColor: '#FEE2E2', marginTop: 10 }]}
+                  onPress={handleDelete}>
+                  <Text style={[styles.footerBtnText, { color: '#DC2626' }]}>
+                    {tr('Hesabı Sil') || 'Delete Account'}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  container: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 60,
+  },
+  loadingWrap: {
+    paddingTop: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Top User Card
+  topUserCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  topAvatarCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FFF3E8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  userNameText: {
+    fontSize: 19,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  userCodeText: {
+    fontSize: 13,
+    marginTop: 4,
+  },
+
+  // Three Quick Cards
+  threeCardsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+    gap: 10,
+  },
+  quickCard: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  quickIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  quickTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  quickSub: {
+    fontSize: 10,
+    textAlign: 'center',
+  },
+
+  // Hesap Bilgileri Form Card
+  formCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 18,
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  formCardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 16,
+  },
+  formGroup: {
+    marginBottom: 14,
+  },
+  formLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 6,
+  },
+  formInput: {
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    fontSize: 14,
+  },
+  saveBtn: {
+    height: 50,
+    borderRadius: 12,
+    backgroundColor: '#F67922',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 6,
+    shadowColor: '#F67922',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  saveBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+
+  // Settings Card (Language)
+  settingsCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 18,
+    marginBottom: 14,
+  },
+  settingsCardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  langPillsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  langPill: {
+    flex: 1,
+    height: 42,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  langPillActive: {
+    backgroundColor: '#F67922',
+    borderColor: '#F67922',
+  },
+  langPillText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  langPillTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+
+  // Footer Actions
+  footerActions: {
+    marginTop: 6,
+  },
+  footerBtn: {
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+});

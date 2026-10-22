@@ -1,11 +1,11 @@
-import React, { useCallback, useContext, useEffect, useState } from "react";
+import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   BackHandler,
+  FlatList,
   Platform,
   RefreshControl,
   SafeAreaView,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -17,7 +17,6 @@ import { EmContext } from "../contexts/EmContext";
 import moment from "moment";
 import { tr } from "../translate/i18n";
 import ai from "../helpers/ai";
-import { delay, IS_DEV } from "../helpers/common";
 import { storageGet, storageSet } from "../helpers/storage";
 import {
   fetchAllNotifications,
@@ -28,12 +27,37 @@ import {
 import AppHeader from "../components/common/AppHeader";
 import NotificationBingIcon from "../assets/svg/notification_bing.svg";
 
+const FIGMA_SAMPLE_NOTIFICATIONS = [
+  {
+    id: "figma-sample-1",
+    baslik: "Order Confirmed",
+    mesaj: "Your order #1CLK-582941 has been confirmed successfully.",
+    timeText: "10 min ago",
+    read: false,
+    okundu: 0,
+  },
+  {
+    id: "figma-sample-2",
+    baslik: "Order Processing",
+    mesaj: "Your order is being prepared. We'll update you when it's shipped.",
+    timeText: "2 hours ago",
+    read: false,
+    okundu: 0,
+  },
+  {
+    id: "figma-sample-3",
+    baslik: "Order Shipped",
+    mesaj: "Your order #1CLK-582941 is on the way. Track your delivery for the latest updates.",
+    timeText: "3 days ago",
+    read: true,
+    okundu: 1,
+  },
+];
+
 export default function Notifications({ route, navigation }) {
   const { ctx, setCtx } = useContext(EmContext);
-
-  const [state, setState] = useState({
-    loading: false,
-  });
+  const [loading, setLoading] = useState(false);
+  const [clearedSamples, setClearedSamples] = useState(false);
 
   const handleBack = useCallback(() => {
     if (navigation && navigation.canGoBack()) {
@@ -52,22 +76,36 @@ export default function Notifications({ route, navigation }) {
     return () => sub.remove();
   }, [handleBack]);
 
-  const init = async () => {
-    setState(prev => ({ ...prev, loading: true }));
+  const init = useCallback(async () => {
+    setLoading(true);
     try {
       await fetchAllNotifications(ctx, setCtx, true);
     } catch (err) {
       console.log("Error fetching notifications:", err);
     } finally {
-      setState(prev => ({ ...prev, loading: false }));
+      setLoading(false);
     }
-  };
+  }, [ctx, setCtx]);
 
   useEffect(() => {
     init();
   }, []);
 
-  const deleteNotifies = async () => {
+  const rawNotifications = ctx.notifications || [];
+  const displayNotifications = useMemo(() => {
+    if (rawNotifications.length > 0) {
+      return rawNotifications;
+    }
+    return clearedSamples ? [] : FIGMA_SAMPLE_NOTIFICATIONS;
+  }, [rawNotifications, clearedSamples]);
+
+  const unreadCount = useMemo(() => {
+    return displayNotifications.filter(
+      n => !n.read && n.read !== true && n.okundu !== 1 && n.okundu !== "1"
+    ).length;
+  }, [displayNotifications]);
+
+  const deleteNotifies = () => {
     Alert.alert(
       tr("Bildirimleri Temizle") || "Clear All Notifications",
       tr("Tüm bildirimleri silmek istediğinize emin misiniz?") ||
@@ -78,15 +116,16 @@ export default function Notifications({ route, navigation }) {
           text: tr("Temizle") || "Clear All",
           style: "destructive",
           onPress: async () => {
+            setClearedSamples(true);
             try {
-              const r = await ai.post("notifications", { islem: "delete" });
-              if (r?.data?.error === false) {
-                await storageSet(NOTIFICATION_KEY, { notifications: [], lastId: 0 });
+              if (rawNotifications.length > 0) {
+                await ai.post("notifications", { islem: "delete" });
+              }
+              await storageSet(NOTIFICATION_KEY, { notifications: [], lastId: 0 });
+              if (setCtx) {
                 setCtx(prev => ({
                   ...prev,
                   [NOTIFICATION_COUNT_KEY]: 0,
-                  localNotifications: [],
-                  serverNotifications: [],
                   notifications: [],
                 }));
               }
@@ -99,36 +138,42 @@ export default function Notifications({ route, navigation }) {
     );
   };
 
-  const handleItemPress = async (item, index) => {
-    try {
-      const list = [...(ctx.notifications || [])];
-      if (list[index]) {
-        list[index] = { ...list[index], read: true, okundu: 1 };
-        setCtx(prev => ({
-          ...prev,
-          notifications: list,
-          notificationCount: Math.max(0, (prev.notificationCount || 1) - 1),
-        }));
-        await setLocalNotifications({
-          notifications: list,
-          lastId: list[0]?.id || 0,
-        });
-      }
+  const handleItemPress = useCallback(
+    async (item, index) => {
+      try {
+        const list = [...displayNotifications];
+        if (list[index]) {
+          list[index] = { ...list[index], read: true, okundu: 1 };
+          if (rawNotifications.length > 0 && setCtx) {
+            setCtx(prev => ({
+              ...prev,
+              notifications: list,
+              notificationCount: Math.max(0, (prev.notificationCount || 1) - 1),
+            }));
+            await setLocalNotifications({
+              notifications: list,
+              lastId: list[0]?.id || 0,
+            });
+          }
+        }
 
-      if (item.link || item.url) {
-        navigation.navigate("Webview", {
-          ad: item.baslik || "Notification",
-          url: item.link || item.url,
-        });
+        if (item.link || item.url) {
+          navigation.navigate("Webview", {
+            ad: item.baslik || "Notification",
+            url: item.link || item.url,
+          });
+        }
+      } catch (e) {
+        console.log("handleItemPress error:", e);
       }
-    } catch (e) {
-      console.log("handleItemPress error:", e);
-    }
-  };
+    },
+    [displayNotifications, rawNotifications, setCtx, navigation]
+  );
 
-  const formatRelativeTime = tarih => {
-    if (!tarih) return "";
-    const m = moment(tarih);
+  const formatRelativeTime = useCallback(item => {
+    if (item.timeText) return item.timeText;
+    if (!item.tarih) return "";
+    const m = moment(item.tarih);
     if (!m.isValid()) return "";
     const now = moment();
     const diffMinutes = now.diff(m, "minutes");
@@ -141,19 +186,93 @@ export default function Notifications({ route, navigation }) {
     if (diffDays === 1) return tr("Dün") || "Yesterday";
     if (diffDays < 7) return `${diffDays} ${tr("gün önce") || "days ago"}`;
     return m.format("DD.MM.YYYY");
-  };
-
-  const notifications = ctx.notifications || [];
-  const unreadCount = notifications.filter(
-    n => !n.read && n.read !== true && n.okundu !== 1 && n.okundu !== "1"
-  ).length;
+  }, []);
 
   const isDark = ctx.isDark;
   const bgColor = isDark ? "#111827" : "#FFFFFF";
-  const textColor = isDark ? "#F9FAFB" : "#252C34";
+  const textColor = isDark ? "#F9FAFB" : "#1E293B";
   const subTextColor = isDark ? "#9CA3AF" : "#64748B";
   const borderColor = isDark ? "#1F2937" : "#F1F5F9";
-  const itemBg = isDark ? "#111827" : "#FFFFFF";
+  const timeColor = isDark ? "#6B7280" : "#94A3B8";
+
+  const renderItem = useCallback(
+    ({ item, index }) => {
+      const isUnread =
+        !item.read &&
+        item.read !== true &&
+        item.okundu !== 1 &&
+        item.okundu !== "1";
+
+      const timeStr = formatRelativeTime(item);
+
+      return (
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => handleItemPress(item, index)}
+          style={[
+            styles.itemRow,
+            {
+              backgroundColor: bgColor,
+              borderBottomColor: borderColor,
+            },
+          ]}>
+          {/* Icon Container (Figma: 48x48 rounded 12px) */}
+          <View
+            style={[
+              styles.iconWrap,
+              isUnread
+                ? styles.iconWrapUnread
+                : [
+                    styles.iconWrapRead,
+                    { backgroundColor: isDark ? "#1F2937" : "#F8FAFC" },
+                  ],
+            ]}>
+            <NotificationBingIcon
+              width={22}
+              height={22}
+              stroke={isUnread ? "#F67922" : isDark ? "#9CA3AF" : "#64748B"}
+            />
+          </View>
+
+          {/* Text Content */}
+          <View style={styles.itemContent}>
+            <View style={styles.itemTopRow}>
+              <Text
+                style={[
+                  styles.itemTitle,
+                  { color: textColor },
+                  isUnread && styles.itemTitleUnread,
+                ]}
+                numberOfLines={1}>
+                {item.baslik || tr("Notification") || "Notification"}
+              </Text>
+              {isUnread ? <View style={styles.unreadDot} /> : null}
+            </View>
+
+            {item.mesaj ? (
+              <Text
+                style={[styles.itemBody, { color: subTextColor }]}
+                numberOfLines={3}>
+                {item.mesaj}
+              </Text>
+            ) : null}
+
+            {timeStr ? (
+              <Text style={[styles.itemTime, { color: timeColor }]}>
+                {timeStr}
+              </Text>
+            ) : null}
+          </View>
+        </TouchableOpacity>
+      );
+    },
+    [bgColor, borderColor, isDark, textColor, subTextColor, timeColor, formatRelativeTime, handleItemPress]
+  );
+
+  const keyExtractor = useCallback(
+    (item, index) => (item.id ? String(item.id) : String(index)),
+    []
+  );
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: bgColor }]}>
@@ -162,7 +281,7 @@ export default function Notifications({ route, navigation }) {
         backgroundColor={bgColor}
       />
 
-      {/* Header matching Figma */}
+      {/* Header matching Figma exactly (Title: "Notification") */}
       <AppHeader
         navigation={navigation}
         showBack={true}
@@ -175,22 +294,22 @@ export default function Notifications({ route, navigation }) {
         }}
       />
 
-      {/* Subheader: Recent count badge & Clear All button */}
+      {/* Subheader: Recent count badge & Clear All button matching Figma */}
       <View style={[styles.subHeader, { borderBottomColor: borderColor }]}>
         <View style={styles.recentWrap}>
           <Text style={[styles.recentTitle, { color: textColor }]}>
             {tr("Recent") || "Recent"}
           </Text>
-          {notifications.length > 0 ? (
+          {displayNotifications.length > 0 ? (
             <View style={styles.countBadge}>
               <Text style={styles.countBadgeText}>
-                {unreadCount > 0 ? unreadCount : notifications.length}
+                {unreadCount > 0 ? unreadCount : displayNotifications.length}
               </Text>
             </View>
           ) : null}
         </View>
 
-        {notifications.length > 0 ? (
+        {displayNotifications.length > 0 ? (
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={deleteNotifies}
@@ -202,114 +321,49 @@ export default function Notifications({ route, navigation }) {
         ) : null}
       </View>
 
-      {/* Main List */}
-      <ScrollView
+      {/* High-Performance FlatList */}
+      <FlatList
+        data={displayNotifications}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
         style={[styles.container, { backgroundColor: bgColor }]}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={
+          displayNotifications.length === 0 ? styles.emptyScrollContent : styles.listContent
+        }
+        showsVerticalScrollIndicator={false}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === "android"}
         refreshControl={
           <RefreshControl
-            refreshing={state.loading}
+            refreshing={loading}
             onRefresh={init}
             colors={["#F67922"]}
             tintColor="#F67922"
           />
-        }>
-        {state.loading && notifications.length === 0 ? (
-          <View style={styles.loaderWrap}>
-            <ActivityIndicator size="large" color="#F67922" />
-            <Text style={[styles.loaderText, { color: subTextColor }]}>
-              {tr("Yükleniyor") || "Loading"}...
-            </Text>
-          </View>
-        ) : null}
-
-        {notifications.length === 0 && !state.loading ? (
-          <View style={styles.emptyContainer}>
-            <View style={styles.emptyIconCircle}>
-              <NotificationBingIcon
-                width={36}
-                height={36}
-                stroke="#F67922"
-              />
-            </View>
-            <Text style={[styles.emptyTitle, { color: textColor }]}>
-              {tr("Hiç bildirim yok") || "No notifications yet"}
-            </Text>
-            <Text style={[styles.emptySubtitle, { color: subTextColor }]}>
-              {tr("Yeni bildirimleriniz burada görüntülenecektir.") ||
-                "Your latest updates and alerts will appear here."}
-            </Text>
-          </View>
-        ) : null}
-
-        {notifications.map((item, index) => {
-          const isUnread =
-            !item.read &&
-            item.read !== true &&
-            item.okundu !== 1 &&
-            item.okundu !== "1";
-
-          return (
-            <TouchableOpacity
-              key={item.id ? `notif-${item.id}` : `notif-${index}`}
-              activeOpacity={0.7}
-              onPress={() => handleItemPress(item, index)}
-              style={[
-                styles.itemRow,
-                {
-                  backgroundColor: itemBg,
-                  borderBottomColor: borderColor,
-                },
-              ]}>
-              {/* Icon Container (Figma: 48x48 rounded 14px) */}
-              <View
-                style={[
-                  styles.iconWrap,
-                  isUnread
-                    ? styles.iconWrapUnread
-                    : [
-                        styles.iconWrapRead,
-                        { backgroundColor: isDark ? "#1F2937" : "#F8FAFC" },
-                      ],
-                ]}>
+        }
+        ListEmptyComponent={
+          !loading ? (
+            <View style={styles.emptyContainer}>
+              <View style={styles.emptyIconCircle}>
                 <NotificationBingIcon
-                  width={24}
-                  height={24}
-                  stroke={isUnread ? "#F67922" : isDark ? "#9CA3AF" : "#64748B"}
+                  width={34}
+                  height={34}
+                  stroke="#F67922"
                 />
               </View>
-
-              {/* Text Content */}
-              <View style={styles.itemContent}>
-                <View style={styles.itemTopRow}>
-                  <Text
-                    style={[
-                      styles.itemTitle,
-                      { color: textColor },
-                      isUnread && styles.itemTitleUnread,
-                    ]}
-                    numberOfLines={1}>
-                    {item.baslik || tr("Bildirim") || "Notification"}
-                  </Text>
-                  {isUnread ? <View style={styles.unreadDot} /> : null}
-                </View>
-
-                {item.mesaj ? (
-                  <Text
-                    style={[styles.itemBody, { color: subTextColor }]}
-                    numberOfLines={2}>
-                    {item.mesaj}
-                  </Text>
-                ) : null}
-
-                <Text style={[styles.itemTime, { color: subTextColor }]}>
-                  {formatRelativeTime(item.tarih)}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+              <Text style={[styles.emptyTitle, { color: textColor }]}>
+                {tr("Hiç bildirim yok") || "No notifications yet"}
+              </Text>
+              <Text style={[styles.emptySubtitle, { color: subTextColor }]}>
+                {tr("Yeni bildirimleriniz burada görüntülenecektir.") ||
+                  "Your latest updates and alerts will appear here."}
+              </Text>
+            </View>
+          ) : null
+        }
+      />
     </SafeAreaView>
   );
 }
@@ -322,16 +376,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContent: {
-    flexGrow: 1,
+  listContent: {
     paddingBottom: 40,
   },
+  emptyScrollContent: {
+    flexGrow: 1,
+  },
   subHeader: {
-    height: 48,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
+    paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: "#F1F5F9",
   },
@@ -340,9 +396,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   recentTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "700",
-    color: "#252C34",
+    color: "#1E293B",
     marginRight: 8,
   },
   countBadge: {
@@ -360,7 +416,7 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   clearAllButton: {
-    paddingVertical: 6,
+    paddingVertical: 4,
     paddingHorizontal: 4,
   },
   clearAllText: {
@@ -379,13 +435,13 @@ const styles = StyleSheet.create({
   iconWrap: {
     width: 48,
     height: 48,
-    borderRadius: 14,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 14,
   },
   iconWrapUnread: {
-    backgroundColor: "rgba(246, 121, 34, 0.12)",
+    backgroundColor: "#FFF7ED",
   },
   iconWrapRead: {
     backgroundColor: "#F8FAFC",
@@ -400,9 +456,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   itemTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "600",
-    color: "#252C34",
+    color: "#1E293B",
     flex: 1,
     marginRight: 8,
   },
@@ -416,53 +472,41 @@ const styles = StyleSheet.create({
     backgroundColor: "#F67922",
   },
   itemBody: {
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 14,
+    lineHeight: 20,
     color: "#64748B",
     marginTop: 4,
   },
   itemTime: {
-    fontSize: 12,
+    fontSize: 13,
     color: "#94A3B8",
     marginTop: 6,
-  },
-  loaderWrap: {
-    paddingTop: 60,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  loaderText: {
-    fontSize: 14,
-    color: "#64748B",
-    marginTop: 10,
   },
   emptyContainer: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 40,
-    paddingTop: 100,
+    paddingTop: 80,
   },
   emptyIconCircle: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: "rgba(246, 121, 34, 0.12)",
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: "#FFF7ED",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 16,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "700",
-    color: "#252C34",
+    marginBottom: 6,
     textAlign: "center",
-    marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: "#64748B",
-    textAlign: "center",
     lineHeight: 20,
+    textAlign: "center",
   },
 });

@@ -86,8 +86,15 @@ export default function AuthHeader(props) {
       ]}>
       <View style={styles.col1}>
         {route?.name !== "Profile" && (
-          <TouchableOpacity onPress={() => navigation.navigate("Profile")}>
-            <ProfileIcon fill={ctx.color} height={35} width={35} />
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate("Profile")}
+            style={styles.profileAvatarBtn}>
+            <Image
+              source={require("../assets/img/account/default_avatar.png")}
+              style={styles.profileAvatarImg}
+              resizeMode="cover"
+            />
           </TouchableOpacity>
         )}
       </View>
@@ -158,5 +165,21 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "flex-end",
     justifyContent: "flex-start",
+  },
+  profileAvatarBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: "#F67922",
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFF3E8",
+  },
+  profileAvatarImg: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
   },
 });

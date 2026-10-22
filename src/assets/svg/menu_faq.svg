@@ -1,0 +1,10 @@
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Speech bubble with tail on bottom left and question mark on top right -->
+  <path d="M4.5 17.5L3 21L6.5 19.5H16.5C18.433 19.5 20 17.933 20 16V13M20 7V5.5C20 3.567 18.433 2 16.5 2H5.5C3.567 2 2 3.567 2 5.5V14C2 15.933 3.567 17.5 5.5 17.5" stroke="#F67922" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Two message dots -->
+  <circle cx="7" cy="11" r="1.1" fill="#F67922" />
+  <circle cx="11.5" cy="11" r="1.1" fill="#F67922" />
+  <!-- Question mark in top right -->
+  <path d="M18.5 3.5C19.3 3.5 20 4.1 20 4.9C20 5.6 19.5 6.1 19 6.5C18.6 6.8 18.5 7.2 18.5 7.6" stroke="#F67922" stroke-width="1.8" stroke-linecap="round"/>
+  <circle cx="18.5" cy="10" r="0.9" fill="#F67922"/>
+</svg>

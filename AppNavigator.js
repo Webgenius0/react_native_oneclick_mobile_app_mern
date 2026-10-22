@@ -24,6 +24,7 @@ import BagIcon from './src/assets/svg/bag.svg';
 import TruckIcon from './src/assets/svg/truck.svg';
 import SupportIcon from './src/assets/svg/support.svg';
 import ExpressIcon from './src/assets/svg/1click.svg';
+import AccountTabIcon from './src/assets/svg/account_tab.svg';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -51,6 +52,15 @@ import AccountCreatedSuccess from './src/pages/AccountCreatedSuccess';
 import ForgotPassword from './src/pages/ForgotPassword';
 import SetNewPassword from './src/pages/SetNewPassword';
 import Profile from './src/pages/Profile';
+import PersonalInformation from './src/pages/PersonalInformation';
+import Account from './src/pages/Account';
+import ContactOneClick from './src/pages/ContactOneClick';
+import Faq from './src/pages/Faq';
+import PrivacyPolicy from './src/pages/PrivacyPolicy';
+import TermsOfService from './src/pages/TermsOfService';
+import Language from './src/pages/Language';
+import PaymentMethods from './src/pages/PaymentMethods';
+import PrivacySecurity from './src/pages/PrivacySecurity';
 import Test from './src/pages/Test';
 import Notifications from './src/pages/Notifications';
 import PaymentStart from './src/pages/PaymentStart';
@@ -275,6 +285,15 @@ export default function AppNavigator() {
                   fill={fill}
                 />
               );
+            case 'Account':
+            case 'Profile':
+              return (
+                <AccountTabIcon
+                  width={24}
+                  height={24}
+                  stroke={fill}
+                />
+              );
             case 'Support':
               return (
                 <SupportIcon
@@ -349,6 +368,15 @@ export default function AppNavigator() {
         options={{
           title: tr('Destek'),
           headerTitleStyle: headerTitleStyle,
+        }}
+      />
+      <Tab.Screen
+        name="Account"
+        component={Account}
+        options={{
+          title: tr('Hesabım'),
+          headerTitleStyle: headerTitleStyle,
+          headerShown: false,
         }}
       />
     </Tab.Navigator>
@@ -493,29 +521,56 @@ export default function AppNavigator() {
         <Stack.Screen
           name="Profile"
           component={Profile}
-          options={({ navigation }) => ({
-            title: tr('Profil'),
-            headerTitleStyle: headerTitleStyle,
-            headerLeft: props => (
-              <HeaderBackButton
-                {...props}
-                labelVisible={false}
-                backTitleVisible={false}
-                tintColor={ctx.color}
-                onPress={() => {
-                  if (navigation.canGoBack()) {
-                    navigation.goBack();
-                  } else {
-                    navigation.navigate('AuthAfter');
-                  }
-                }}
-              />
-            ),
-          })}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="PersonalInformation"
+          component={PersonalInformation}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="Account"
+          component={Account}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ContactOneClick"
+          component={ContactOneClick}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="Faq"
+          component={Faq}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="PrivacyPolicy"
+          component={PrivacyPolicy}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="TermsOfService"
+          component={TermsOfService}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="Language"
+          component={Language}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="Notifications"
           component={Notifications}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="PaymentMethods"
+          component={PaymentMethods}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="PrivacySecurity"
+          component={PrivacySecurity}
           options={{ headerShown: false }}
         />
         <Stack.Screen
