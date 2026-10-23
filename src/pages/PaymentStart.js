@@ -1,365 +1,393 @@
-import React, {
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import {
-  View,
+  SafeAreaView,
   Text,
+  View,
   StyleSheet,
-  Touchable,
   TouchableOpacity,
-  Image,
-  TextInput,
-  Linking,
   ScrollView,
-  Dimensions,
+  StatusBar,
+  Image,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
-import {tr} from '../translate/i18n';
+import Svg, { Path } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { tr } from '../translate/i18n';
+import AppHeader from '../components/common/AppHeader';
+import AppCheckbox from '../components/common/AppCheckbox';
+import { EmContext } from '../contexts/EmContext';
 import ai from '../helpers/ai';
-import OrderItem from '../components/OrderItem';
-import FastImage from 'react-native-fast-image';
-import NoImage from '../assets/svg/no-image.svg';
-import Colors from '../assets/Colors';
-import GlobalStyle from '../assets/GlobalStyle';
-import OrderStatus from '../components/OrderStatus';
-import CheckBox from '@react-native-community/checkbox';
-import {delay, formatDate, lb} from '../helpers/common';
-import Dump from '../components/Dump';
-import Toast from 'react-native-toast-message';
-import {useFocusEffect, useIsFocused} from '@react-navigation/native';
-import {EmContext} from '../contexts/EmContext';
-import PaymentMethodIcon from '../components/paymentStart/PaymentMethodIcon';
-import {isImage} from '../helpers/file';
-import PaymentMethods from '../components/paymentStart/PaymentMethods';
-import NoOrder from '../components/paymentStart/NoOrder';
-import PaymentOrderList from '../components/paymentStart/PaymentOrderList';
 
-const gs = GlobalStyle;
-const {width, height} = Dimensions.get('window');
+export default function PaymentStart({ navigation, route }) {
+  const insets = useSafeAreaInsets();
+  const { ctx } = useContext(EmContext);
 
-export default function ({navigation, route}) {
-  const {ctx} = useContext(EmContext);
-
-  let defaultTutar = '',
-    default_siparis_ids = [];
-  let defaultLoading = true;
   const quick = route.params?.quick;
-  let siparis_id = null;
-  let paramSiparisIds = null;
-  let grup = null;
-  let grupID = null;
-  let inputAutoFocus = false;
-  let inputEditable = false;
-  const isFocused = useIsFocused();
+  const initialTutar = route.params?.tutar || '0.00';
+  const paramSiparisIds = route.params?.siparis_ids || [];
+  const grupID = route.params?.grupID;
+  const subtotalParam = route.params?.subtotal;
+  const shippingParam = route.params?.shipping;
+  const itemCountParam = route.params?.itemCount;
 
-  if (quick) {
-    defaultTutar = route.params.tutar;
-    defaultLoading = true;
-    siparis_id = route.params.siparis_id;
-    paramSiparisIds = route.params.siparis_ids;
-    grupID = route.params.grupID;
-    grup = route.params.grup;
-    if (paramSiparisIds) {
-      default_siparis_ids = Array.isArray(paramSiparisIds)
-        ? paramSiparisIds
-        : [paramSiparisIds];
-    }
-    if (!siparis_id && default_siparis_ids && default_siparis_ids.length > 0) {
-      siparis_id = default_siparis_ids[0];
-    }
-  } else {
-    inputAutoFocus = true;
-    inputEditable = true;
-  }
+  const [tutar, setTutar] = useState(initialTutar);
+  const [selectedMethodId, setSelectedMethodId] = useState('edahab');
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const [loading, setLoading] = useState(defaultLoading);
-  const [tutar, setTutar] = useState(defaultTutar);
-  const [siparisler, setSiparisler] = useState([]);
-  const [siparis_ids, setSiparisIds] = useState(default_siparis_ids);
-  const [methods, setMethods] = useState([]);
-  const [gettingPaymentUrl, setGettingPaymentUrl] = useState(false);
-  const [isNavigatedBack, setIsNavigatedBack] = useState(false);
-  const tutarRef = useRef();
+  const numTutar = parseFloat(tutar) || 0;
+  const shipping = parseFloat(shippingParam) || 25.0;
+  const subtotal =
+    parseFloat(subtotalParam) || Math.max(0, numTutar - shipping) || numTutar;
+  const total = numTutar > 0 ? numTutar : subtotal + shipping;
 
-  const fetchOrders = async () => {
-    // console.log("fecth", +new Date());
-    lb('FETCH UNPAID ORDERS');
-    setLoading(true);
-    const c = await ai.post('orders-unpaid', {
-      siparis_id: siparis_id,
+  const handlePayPress = () => {
+    const navigateParams = {
+      tutar: total.toFixed(2),
+      ana_tutar: total.toFixed(2),
+      komisyon_tutar: 0,
+      siparis_ids: paramSiparisIds,
       grupID: grupID,
-    });
-    console.log(c.data);
-    console.log('\n');
+    };
 
-    if (c.data.error === false) {
-      let new_siparisler = c.data.ss || [];
-      // sort siparisler by id is = siparis_id
-      if (quick) {
-        new_siparisler = new_siparisler.sort((a, b) =>
-          a.id === siparis_id || (grupID && a.grupID === grupID) ? -1 : a.id - b.id,
-        );
-      }
-
-      let new_siparis_ids = [];
-      if (quick) {
-        if (grupID) {
-          new_siparis_ids = new_siparisler
-            .filter(item => item.grupID === grupID)
-            .map(item => item.id);
-        } else if (siparis_id) {
-          new_siparis_ids = new_siparisler
-            .filter(item => item.id === siparis_id)
-            .map(item => item.id);
-        }
-        if (new_siparis_ids.length === 0 && default_siparis_ids.length > 0) {
-          new_siparis_ids = default_siparis_ids;
-        }
-      } else {
-        new_siparis_ids = new_siparisler.map(item => item.id);
-      }
-      setSiparisler(new_siparisler);
-      setSiparisIds(new_siparis_ids);
-      setLoading(false);
+    if (selectedMethodId === 'waafipay') {
+      navigation.navigate('WaafiPay', navigateParams);
     } else {
-      setSiparisIds(default_siparis_ids);
-      setLoading(false);
+      navigation.navigate('EDahab', navigateParams);
     }
   };
 
-  const tutarHesapla = (siparisler, siparis_ids, grup) => {
-    let tutar = 0;
-    (siparisler || []).forEach(item => {
-      if (item && siparis_ids && siparis_ids.includes(item.id)) {
-        const itemVal = parseFloat(item.tutar);
-        if (!isNaN(itemVal)) {
-          tutar += itemVal;
-        }
-      }
-    });
-
-    if (grup && grup.nakliye_usd) {
-      const shippingVal = parseFloat(grup.nakliye_usd);
-      if (!isNaN(shippingVal)) {
-        tutar += shippingVal;
-      }
-    }
-
-    console.log('calculatedTutar', tutar);
-
-    return Number(tutar || 0).toFixed(2);
-  };
-
-  const checkFocus = async () => {
-    console.log('checkFocus', +new Date());
-    console.log(!loading, siparisler.length === 0);
-  };
-
-  const fetchMethods = async () => {
-    try {
-      const c = await ai.get('payment-methods');
-      console.log('payment-methods response:', c?.data);
-      if (c?.data?.error === false && c?.data?.ss?.length > 0) {
-        setMethods(c.data.ss);
-      } else {
-        setMethods([
-          {
-            id: 1,
-            ad: 'WaafiPay',
-            target: 'WaafiPay',
-            durum: 1,
-            ios: 1,
-            android: 1,
-            iosComingSoon: 0,
-            androidComingSoon: 0,
-            komisyonYuzde: 1,
-            komisyonFixed: 0,
-          },
-          {
-            id: 2,
-            ad: 'eDahab',
-            target: 'EDahab',
-            durum: 1,
-            ios: 1,
-            android: 1,
-            iosComingSoon: 0,
-            androidComingSoon: 0,
-            komisyonYuzde: 0,
-            komisyonFixed: 0,
-          },
-        ]);
-      }
-    } catch (err) {
-      console.log('fetchMethods error:', err);
-      setMethods([
-        {
-          id: 1,
-          ad: 'WaafiPay',
-          target: 'WaafiPay',
-          durum: 1,
-          ios: 1,
-          android: 1,
-          iosComingSoon: 0,
-          androidComingSoon: 0,
-          komisyonYuzde: 1,
-          komisyonFixed: 0,
-        },
-        {
-          id: 2,
-          ad: 'eDahab',
-          target: 'EDahab',
-          durum: 1,
-          ios: 1,
-          android: 1,
-          iosComingSoon: 0,
-          androidComingSoon: 0,
-          komisyonYuzde: 0,
-          komisyonFixed: 0,
-        },
-      ]);
-    }
-  };
-
-  const init = async () => {
-    await fetchOrders();
-    await fetchMethods();
-  };
-
-  useEffect(() => {
-    if (!isFocused) {
-      setIsNavigatedBack(true);
-      if (gettingPaymentUrl) {
-        setGettingPaymentUrl(false);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFocused]);
-
-  useEffect(() => {
-    if (!quick) {
-      init();
-      console.log('useEffect', +new Date());
-      checkFocus();
-    } else {
-      init();
-      // fastPay();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (siparisler.length > 0) {
-      let newTutar = tutarHesapla(siparisler, siparis_ids, grup);
-      if (parseFloat(newTutar) > 0) {
-        setTutar(newTutar);
-      }
-    }
-  }, [siparisler, siparis_ids, grup]);
-
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: ctx.bgColor,
-      alignItems: 'center',
-      justifyContent: 'flex-start',
-      flexDirection: 'column',
-    },
-
-    altContainer: {
-      padding: 0,
-      // backgroundColor: 'red',
-      justifyContent: 'flex-start',
-    },
-    img: {
-      width: 90,
-      height: 50,
-      // borderWidth: 1,
-      // borderColor: "#c5c5c5",
-      borderRadius: 5,
-      resizeMode: 'contain',
-    },
-    tutarRow: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingTop: 10,
-    },
-    tutarLabel: {
-      fontSize: 16,
-      fontWeight: 'bold',
-      marginBottom: 0,
-      marginEnd: 20,
-      color: ctx.color,
-    },
-    tutarInput: {
-      fontSize: 25,
-      fontWeight: 'bold',
-      // marginBottom: 20,
-      textAlign: 'center',
-      color: ctx.color,
-      minWidth: 200,
-      borderWidth: 1,
-      borderColor: '#c5c5c5',
-    },
-  });
-
-  const formatTutar = tutar => {
-    console.log({tutar});
-    return '$' + parseFloat(tutar).toFixed(2);
-  };
+  const isDark = ctx?.isDark;
+  const pageBg = isDark ? '#111827' : '#F8FAFC';
+  const cardBg = isDark ? '#1F2937' : '#FFFFFF';
+  const textColor = isDark ? '#F9FAFB' : '#1E293B';
+  const subTextColor = isDark ? '#9CA3AF' : '#64748B';
+  const borderColor = isDark ? '#374151' : '#F1F5F9';
 
   return (
-    <View style={styles.container}>
-      <NoOrder siparisler={siparisler} />
-
-      <PaymentOrderList
-        siparisler={siparisler}
-        siparis_ids={siparis_ids}
-        grupID={grupID}
-        grup={grup}
-        setSiparisIds={setSiparisIds}
-        tutarHesapla={tutarHesapla}
-        setTutar={setTutar}
-        tutar={tutar}
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: cardBg }]}>
+      <StatusBar
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={cardBg}
       />
 
-      {/*<Dump state={state} isFocused={isFocused} isNavigatedBack={isNavigatedBack}></Dump>*/}
+      {/* Figma Header */}
+      <AppHeader
+        navigation={navigation}
+        showBack={true}
+        title={tr('Payment Method') || 'Payment Method'}
+        style={{
+          borderBottomWidth: 1,
+          borderBottomColor: borderColor,
+          backgroundColor: cardBg,
+        }}
+      />
 
-      <View style={styles.altContainer}>
-        <View style={styles.tutarRow}>
-          <Text style={styles.tutarLabel}>{tr('Tutar')}</Text>
-          <TextInput
-            defaultValue={tutar > 0 ? formatTutar(tutar) : ''}
-            ref={tutarRef}
-            autoFocus={inputAutoFocus}
-            editable={inputEditable}
-            style={styles.tutarInput}
-            onChangeText={e => setTutar(e)}
-            onFocus={() => {
-              if (tutar === 0) {
-                setTutar('');
-              }
-            }}
-            keyboardType="numeric"
-            placeholder={tr('Tutar')}
-            placeholderTextColor={ctx.color}
-          />
+      <ScrollView
+        style={[styles.container, { backgroundColor: pageBg }]}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}>
+        {/* Title */}
+        <Text style={[styles.sectionTitle, { color: textColor }]}>
+          {tr('Select Payment Option') || 'Select Payment Option'}
+        </Text>
+
+        {/* Option 1: E-Dahab */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => setSelectedMethodId('edahab')}
+          style={[
+            styles.methodCard,
+            { backgroundColor: cardBg, borderColor: borderColor },
+            selectedMethodId === 'edahab' && styles.methodCardSelected,
+          ]}>
+          <View style={styles.cardLeft}>
+            <AppCheckbox
+              checked={selectedMethodId === 'edahab'}
+              onChange={() => setSelectedMethodId('edahab')}
+              style={styles.checkbox}
+            />
+            <View style={[styles.logoWrap, { borderColor: borderColor }]}>
+              <Image
+                source={require('../assets/img/edahab.png')}
+                style={styles.logoImg}
+                resizeMode="contain"
+              />
+            </View>
+            <View style={styles.cardDetailsCol}>
+              <Text style={[styles.cardTitle, { color: textColor }]}>
+                E-Dahab Mobile Money
+              </Text>
+              <Text style={[styles.cardExpiry, { color: subTextColor }]}>
+                Telesom Mobile Wallet
+              </Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+
+        {/* Option 2: WaafiPay */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => setSelectedMethodId('waafipay')}
+          style={[
+            styles.methodCard,
+            { backgroundColor: cardBg, borderColor: borderColor },
+            selectedMethodId === 'waafipay' && styles.methodCardSelected,
+          ]}>
+          <View style={styles.cardLeft}>
+            <AppCheckbox
+              checked={selectedMethodId === 'waafipay'}
+              onChange={() => setSelectedMethodId('waafipay')}
+              style={styles.checkbox}
+            />
+            <View style={[styles.logoWrap, { borderColor: borderColor }]}>
+              <Image
+                source={require('../assets/img/waafipay.png')}
+                style={styles.logoImg}
+                resizeMode="contain"
+              />
+            </View>
+            <View style={styles.cardDetailsCol}>
+              <Text style={[styles.cardTitle, { color: textColor }]}>
+                WaafiPay / ZAAD Service
+              </Text>
+              <Text style={[styles.cardExpiry, { color: subTextColor }]}>
+                Mobile Wallet & Direct Checkout
+              </Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+
+        {/* Price Summary (Figma) */}
+        <View
+          style={[
+            styles.sectionCard,
+            { backgroundColor: cardBg, borderColor: borderColor, marginTop: 20 },
+          ]}>
+          <Text style={[styles.summaryHeaderTitle, { color: textColor }]}>
+            {tr('Price Summary') || 'Price Summary'}
+          </Text>
+
+          <View style={styles.priceSummaryRow}>
+            <Text style={[styles.priceSummaryLabel, { color: subTextColor }]}>
+              {tr('Subtotal') || 'Subtotal'} ({itemCountParam || 3}{' '}
+              {itemCountParam === 1 ? 'item' : 'items'})
+            </Text>
+            <Text style={[styles.priceSummaryValue, { color: textColor }]}>
+              ${subtotal.toFixed(2)}
+            </Text>
+          </View>
+
+          <View style={styles.priceSummaryRow}>
+            <Text style={[styles.priceSummaryLabel, { color: subTextColor }]}>
+              {tr('Shipping Cost') || 'Shipping Cost'}
+            </Text>
+            <Text style={[styles.priceSummaryValue, { color: textColor }]}>
+              ${shipping.toFixed(2)}
+            </Text>
+          </View>
+
+          <View
+            style={[
+              styles.totalRow,
+              { borderTopColor: borderColor, borderTopWidth: 1 },
+            ]}>
+            <Text style={[styles.totalLabel, { color: textColor }]}>
+              {tr('Total') || 'Total'}
+            </Text>
+            <Text style={styles.totalValue}>${total.toFixed(2)}</Text>
+          </View>
         </View>
+      </ScrollView>
 
-        <Dump show={false} tutar={tutar} siparis_ids={siparis_ids} />
+      {/* Sticky Bottom Pay Button (Figma) */}
+      <View
+        style={[
+          styles.bottomCtaWrap,
+          {
+            backgroundColor: cardBg,
+            borderTopColor: borderColor,
+            paddingBottom: Math.max(insets.bottom, 16),
+          },
+        ]}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={handlePayPress}
+          disabled={isProcessing}
+          style={styles.payBtn}>
+          {isProcessing ? (
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : (
+            <Text style={styles.payBtnText}>
+              {tr('Pay') || 'Pay'} ${total.toFixed(2)}
+            </Text>
+          )}
+        </TouchableOpacity>
 
-        <PaymentMethods
-          methods={methods}
-          tutar={tutar}
-          siparis_ids={siparis_ids}
-          grupID={grupID}
-          navigation={navigation}
-        />
+        <View style={styles.securityCaptionRow}>
+          <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+            <Path
+              d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
+              stroke="#64748B"
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </Svg>
+          <Text style={[styles.securityCaption, { color: subTextColor }]}>
+            {tr('Your payment information is secure') ||
+              'Your payment information is secure'}
+          </Text>
+        </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  container: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 14,
+  },
+  methodCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  methodCardSelected: {
+    borderColor: '#F67922',
+    backgroundColor: '#FFFBF7',
+  },
+  cardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  checkbox: {
+    marginVertical: 0,
+    marginRight: 12,
+  },
+  logoWrap: {
+    width: 60,
+    height: 38,
+    borderRadius: 8,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    overflow: 'hidden',
+  },
+  logoImg: {
+    width: 48,
+    height: 26,
+  },
+  cardDetailsCol: {
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  cardExpiry: {
+    fontSize: 12,
+  },
+  sectionCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  summaryHeaderTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  priceSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginVertical: 6,
+  },
+  priceSummaryLabel: {
+    fontSize: 14,
+  },
+  priceSummaryValue: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  totalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 12,
+    marginTop: 8,
+  },
+  totalLabel: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  totalValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#F67922',
+  },
+  bottomCtaWrap: {
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  payBtn: {
+    backgroundColor: '#F67922',
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  payBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  securityCaptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  securityCaption: {
+    fontSize: 12,
+    marginLeft: 6,
+  },
+});

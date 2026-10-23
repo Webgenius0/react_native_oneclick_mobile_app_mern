@@ -8,7 +8,8 @@ export default function NotificationButton({
   ctx,
   color,
   badgeBgColor,
-  size = 28,
+  size = 24,
+  containerStyle,
 }) {
   const iconColor = color || cs.btnColor;
   const count = ctx?.notificationCount || 0;
@@ -16,9 +17,16 @@ export default function NotificationButton({
   return (
     <TouchableOpacity
       activeOpacity={0.7}
-      style={styles.container}
+      style={[styles.container, containerStyle]}
       onPress={() => navigation?.navigate("Notifications")}>
-      <HomeBellIcon width={size} height={size} fill={iconColor} />
+      <View style={styles.iconWrap}>
+        <HomeBellIcon
+          width={size}
+          height={size}
+          fill={iconColor}
+          color={iconColor}
+        />
+      </View>
       {count > 0 ? (
         <View
           style={[
@@ -36,15 +44,21 @@ export default function NotificationButton({
 
 const styles = StyleSheet.create({
   container: {
-    padding: 6,
+    width: 36,
+    height: 36,
     position: "relative",
     justifyContent: "center",
     alignItems: "center",
   },
+  iconWrap: {
+    justifyContent: "center",
+    alignItems: "center",
+    transform: [{ translateY: -2.5 }],
+  },
   badge: {
     position: "absolute",
-    top: 2,
-    right: 2,
+    top: -2,
+    right: -2,
     backgroundColor: "#FF3B30",
     borderRadius: 9,
     minWidth: 18,

@@ -7,46 +7,56 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { EmContext } from '../contexts/EmContext';
 import { tr } from '../translate/i18n';
 import AppHeader from '../components/common/AppHeader';
 
-const { width } = Dimensions.get('window');
-
 const PAYMENT_OPTIONS = [
   {
     id: 'edahab',
+    target: 'EDahab',
     title: 'E-Dahab Mobile Money',
-    subtitle: 'Telesom Mobile Money',
+    subtitle: 'Telesom Somalia',
     desc: 'Instant direct checkout with your registered E-Dahab wallet. Fast, secure, and fee-free payment for international orders.',
     badge: 'Active',
     logo: require('../assets/img/edahab.png'),
-    logoWidth: 100,
-    logoHeight: 46,
+    logoWidth: 70,
+    logoHeight: 32,
   },
   {
     id: 'waafipay',
+    target: 'WaafiPay',
     title: 'WaafiPay / ZAAD Service',
-    subtitle: 'Mobile Wallet & Regional Checkout',
+    subtitle: 'Mobile Wallet & Direct Checkout',
     desc: 'Seamless local mobile payment with WaafiPay and ZAAD. Fast order processing and instant verification.',
     badge: 'Active',
     logo: require('../assets/img/waafipay.png'),
-    logoWidth: 120,
-    logoHeight: 44,
+    logoWidth: 75,
+    logoHeight: 28,
   },
 ];
 
-export default function PaymentMethods({ navigation }) {
+export default function PaymentMethods({ navigation, route }) {
   const { ctx } = useContext(EmContext);
 
-  const isDark = ctx.isDark;
+  const isDark = ctx?.isDark;
   const pageBg = isDark ? '#111827' : '#F8FAFC';
   const cardBg = isDark ? '#1F2937' : '#FFFFFF';
   const textColor = isDark ? '#F9FAFB' : '#1E293B';
   const subTextColor = isDark ? '#9CA3AF' : '#64748B';
-  const borderColor = isDark ? '#374151' : '#E5E7EB';
+  const borderColor = isDark ? '#374151' : '#F1F5F9';
+
+  const handleSelectMethod = (target) => {
+    navigation.navigate(target, {
+      tutar: route?.params?.tutar || 0,
+      ana_tutar: route?.params?.ana_tutar || 0,
+      komisyon_tutar: route?.params?.komisyon_tutar || 0,
+      siparis_ids: route?.params?.siparis_ids || '',
+    });
+  };
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: cardBg }]}>
@@ -73,25 +83,28 @@ export default function PaymentMethods({ navigation }) {
         {/* Intro */}
         <View style={styles.introWrap}>
           <Text style={[styles.introTitle, { color: textColor }]}>
-            {tr('Manage your payment options') || 'Manage your payment options'}
+            {tr('Supported Payment Methods') || 'Supported Payment Methods'}
           </Text>
           <Text style={[styles.introSub, { color: subTextColor }]}>
-            Current supported payment options for your international orders and fast checkout.
+            {tr('Choose a payment option below to view details and proceed with checkout.') ||
+              'Choose a payment option below to view details and proceed with checkout.'}
           </Text>
         </View>
 
-        {/* Payment Options Cards */}
+        {/* Payment Options (E-Dahab & WaafiPay Only) */}
         <View style={styles.cardsList}>
           {PAYMENT_OPTIONS.map(opt => (
-            <View
+            <TouchableOpacity
               key={opt.id}
+              activeOpacity={0.8}
+              onPress={() => handleSelectMethod(opt.target)}
               style={[
                 styles.paymentCard,
                 { backgroundColor: cardBg, borderColor: borderColor },
               ]}>
               <View style={styles.cardHeader}>
                 <View style={styles.cardHeaderLeft}>
-                  <View style={styles.logoWrap}>
+                  <View style={[styles.logoWrap, { borderColor: borderColor }]}>
                     <Image
                       source={opt.logo}
                       style={{
@@ -100,6 +113,14 @@ export default function PaymentMethods({ navigation }) {
                       }}
                       resizeMode="contain"
                     />
+                  </View>
+                  <View style={styles.titleCol}>
+                    <Text style={[styles.cardTitle, { color: textColor }]}>
+                      {opt.title}
+                    </Text>
+                    <Text style={[styles.cardSub, { color: subTextColor }]}>
+                      {opt.subtitle}
+                    </Text>
                   </View>
                 </View>
 
@@ -111,19 +132,17 @@ export default function PaymentMethods({ navigation }) {
                 </View>
               </View>
 
-              <View style={styles.cardTitles}>
-                <Text style={[styles.cardTitle, { color: textColor }]}>
-                  {opt.title}
-                </Text>
-                <Text style={[styles.cardSub, { color: subTextColor }]}>
-                  {opt.subtitle}
-                </Text>
-              </View>
-
               <Text style={[styles.cardDesc, { color: subTextColor }]}>
                 {opt.desc}
               </Text>
-            </View>
+
+              {/* Action link */}
+              <View style={[styles.actionRow, { borderTopColor: borderColor }]}>
+                <Text style={styles.actionText}>
+                  {tr('Open Payment') || 'Open Payment'} →
+                </Text>
+              </View>
+            </TouchableOpacity>
           ))}
         </View>
       </ScrollView>
@@ -141,30 +160,28 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 14,
+    paddingTop: 16,
     paddingBottom: 40,
   },
   introWrap: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   introTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#1E293B',
     marginBottom: 4,
   },
   introSub: {
     fontSize: 13,
     lineHeight: 18,
-    color: '#64748B',
   },
   cardsList: {
-    gap: 14,
+    rowGap: 16,
   },
   paymentCard: {
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
-    padding: 18,
+    padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
@@ -175,56 +192,69 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 12,
   },
   cardHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   logoWrap: {
-    height: 48,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'flex-start',
+    marginRight: 12,
+  },
+  titleCol: {
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  cardSub: {
+    fontSize: 12,
   },
   activeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 6,
   },
   activeDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#10B981',
-    marginRight: 6,
+    backgroundColor: '#16A34A',
+    marginRight: 5,
   },
   activeBadgeText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#059669',
-  },
-  cardTitles: {
-    marginBottom: 8,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1E293B',
-  },
-  cardSub: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 2,
-    fontWeight: '500',
+    color: '#16A34A',
   },
   cardDesc: {
     fontSize: 13,
-    lineHeight: 18,
-    color: '#64748B',
+    lineHeight: 19,
+    marginBottom: 12,
+  },
+  actionRow: {
+    borderTopWidth: 1,
+    paddingTop: 10,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  actionText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#F67922',
   },
 });

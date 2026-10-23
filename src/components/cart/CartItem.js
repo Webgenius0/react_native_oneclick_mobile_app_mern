@@ -1,36 +1,28 @@
+import React from 'react';
 import {
-  Button,
-  Keyboard,
-  Text,
-  TextInput,
-  TouchableOpacity,
   View,
+  Text,
+  TouchableOpacity,
   StyleSheet,
-  Touchable,
   ScrollView,
+  TextInput,
+  Alert,
 } from 'react-native';
 import FastImage from 'react-native-fast-image';
-import CartItemCountArea from './CartItemCountArea';
-import {t} from '../../translate/i18n';
+import { t, tr } from '../../translate/i18n';
 import TrashIcon from '../../assets/svg/trash.svg';
-import CartItemImage from './CartItemImage';
-import Colors from '../../assets/Colors';
-import CheckBox from '@react-native-community/checkbox';
-import React from 'react';
-import Dump from '../Dump';
+import AppCheckbox from '../common/AppCheckbox';
 import { useExchangeRateStore } from '../../store/useExchangeRateStore';
 import { useSheinPriceStore } from '../../store/useSheinPriceStore';
 import {
-  normalizeCurrency,
   parsePrice,
   calculateConvertedPrice,
-  detectItemCurrency,
   getReceivedCurrencyInfo,
 } from '../../helpers/currencyHelper';
 import { cleanProductTitle, getStoreName } from '../../helpers/storeHelper';
 import { isAgeOrMeasurement } from '../../helpers/variantUtils';
 
-const CartItem = ({
+export default function CartItem({
   item,
   onRemove,
   onIncrease,
@@ -39,29 +31,34 @@ const CartItem = ({
   onChange,
   onUpdateOption,
   navigation,
-}) => {
+  isDark = false,
+}) {
   const targetId = item.id || item.url;
   const { rates, inverseRates } = useExchangeRateStore();
   const sheinPercent = useSheinPriceStore(state => state.percent) ?? 0;
   const safePercent = Number(sheinPercent) > 0 ? Number(sheinPercent) : 0;
   const isShein = Boolean(
     (item?.store && String(item.store).toLowerCase().includes('shein')) ||
-    (item?.url && String(item.url).toLowerCase().includes('shein.com')) ||
-    (item?.marketplace && String(item.marketplace).toLowerCase().includes('shein')) ||
-    String(getStoreName(item?.url, item?.store || '')).toLowerCase() === 'shein',
+      (item?.url && String(item.url).toLowerCase().includes('shein.com')) ||
+      (item?.marketplace && String(item.marketplace).toLowerCase().includes('shein')) ||
+      String(getStoreName(item?.url, item?.store || '')).toLowerCase() === 'shein',
   );
 
   const basePrice = parsePrice(item?.price) || 0;
-  const percentAmount = isShein && safePercent > 0
-    ? (basePrice * (safePercent / 100))
-    : 0;
+  const percentAmount =
+    isShein && safePercent > 0 ? basePrice * (safePercent / 100) : 0;
   const finalPrice = basePrice + percentAmount;
-  const displayPrice = finalPrice > 0 ? finalPrice.toFixed(2) : (item?.price || '');
+  const displayPrice =
+    finalPrice > 0 ? finalPrice.toFixed(2) : item?.price || '';
 
-  const { code: itemCurrency, display: receivedDisplay, isUsd } = getReceivedCurrencyInfo(item);
-  const convertedUsd = finalPrice > 0
-    ? (isUsd ? finalPrice : calculateConvertedPrice(finalPrice, itemCurrency, rates, inverseRates))
-    : null;
+  const { code: itemCurrency, display: receivedDisplay, isUsd } =
+    getReceivedCurrencyInfo(item);
+  const convertedUsd =
+    finalPrice > 0
+      ? isUsd
+        ? finalPrice
+        : calculateConvertedPrice(finalPrice, itemCurrency, rates, inverseRates)
+      : null;
 
   const changeItem = (field, value) => {
     onChange(targetId, field, value);
@@ -75,7 +72,8 @@ const CartItem = ({
 
     const currentOptions = Array.isArray(item.options) ? item.options : [];
     const targetOpt = currentOptions.find(
-      opt => opt && opt.name && opt.name.toLowerCase() === optionName.toLowerCase(),
+      opt =>
+        opt && opt.name && opt.name.toLowerCase() === optionName.toLowerCase(),
     );
     const updatedOptions = currentOptions.map(opt =>
       opt && opt.name && opt.name.toLowerCase() === optionName.toLowerCase()
@@ -84,7 +82,12 @@ const CartItem = ({
     );
     onChange(targetId, 'options', updatedOptions);
 
-    if (targetOpt && targetOpt.prices && targetOpt.prices[selectedValue] && !isAgeOrMeasurement(selectedValue)) {
+    if (
+      targetOpt &&
+      targetOpt.prices &&
+      targetOpt.prices[selectedValue] &&
+      !isAgeOrMeasurement(selectedValue)
+    ) {
       onChange(targetId, 'price', targetOpt.prices[selectedValue]);
     }
 
@@ -98,467 +101,347 @@ const CartItem = ({
   };
 
   const openUrl = url => {
-    // TODO: check webview
-    navigation.navigate('Webview', {url: url});
+    if (url && navigation) {
+      navigation.navigate('Webview', { url: url });
+    }
   };
 
+  const confirmRemove = () => {
+    Alert.alert(
+      tr('Ürünü Sil') || 'Remove Item',
+      tr('Bu ürünü sepetten silmek istediğinize emin misiniz?') ||
+        'Are you sure you want to remove this item from your cart?',
+      [
+        { text: tr('İptal') || 'Cancel', style: 'cancel' },
+        {
+          text: tr('Sil') || 'Remove',
+          style: 'destructive',
+          onPress: () => onRemove(targetId),
+        },
+      ],
+    );
+  };
+
+  // Compile variant summary (e.g. "Black" or "US 8 • White")
+  const variantParts = [];
+  if (Array.isArray(item?.options) && item.options.length > 0) {
+    item.options.forEach(opt => {
+      if (opt && opt.selected) {
+        variantParts.push(opt.selected);
+      }
+    });
+  }
+  if (variantParts.length === 0) {
+    if (item?.size) variantParts.push(item.size);
+    if (item?.color) variantParts.push(item.color);
+  }
+  const variantText = variantParts.join(' • ');
+
+  const imageUri =
+    item.image ||
+    item.img ||
+    (item.options &&
+      item.options.find(o => o.selectedImage)?.selectedImage) ||
+    null;
+
+  const cardBg = isDark ? '#1F2937' : '#FFFFFF';
+  const textColor = isDark ? '#F9FAFB' : '#1E293B';
+  const subTextColor = isDark ? '#9CA3AF' : '#64748B';
+  const borderColor = isDark ? '#374151' : '#F1F5F9';
+  const stepperBg = isDark ? '#374151' : '#F8FAFC';
+
   return (
-    <View style={styles.container}>
-      <View style={styles.row}>
-        <View style={styles.column}>
-          <View style={styles.row}>
-            <View style={{flexDirection: 'column', alignItems: 'flex-start'}}>
-              <CheckBox
-                disabled={false}
-                checked={item.checked}
-                style={styles.cb}
-                value={item.checked}
-                color={'#000'}
-                tintColors={{true: '#F15927', false: 'black'}}
-                onValueChange={newValue => {
-                  console.log('NewValue', newValue, item);
-                  checkItem(item);
-                }}
-              />
-              <CartItemImage item={item} onChange={onChange} />
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: cardBg, borderColor: borderColor },
+      ]}>
+      <View style={styles.topRow}>
+        {/* Checkbox */}
+        <AppCheckbox
+          checked={Boolean(item.checked)}
+          onChange={() => checkItem(item)}
+          style={styles.checkbox}
+        />
+
+        {/* Product Image */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => openUrl(item.url)}
+          style={[styles.imageContainer, { borderColor: borderColor }]}>
+          {imageUri ? (
+            <FastImage
+              source={{ uri: imageUri }}
+              style={styles.image}
+              resizeMode={FastImage.resizeMode.contain}
+            />
+          ) : (
+            <View style={[styles.imagePlaceholder, { backgroundColor: stepperBg }]}>
+              <Text style={styles.imagePlaceholderText}>No Image</Text>
             </View>
-            <View style={styles.flexColumn}>
-              <View style={styles.itemHeader}>
-                <View style={styles.flex1}>
-                  {Boolean(item?.store || getStoreName(item?.url, '')) && (
-                    <View style={styles.storeBadge}>
-                      <Text style={styles.storeBadgeText}>
-                        {item?.store || getStoreName(item?.url, '')}
-                      </Text>
-                    </View>
-                  )}
-                  <TouchableOpacity onPress={() => openUrl(item.url)}>
-                    <Text
-                      numberOfLines={2}
-                      ellipsizeMode="tail"
-                      style={styles.url}>
-                      {cleanProductTitle(item.title, item.url)}
-                    </Text>
-                  </TouchableOpacity>
-                  {Boolean(item?.price) ? (
-                    <View style={styles.priceContainer}>
-                      {finalPrice > 0 ? (
-                        <>
-                          <Text style={styles.priceText}>
-                            {isUsd
-                              ? (receivedDisplay === '$' ? `$${finalPrice.toFixed(2)}` : `${finalPrice.toFixed(2)} USD`)
-                              : `$${(convertedUsd ?? finalPrice).toFixed(2)}`}
-                          </Text>
-                          {!isUsd && (
-                            <Text style={styles.originalPriceText}>
-                              {` (${displayPrice} ${itemCurrency})`}
-                            </Text>
-                          )}
-                        </>
-                      ) : (
-                        <Text style={styles.priceText}>
-                          {`${displayPrice} ${itemCurrency}`}
-                        </Text>
-                      )}
-                    </View>
-                  ) : (
-                    <View style={styles.priceContainer}>
-                      <Text style={styles.pendingPriceText}>
-                        {t('Fiyat Hesaplanıyor')}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-                <View style={styles.trashIconWrapper}>
-                  <TouchableOpacity
-                    title="Sil"
-                    onPress={() => onRemove(targetId)}
-                    style={styles.trashButton}>
-                    <TrashIcon width={20} height={20} fill={'red'} />
-                  </TouchableOpacity>
-                </View>
-              </View>
+          )}
+        </TouchableOpacity>
 
-              {/* Dynamic Product Options (Model, Weight, Size, Color, etc.) */}
-              {Array.isArray(item?.options) && item.options.length > 0 ? (
-                item.options.map((opt, optIdx) => {
-                  if (!opt || !opt.name) {
-                    return null;
-                  }
-                  const selectedVal = (opt.selected || (Array.isArray(opt.values) && opt.values.length === 1 ? opt.values[0] : '') || '').trim();
-                  return (
-                    <View key={optIdx} style={styles.optionContainer}>
-                      <View style={styles.optionHeaderRow}>
-                        <Text style={styles.optionLabel}>{opt.name}:</Text>
-                        {Boolean(selectedVal) ? (
-                          <View style={styles.selectedBadge}>
-                            <Text style={styles.selectedBadgeText}>
-                              {selectedVal}
-                              {Boolean(
-                                opt.prices &&
-                                  opt.prices[selectedVal] &&
-                                  opt.prices[selectedVal] !== item.price &&
-                                  !isAgeOrMeasurement(selectedVal),
-                              ) && (
-                                <Text style={styles.badgePriceText}>
-                                  {` (${opt.prices[selectedVal]} ${item.currency || ''})`}
-                                </Text>
-                              )}
-                            </Text>
-                          </View>
-                        ) : null}
-                      </View>
-                      {/* Only show selection choices if no option is selected yet */}
-                      {!selectedVal && Array.isArray(opt.values) && opt.values.length > 0 && (
-                        <ScrollView
-                          horizontal
-                          showsHorizontalScrollIndicator={false}
-                          contentContainerStyle={styles.chipsScrollContent}>
-                          {opt.values.map((val, valIdx) => (
-                            <TouchableOpacity
-                              key={valIdx}
-                              onPress={() => changeOption(opt.name, val)}
-                              style={styles.chip}>
-                              <Text style={styles.chipText}>{val}</Text>
-                            </TouchableOpacity>
-                          ))}
-                        </ScrollView>
-                      )}
-                    </View>
-                  );
-                })
-              ) : (
-                <>
-                  {/* Conditional Size Option */}
-                  {Boolean(item?.hasSize) && (
-                    <View style={styles.optionContainer}>
-                      <View style={styles.optionHeaderRow}>
-                        <Text style={styles.optionLabel}>{t('Beden')}:</Text>
-                        {Boolean(item?.size) && (
-                          <View style={styles.selectedBadge}>
-                            <Text style={styles.selectedBadgeText}>{item.size}</Text>
-                          </View>
-                        )}
-                      </View>
-                      {!item?.size && (
-                        Array.isArray(item.sizes) && item.sizes.length > 0 ? (
-                          <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.chipsScrollContent}>
-                            {item.sizes.map((s, idx) => (
-                              <TouchableOpacity
-                                key={idx}
-                                onPress={() => changeItem('size', s)}
-                                style={styles.chip}>
-                                <Text style={styles.chipText}>{s}</Text>
-                              </TouchableOpacity>
-                            ))}
-                          </ScrollView>
-                        ) : (
-                          <TextInput
-                            style={styles.input}
-                            value={item?.size ?? ''}
-                            placeholder={t('Beden')}
-                            placeholderTextColor={'#8f8f8f'}
-                            onChangeText={text => changeItem('size', text)}
-                          />
-                        )
-                      )}
-                    </View>
-                  )}
+        {/* Content Column */}
+        <View style={styles.contentCol}>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => openUrl(item.url)}>
+            <Text
+              numberOfLines={2}
+              ellipsizeMode="tail"
+              style={[styles.title, { color: textColor }]}>
+              {cleanProductTitle(item.title, item.url)}
+            </Text>
+          </TouchableOpacity>
 
-                  {/* Conditional Color Option */}
-                  {Boolean(item?.hasColor) && (
-                    <View style={styles.optionContainer}>
-                      <View style={styles.optionHeaderRow}>
-                        <Text style={styles.optionLabel}>
-                          {t('Renk') || 'Renk'}:
-                        </Text>
-                        {Boolean(item?.color) && (
-                          <View style={styles.selectedBadge}>
-                            <Text style={styles.selectedBadgeText}>{item.color}</Text>
-                          </View>
-                        )}
-                      </View>
-                      {!item?.color && (
-                        Array.isArray(item.colors) && item.colors.length > 0 ? (
-                          <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.chipsScrollContent}>
-                            {item.colors.map((c, idx) => (
-                              <TouchableOpacity
-                                key={idx}
-                                onPress={() => changeItem('color', c)}
-                                style={styles.chip}>
-                                <Text style={styles.chipText}>{c}</Text>
-                              </TouchableOpacity>
-                            ))}
-                          </ScrollView>
-                        ) : (
-                          <TextInput
-                            style={styles.input}
-                            value={item?.color ?? ''}
-                            placeholder={t('Renk') || 'Renk'}
-                            placeholderTextColor={'#8f8f8f'}
-                            onChangeText={text => changeItem('color', text)}
-                          />
-                        )
-                      )}
-                    </View>
-                  )}
-                </>
-              )}
+          {variantText ? (
+            <Text
+              numberOfLines={1}
+              style={[styles.variantText, { color: subTextColor }]}>
+              {variantText}
+            </Text>
+          ) : null}
 
-              <View style={styles.countRow}>
-                <CartItemCountArea
-                  item={item}
-                  onIncrease={onIncrease}
-                  onDecrease={onDecrease}
-                />
-              </View>
-            </View>
+          {/* Price */}
+          <View style={styles.priceRow}>
+            {finalPrice > 0 ? (
+              <Text style={styles.priceText}>
+                {isUsd
+                  ? receivedDisplay === '$'
+                    ? `$${finalPrice.toFixed(2)}`
+                    : `${finalPrice.toFixed(2)} USD`
+                  : `$${(convertedUsd ?? finalPrice).toFixed(2)}`}
+              </Text>
+            ) : (
+              <Text style={styles.pendingPriceText}>
+                {t('Fiyat Hesaplanıyor') || 'Calculating price...'}
+              </Text>
+            )}
+            {!isUsd && finalPrice > 0 ? (
+              <Text style={[styles.originalPriceText, { color: subTextColor }]}>
+                {` (${displayPrice} ${itemCurrency})`}
+              </Text>
+            ) : null}
           </View>
         </View>
+
+        {/* Quantity Stepper & Trash */}
+        <View style={styles.actionsCol}>
+          <View style={[styles.stepperWrap, { backgroundColor: stepperBg, borderColor: borderColor }]}>
+            <TouchableOpacity
+              activeOpacity={0.6}
+              onPress={() => onDecrease(targetId)}
+              style={styles.stepperBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={[styles.stepperSymbol, { color: textColor }]}>−</Text>
+            </TouchableOpacity>
+
+            <Text style={[styles.stepperCount, { color: textColor }]}>
+              {item.count || 1}
+            </Text>
+
+            <TouchableOpacity
+              activeOpacity={0.6}
+              onPress={() => onIncrease(targetId)}
+              style={styles.stepperBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={[styles.stepperSymbol, { color: textColor }]}>+</Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={confirmRemove}
+            style={styles.trashBtn}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TrashIcon width={18} height={18} fill="#EF4444" />
+          </TouchableOpacity>
+        </View>
       </View>
-      <View>
-        <TextInput
-          style={styles.textarea}
-          multiline={true}
-          textAlignVertical="top"
-          value={item?.desc ?? item?.description ?? ''}
-          maxLength={500}
-          returnKeyType="done"
-          placeholderTextColor={'#8f8f8f'}
-          placeholder={t('sepetAciklama')}
-          onKeyPress={e => {
-            if (e.nativeEvent.key === 'Enter') {
-              Keyboard.dismiss();
-            }
-          }}
-          onChangeText={text => changeItem('desc', text)}
-        />
-      </View>
-      {/*<Dump item={item} />*/}
+
+      {/* Dynamic Product Options if not completed */}
+      {Array.isArray(item?.options) && item.options.length > 0 ? (
+        <View style={styles.optionsWrap}>
+          {item.options.map((opt, optIdx) => {
+            if (!opt || !opt.name) return null;
+            const selectedVal = (
+              opt.selected ||
+              (Array.isArray(opt.values) && opt.values.length === 1
+                ? opt.values[0]
+                : '') ||
+              ''
+            ).trim();
+
+            if (selectedVal) return null; // already displayed in variantText
+
+            return (
+              <View key={optIdx} style={styles.optionRow}>
+                <Text style={[styles.optionLabel, { color: subTextColor }]}>
+                  {opt.name}:
+                </Text>
+                {Array.isArray(opt.values) && opt.values.length > 0 && (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.chipsScroll}>
+                    {opt.values.map((val, valIdx) => (
+                      <TouchableOpacity
+                        key={valIdx}
+                        onPress={() => changeOption(opt.name, val)}
+                        style={styles.chip}>
+                        <Text style={styles.chipText}>{val}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      ) : null}
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'column',
-    width: '100%',
-    borderWidth: 1,
-    borderColor: '#cfcfcf',
-    backgroundColor: '#FFF',
-    padding: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  checkbox: {
+    marginRight: 8,
+    marginVertical: 0,
+  },
+  imageContainer: {
+    width: 64,
+    height: 64,
     borderRadius: 10,
-    marginVertical: 7,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-  },
-  row: {
-    flexDirection: 'row',
-    marginBottom: 10,
-  },
-  column: {
-    flexDirection: 'column',
-    flex: 1,
-  },
-  flexColumn: {
-    flex: 1,
-    flexDirection: 'column',
-  },
-  itemHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    width: '100%',
-    flex: 1,
-    marginBottom: 5,
-  },
-  flex1: {
-    flex: 1,
-  },
-  trashIconWrapper: {
-    width: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  trashButton: {
-    padding: 5,
-    borderRadius: 5,
-  },
-  storeBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#FFF1EC',
-    borderColor: '#F15927',
     borderWidth: 1,
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginBottom: 4,
-  },
-  storeBadgeText: {
-    color: '#F15927',
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  optionHeaderRow: {
-    flexDirection: 'row',
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  imagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imagePlaceholderText: {
+    fontSize: 10,
+    color: '#94A3B8',
+  },
+  contentCol: {
+    flex: 1,
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  title: {
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 18,
     marginBottom: 3,
   },
-  optionSelectedValue: {
+  variantText: {
     fontSize: 12,
+    lineHeight: 16,
+    marginBottom: 4,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  priceText: {
+    fontSize: 15,
     fontWeight: '700',
-    color: '#F15927',
-    marginLeft: 5,
+    color: '#F67922',
   },
-  selectedBadge: {
-    backgroundColor: '#FFF1EC',
-    borderColor: '#F15927',
-    borderWidth: 1,
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    marginLeft: 6,
-  },
-  selectedBadgeText: {
-    color: '#F15927',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  badgePriceText: {
-    color: '#666',
+  originalPriceText: {
     fontSize: 11,
-    fontWeight: '500',
+    marginLeft: 4,
   },
-  optionContainer: {
+  pendingPriceText: {
+    fontSize: 12,
+    color: '#F59E0B',
+    fontStyle: 'italic',
+  },
+  actionsCol: {
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    height: 64,
+  },
+  stepperWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  stepperBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperSymbol: {
+    fontSize: 16,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  stepperCount: {
+    fontSize: 13,
+    fontWeight: '700',
+    minWidth: 18,
+    textAlign: 'center',
+    marginHorizontal: 2,
+  },
+  trashBtn: {
+    padding: 4,
+    marginTop: 6,
+  },
+  optionsWrap: {
+    marginTop: 10,
+    paddingLeft: 28,
+  },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginVertical: 4,
   },
   optionLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#555',
-  },
-  chipsScrollContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 2,
-  },
-  chip: {
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#D0D0D0',
-    backgroundColor: '#FAFAFA',
     marginRight: 6,
   },
-  chipSelected: {
-    borderColor: '#F15927',
-    backgroundColor: '#F15927',
-  },
-  chipText: {
-    fontSize: 12,
-    color: '#333',
-    fontWeight: '500',
-  },
-  chipTextSelected: {
-    color: '#FFF',
-    fontWeight: '700',
-  },
-  chipPriceText: {
-    fontSize: 10,
-    fontWeight: '400',
-    color: '#666',
-  },
-  chipPriceTextSelected: {
-    color: '#FFF',
-    fontWeight: '600',
-  },
-  countRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 4,
-  },
-  sizeInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'flex-start',
-    flex: 1,
-    paddingRight: 10,
-  },
-  textarea: {
-    width: '100%',
-    height: 60,
-    padding: 10,
-    borderColor: 'gray',
-    borderWidth: 1,
-    borderRadius: 5,
-    color: '#000',
-  },
-  input: {
-    borderColor: 'gray',
-    borderWidth: 1,
-    borderRadius: 5,
-    padding: 5,
-    minHeight: 30,
-    flex: 1,
-    color: '#000',
-  },
-  url: {
-    marginBottom: 5,
-    color: '#000',
-    flexShrink: 1,
-  },
-  priceContainer: {
+  chipsScroll: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    marginBottom: 5,
   },
-  priceText: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#F15927',
+  chip: {
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FFEDD5',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginRight: 6,
   },
-  originalPriceText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#777',
-    marginLeft: 6,
-  },
-  convertedPriceText: {
-    fontSize: 13,
+  chipText: {
+    fontSize: 11,
+    color: '#F67922',
     fontWeight: '600',
-    color: '#2e7d32',
-  },
-  sheinPriceText: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#F15927',
-    marginLeft: 3,
-  },
-  pendingPriceText: {
-    fontSize: 13,
-    color: '#888',
-    fontStyle: 'italic',
-  },
-  cb: {
-    marginBottom: 10,
-    color: Colors.btnColor,
-    // borderColor: Colors.btnColor,
-    // borderWidth: 2,
-    // borderRadius: 5,
-    // borderColor: '#c5c5c5',
   },
 });
-
-export default CartItem;

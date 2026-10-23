@@ -1,4 +1,4 @@
-import React, {useState, useRef, useEffect} from 'react';
+import React, { useState, useRef, useEffect, useContext } from 'react';
 import {
   View,
   Text,
@@ -9,25 +9,29 @@ import {
   ActivityIndicator,
   Keyboard,
   Modal,
+  ScrollView,
+  StatusBar,
+  Image,
 } from 'react-native';
-import {t} from '../translate/i18n';
-import GlobalStyle from '../assets/GlobalStyle';
+import Svg, { Path } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { t, tr } from '../translate/i18n';
 import Toast from 'react-native-toast-message';
 import ai from '../helpers/ai';
-import {CommonActions} from '@react-navigation/native';
-import Dump from '../components/Dump';
-import {IS_LOCAL} from '../../config';
-import Colors from '../assets/Colors';
-import {delay, getUserAgent} from '../helpers/common';
-import {useCartStore} from '../store/useCartStore';
-import {useUserStore} from '../store/useUserStore';
+import { CommonActions } from '@react-navigation/native';
+import { IS_LOCAL } from '../../config';
+import { delay, getUserAgent } from '../helpers/common';
+import { useCartStore } from '../store/useCartStore';
+import { useUserStore } from '../store/useUserStore';
+import AppHeader from '../components/common/AppHeader';
+import { EmContext } from '../contexts/EmContext';
 
-export default function EDahab({navigation, route}) {
-  const g = GlobalStyle;
+export default function EDahab({ navigation, route }) {
+  const insets = useSafeAreaInsets();
+  const { ctx } = useContext(EmContext);
   const user = useUserStore(state => state.user);
 
   const paymentType = 'mwallet';
-
   const fill = (__DEV__ && IS_LOCAL) || false;
   const defaultPhoneNumber = fill ? '657654580' : user?.telefon || '';
 
@@ -46,7 +50,6 @@ export default function EDahab({navigation, route}) {
 
   useEffect(() => {
     return () => {
-      // Cleanup polling on unmount
       isCancelledRef.current = true;
     };
   }, []);
@@ -76,9 +79,7 @@ export default function EDahab({navigation, route}) {
 
       await delay(pollIntervalMs);
 
-      if (isCancelledRef.current) {
-        break;
-      }
+      if (isCancelledRef.current) break;
 
       try {
         const pollRes = await ai.post('payment-edahab', {
@@ -90,7 +91,6 @@ export default function EDahab({navigation, route}) {
         const resData = pollRes?.data;
         console.log('eDahab pollRes:', resData);
 
-        // Success: Payment confirmed by customer
         if (resData?.error === false) {
           setPolling(false);
           setSubmitting(false);
@@ -98,49 +98,45 @@ export default function EDahab({navigation, route}) {
 
           Toast.show({
             type: 'success',
-            text1: t('Ödeme Başarılı'),
-            text2: resData?.msg || t('Ödeme Başarılı'),
+            text1: tr('Ödeme Başarılı') || 'Payment Successful',
+            text2: resData?.msg || tr('Ödeme Başarılı') || 'Payment Successful',
           });
 
           navigation.dispatch(
             CommonActions.reset({
               index: 0,
-              routes: [{name: 'AuthAfter', params: {screen: 'Orders'}}],
+              routes: [{ name: 'AuthAfter', params: { screen: 'Orders' } }],
             }),
           );
           return;
         }
 
-        // Still pending customer PIN input: continue polling
         if (resData?.pending === true) {
           continue;
         }
 
-        // Explicit rejection or failure
         setPolling(false);
         setSubmitting(false);
         Toast.show({
           type: 'error',
-          text1: t('Ödeme Başarısız'),
-          text2: resData?.msg || t('Ödeme işlemi tamamlanamadı'),
-          text2Style: {fontSize: 14, color: '#000', width: '100%'},
+          text1: tr('Ödeme Başarısız') || 'Payment Failed',
+          text2: resData?.msg || tr('Ödeme işlemi tamamlanamadı') || 'Payment could not be completed.',
+          text2Style: { fontSize: 14, color: '#000', width: '100%' },
         });
         return;
       } catch (pollErr) {
-        // Network resilience: keep polling until timeout even if single request hiccups
         console.warn('eDahab polling network notice:', pollErr?.message || pollErr);
       }
     }
 
-    // Timeout reached
     if (!isCancelledRef.current) {
       setPolling(false);
       setSubmitting(false);
       Toast.show({
         type: 'error',
-        text1: t('Zaman Aşımı'),
-        text2: t('edahab_timeout_msg'),
-        text2Style: {fontSize: 14, color: '#000', width: '100%'},
+        text1: tr('Zaman Aşımı') || 'Timeout',
+        text2: t('edahab_timeout_msg') || 'Verification timed out. Please try again.',
+        text2Style: { fontSize: 14, color: '#000', width: '100%' },
       });
     }
   };
@@ -148,16 +144,14 @@ export default function EDahab({navigation, route}) {
   const handlePay = async () => {
     Keyboard.dismiss();
 
-    if (submitting || polling) {
-      return false;
-    }
+    if (submitting || polling) return false;
 
     if (!phoneNumber.trim()) {
       Toast.show({
         type: 'error',
-        text1: t('Hata Oluştu'),
-        text2: t('Lütfen tüm alanları doldurunuz'),
-        text2Style: {fontSize: 14, color: '#000'},
+        text1: tr('Hata Oluştu') || 'Required Field',
+        text2: tr('Lütfen telefon numaranızı girin') || 'Please enter your phone number',
+        text2Style: { fontSize: 14, color: '#000' },
       });
       return false;
     }
@@ -193,7 +187,6 @@ export default function EDahab({navigation, route}) {
     console.log('Initiating eDahab payment:', basePayload);
 
     try {
-      // Step 1: Initial request to issue invoice & dispatch USSD push
       const r = await ai.post('payment-edahab', {
         ...basePayload,
         odemeID: 0,
@@ -201,28 +194,25 @@ export default function EDahab({navigation, route}) {
       });
 
       console.log('eDahab initial response:', r?.data);
-
       const resData = r?.data;
 
-      // Check if already approved immediately
       if (resData?.error === false) {
         setSubmitting(false);
         useCartStore.getState().clearCart();
         Toast.show({
           type: 'success',
-          text1: t('Ödeme Başarılı'),
-          text2: resData?.msg || t('Ödeme Başarılı'),
+          text1: tr('Ödeme Başarılı') || 'Payment Successful',
+          text2: resData?.msg || tr('Ödeme Başarılı') || 'Payment Successful',
         });
         navigation.dispatch(
           CommonActions.reset({
             index: 0,
-            routes: [{name: 'AuthAfter', params: {screen: 'Orders'}}],
+            routes: [{ name: 'AuthAfter', params: { screen: 'Orders' } }],
           }),
         );
         return;
       }
 
-      // Check if USSD prompt was sent and invoice is pending
       const issuedOdemeID = resData?.odemeID;
       const issuedInvoiceId = resData?.invoiceId || invoiceId;
 
@@ -231,22 +221,18 @@ export default function EDahab({navigation, route}) {
         if (issuedInvoiceId) {
           setInvoiceId(issuedInvoiceId);
         }
-
-        // Show prompt dialog / polling countdown
         setPolling(true);
         setCountdown(60);
-
-        // Start polling loop
         await runPollingLoop(issuedOdemeID, issuedInvoiceId, basePayload);
       } else {
-        // Definite failure on initialization
         setSubmitting(false);
-        const errorMsg = resData?.msg || resData?.detail || t('Ödeme işlemi başlatılamadı');
+        const errorMsg =
+          resData?.msg || resData?.detail || tr('Ödeme işlemi başlatılamadı') || 'Could not initiate payment.';
         Toast.show({
           type: 'error',
-          text1: t('Ödeme Başarısız'),
+          text1: tr('Ödeme Başarısız') || 'Payment Failed',
           text2: errorMsg,
-          text2Style: {fontSize: 14, color: '#000', width: '100%'},
+          text2Style: { fontSize: 14, color: '#000', width: '100%' },
         });
       }
     } catch (err) {
@@ -254,280 +240,438 @@ export default function EDahab({navigation, route}) {
       setSubmitting(false);
       Toast.show({
         type: 'error',
-        text1: t('Hata Oluştu'),
-        text2: err?.response?.data?.msg || err?.message || t('Ödeme Başarısız'),
+        text1: tr('Hata Oluştu') || 'Payment Error',
+        text2: err?.response?.data?.msg || err?.message || tr('Ödeme Başarısız') || 'Payment Failed',
       });
     }
   };
 
-  const info = t('edahab_info');
+  const isDark = ctx?.isDark;
+  const pageBg = isDark ? '#111827' : '#F8FAFC';
+  const cardBg = isDark ? '#1F2937' : '#FFFFFF';
+  const textColor = isDark ? '#F9FAFB' : '#1E293B';
+  const subTextColor = isDark ? '#9CA3AF' : '#64748B';
+  const borderColor = isDark ? '#374151' : '#F1F5F9';
+  const inputBg = isDark ? '#374151' : '#F8FAFC';
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.container}>
-        <Text style={styles.title}>eDahab ${tutar}</Text>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: cardBg }]}>
+      <StatusBar
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={cardBg}
+      />
 
-        <View style={styles.row}>
-          <Text style={styles.label}>{t('Telefon')}</Text>
+      <AppHeader
+        navigation={navigation}
+        showBack={true}
+        onBackPress={handleCancel}
+        title={tr('E-Dahab Payment') || 'E-Dahab Payment'}
+        style={{
+          borderBottomWidth: 1,
+          borderBottomColor: borderColor,
+          backgroundColor: cardBg,
+        }}
+      />
 
-          {info ? (
-            <View style={styles.info}>
-              <Text style={styles.infoText}>{info}</Text>
+      <ScrollView
+        style={[styles.container, { backgroundColor: pageBg }]}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}>
+        {/* Brand & Amount Card */}
+        <View
+          style={[
+            styles.brandCard,
+            { backgroundColor: cardBg, borderColor: borderColor },
+          ]}>
+          <View style={styles.logoRow}>
+            <View style={[styles.logoWrap, { borderColor: borderColor }]}>
+              <Image
+                source={require('../assets/img/edahab.png')}
+                style={styles.logoImg}
+                resizeMode="contain"
+              />
             </View>
-          ) : null}
+            <View style={styles.brandTitleCol}>
+              <Text style={[styles.brandTitle, { color: textColor }]}>
+                E-Dahab Mobile Money
+              </Text>
+              <Text style={[styles.brandSub, { color: subTextColor }]}>
+                Telesom Mobile Wallet
+              </Text>
+            </View>
+          </View>
 
-          <TextInput
-            style={styles.txtInput}
-            value={phoneNumber}
-            onChangeText={setPhoneNumber}
-            placeholder={t('Telefon')}
-            placeholderTextColor={'#999'}
-            keyboardType="phone-pad"
-            editable={!submitting && !polling}
-          />
+          <View style={[styles.amountBox, { borderTopColor: borderColor }]}>
+            <Text style={[styles.amountLabel, { color: subTextColor }]}>
+              {tr('Total Amount') || 'Total Amount'}
+            </Text>
+            <Text style={styles.amountValue}>${tutar} USD</Text>
+          </View>
         </View>
 
-        <Dump params={route?.params} show={false} />
+        {/* Input Card */}
+        <View
+          style={[
+            styles.inputCard,
+            { backgroundColor: cardBg, borderColor: borderColor },
+          ]}>
+          <Text style={[styles.cardHeaderTitle, { color: textColor }]}>
+            {tr('Phone Number') || 'Registered Phone Number'}
+          </Text>
 
-        {submitting && !polling ? (
-          <View style={[g.p10, g.alignCenter]}>
-            <ActivityIndicator size="large" color={Colors.primary} />
-            <Text style={styles.submittingText}>{t('Ödeme Yapılıyor')}...</Text>
+          <View
+            style={[
+              styles.inputWrap,
+              { backgroundColor: inputBg, borderColor: borderColor },
+            ]}>
+            <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+              <Path
+                d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"
+                stroke="#64748B"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </Svg>
+            <TextInput
+              style={[styles.textInput, { color: textColor }]}
+              value={phoneNumber}
+              onChangeText={setPhoneNumber}
+              placeholder="e.g. 657654580"
+              placeholderTextColor="#94A3B8"
+              keyboardType="phone-pad"
+              editable={!submitting && !polling}
+            />
           </View>
-        ) : null}
 
-        <View style={[styles.rowHorizontal, g.alignCenter, g.pt30]}>
-          <TouchableOpacity
-            style={[g.btnCancel, g.m5, g.mw120]}
-            disabled={submitting}
-            onPress={handleCancel}>
-            <Text style={[g.btnText, g.bold, styles.cancelBtnText]}>
-              {t('İptal')}
+          {/* Info Notice */}
+          <View style={styles.infoNoticeBox}>
+            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+              <Path
+                d="M12 22a10 10 0 100-20 10 10 0 000 20zM12 16v-4M12 8h.01"
+                stroke="#F67922"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </Svg>
+            <Text style={styles.infoNoticeText}>
+              {tr(
+                'Enter your E-Dahab registered phone number. You will receive a USSD prompt on your phone to approve the transaction with your PIN.',
+              ) ||
+                'Enter your E-Dahab registered phone number. You will receive a USSD prompt on your phone to approve the transaction with your PIN.'}
             </Text>
-          </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Action Buttons */}
+        <View style={styles.actionWrap}>
           <TouchableOpacity
-            style={[g.btn, g.m5, g.mw120, styles.payBtn]}
+            activeOpacity={0.85}
             onPress={handlePay}
-            disabled={submitting || polling}>
-            <Text style={[g.btnText, g.bold, styles.payBtnText]}>
-              {submitting ? t('Ödeme Yapılıyor') : t('Ödeme Yap')}
+            disabled={submitting || polling}
+            style={[styles.payBtn, (submitting || polling) && styles.payBtnDisabled]}>
+            {submitting && !polling ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Text style={styles.payBtnText}>
+                {tr('Pay') || 'Pay'} ${tutar}
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={handleCancel}
+            disabled={submitting || polling}
+            style={[styles.cancelBtn, { borderColor: borderColor }]}>
+            <Text style={[styles.cancelBtnText, { color: subTextColor }]}>
+              {tr('İptal') || 'Cancel'}
             </Text>
           </TouchableOpacity>
         </View>
+      </ScrollView>
 
-        {/* Polling / USSD Confirmation Modal */}
-        <Modal
-          visible={polling}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={handleCancelPolling}>
-          <View style={styles.modalBackdrop}>
-            <View style={styles.modalCard}>
-              <ActivityIndicator size="large" color="#4CAF50" style={styles.modalSpinner} />
-
-              <Text style={styles.modalTitle}>
-                {t('edahab_awaiting_title')}
-              </Text>
-
-              <Text style={styles.modalAmount}>
-                ${tutar} USD
-              </Text>
-
-              <Text style={styles.modalInstruction}>
-                {t('edahab_prompt_sent')}
-              </Text>
-
-              <View style={styles.modalPhoneBadge}>
-                <Text style={styles.modalPhoneText}>
-                  eDahab: {phoneNumber}
-                </Text>
-              </View>
-
-              <View style={styles.countdownContainer}>
-                <Text style={styles.countdownLabel}>{t('time_remaining')}:</Text>
-                <Text style={styles.countdownValue}>{countdown}s</Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.modalCancelBtn}
-                onPress={handleCancelPolling}>
-                <Text style={styles.modalCancelBtnText}>
-                  {t('edahab_cancel_btn')}
-                </Text>
-              </TouchableOpacity>
+      {/* USSD Approval Modal */}
+      <Modal
+        visible={polling}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleCancelPolling}>
+        <View style={styles.modalBackdrop}>
+          <View
+            style={[
+              styles.modalCard,
+              { backgroundColor: cardBg, borderColor: borderColor },
+            ]}>
+            <View style={styles.modalSpinnerCircle}>
+              <ActivityIndicator size="large" color="#F67922" />
             </View>
-          </View>
-        </Modal>
 
-        <Dump invoiceId={invoiceId} odemeID={odemeID} show={false} />
-      </View>
+            <Text style={[styles.modalTitle, { color: textColor }]}>
+              {tr('Awaiting Approval') || 'Awaiting Approval'}
+            </Text>
+
+            <Text style={styles.modalAmount}>${tutar} USD</Text>
+
+            <Text style={[styles.modalInstruction, { color: subTextColor }]}>
+              {tr(
+                'A USSD push notification has been sent to your phone. Please check your screen and enter your PIN to complete payment.',
+              ) ||
+                'A USSD push notification has been sent to your phone. Please check your screen and enter your PIN to complete payment.'}
+            </Text>
+
+            <View style={styles.modalPhoneBadge}>
+              <Text style={styles.modalPhoneText}>
+                {phoneNumber}
+              </Text>
+            </View>
+
+            <View style={styles.countdownRow}>
+              <Text style={[styles.countdownLabel, { color: subTextColor }]}>
+                {tr('Time Remaining') || 'Time Remaining'}:
+              </Text>
+              <Text style={styles.countdownValue}>{countdown}s</Text>
+            </View>
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleCancelPolling}
+              style={[styles.modalCancelBtn, { borderColor: borderColor }]}>
+              <Text style={[styles.modalCancelText, { color: subTextColor }]}>
+                {tr('Cancel Request') || 'Cancel Request'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
+  safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
   },
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: '#fff',
   },
-  info: {
-    backgroundColor: '#f4f6f8',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 15,
-    width: '100%',
-    borderLeftWidth: 4,
-    borderLeftColor: '#4CAF50',
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 40,
   },
-  infoText: {
-    fontSize: 13,
-    color: '#333',
-    lineHeight: 18,
-  },
-  row: {
-    flexDirection: 'column',
-    justifyContent: 'flex-start',
-    alignItems: 'flex-start',
-    marginBottom: 20,
-    width: '100%',
-  },
-  rowHorizontal: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    width: '100%',
-    textAlign: 'center',
-    color: '#1a1a1a',
-  },
-  label: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 8,
-    color: '#333',
-  },
-  txtInput: {
-    height: 50,
-    borderColor: '#ccc',
+  brandCard: {
+    borderRadius: 14,
     borderWidth: 1,
-    borderRadius: 6,
-    width: '100%',
-    backgroundColor: '#FFF',
-    color: '#000',
-    paddingHorizontal: 15,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  logoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  logoWrap: {
+    width: 68,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  logoImg: {
+    width: 52,
+    height: 30,
+  },
+  brandTitleCol: {
+    flex: 1,
+  },
+  brandTitle: {
     fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 2,
   },
-  payBtn: {
-    backgroundColor: '#4CAF50',
+  brandSub: {
+    fontSize: 13,
   },
-  payBtnText: {
-    color: '#FFF',
-    fontSize: 16,
+  amountBox: {
+    borderTopWidth: 1,
+    paddingTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  cancelBtnText: {
-    color: '#FFF',
-    fontSize: 16,
-  },
-  submittingText: {
-    marginTop: 10,
-    color: '#666',
+  amountLabel: {
     fontSize: 14,
   },
-
-  // Modal styles
+  amountValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#F67922',
+  },
+  inputCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  cardHeaderTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  inputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 15,
+    marginLeft: 10,
+    padding: 0,
+  },
+  infoNoticeBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFF7ED',
+    borderRadius: 10,
+    padding: 12,
+  },
+  infoNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+    color: '#9A3412',
+    marginLeft: 8,
+  },
+  actionWrap: {
+    rowGap: 12,
+  },
+  payBtn: {
+    backgroundColor: '#F67922',
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  payBtnDisabled: {
+    backgroundColor: '#CBD5E1',
+  },
+  payBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  cancelBtn: {
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     alignItems: 'center',
-    padding: 20,
+    justifyContent: 'center',
+    padding: 24,
   },
   modalCard: {
     width: '100%',
-    maxWidth: 380,
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    borderRadius: 20,
+    borderWidth: 1,
     padding: 24,
     alignItems: 'center',
-    elevation: 8,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
     shadowRadius: 10,
+    elevation: 10,
   },
-  modalSpinner: {
+  modalSpinnerCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FFF7ED',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 16,
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    textAlign: 'center',
-    marginBottom: 8,
+    fontWeight: '700',
+    marginBottom: 6,
   },
   modalAmount: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#4CAF50',
-    marginBottom: 12,
-  },
-  modalInstruction: {
-    fontSize: 14,
-    color: '#555',
-    textAlign: 'center',
-    lineHeight: 20,
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#F67922',
     marginBottom: 14,
   },
+  modalInstruction: {
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
   modalPhoneBadge: {
-    backgroundColor: '#e8f5e9',
-    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 20,
+    paddingHorizontal: 16,
     paddingVertical: 6,
-    paddingHorizontal: 14,
     marginBottom: 16,
   },
   modalPhoneText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#2e7d32',
+    color: '#475569',
   },
-  countdownContainer: {
+  countdownRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: 20,
   },
   countdownLabel: {
-    fontSize: 14,
-    color: '#777',
+    fontSize: 13,
     marginRight: 6,
   },
   countdownValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#d32f2f',
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#F67922',
   },
   modalCancelBtn: {
     width: '100%',
-    paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#ccc',
+    paddingVertical: 12,
     alignItems: 'center',
-    backgroundColor: '#f9f9f9',
   },
-  modalCancelBtnText: {
-    color: '#666',
-    fontSize: 15,
+  modalCancelText: {
+    fontSize: 14,
     fontWeight: '600',
   },
 });

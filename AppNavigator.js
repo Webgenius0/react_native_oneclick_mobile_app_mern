@@ -75,6 +75,8 @@ import EDahab from './src/pages/EDahab';
 import HomeNew from './src/pages/HomeNew.js';
 import { EXPRESS } from './config.js';
 import BannerList from './src/pages/BannerList.js';
+import ReviewOrder from './src/pages/ReviewOrder.js';
+import TrackOrder from './src/pages/TrackOrder.js';
 
 function AuthAfterTabNavigator() {
   const { ctx } = useContext(EmContext);
@@ -87,43 +89,15 @@ function AuthAfterTabNavigator() {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarIcon: ({ focused, color, size }) => {
-          let width = 30, height = 30;
-          let fill = focused ? Colors.primary : !ctx?.isDark ? '#666' : '#FFF';
+          let width = 24, height = 24;
+          let fill = focused ? Colors.primary : !ctx?.isDark ? '#64748B' : '#9CA3AF';
           switch (route.name) {
             case 'Home':
-              if (EXPRESS) {
-                return (
-                  <ExpressIcon
-                    width={50}
-                    height={50}
-                    size={size}
-                    fill={fill}
-                  />
-                );
-              }
+            case 'Categories':
               return (
                 <HomeIcon
-                  width={width}
-                  height={height}
-                  size={size}
-                  fill={fill}
-                />
-              );
-            case 'Categories':
-            case 'CategoryList':
-              return (
-                <DotsIcon
-                  width={width}
-                  height={height}
-                  size={size}
-                  fill={fill}
-                />
-              );
-            case 'Orders':
-              return (
-                <BagIcon
-                  width={width}
-                  height={height}
+                  width={24}
+                  height={24}
                   size={size}
                   fill={fill}
                 />
@@ -131,35 +105,17 @@ function AuthAfterTabNavigator() {
             case 'Cart':
               return (
                 <CartIcon
-                  width={width}
-                  height={height}
+                  width={24}
+                  height={24}
                   size={size}
                   fill={fill}
                 />
               );
-            case 'Arrivals':
+            case 'Orders':
               return (
-                <TruckIcon
-                  width={width}
-                  height={height}
-                  size={size}
-                  fill={fill}
-                />
-              );
-            case 'Balance':
-              return (
-                <CreditIcon
-                  width={width}
-                  height={height}
-                  size={size}
-                  fill={fill}
-                />
-              );
-            case 'Menu':
-              return (
-                <CategoriesIcon
-                  width={width}
-                  height={height}
+                <BagIcon
+                  width={24}
+                  height={24}
                   size={size}
                   fill={fill}
                 />
@@ -173,46 +129,20 @@ function AuthAfterTabNavigator() {
                   stroke={fill}
                 />
               );
-            case 'Support':
-              return (
-                <SupportIcon
-                  width={width}
-                  height={height}
-                  size={size}
-                  fill={fill}
-                />
-              );
           }
           return null;
         },
         tabBarActiveBackgroundColor: ctx?.bgColor,
         tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: ctx?.color,
+        tabBarInactiveTintColor: ctx?.color || '#64748B',
         tabBarInactiveBackgroundColor: ctx?.bgColor,
       })}
-      initialRouteName="Categories">
-      {EXPRESS ? (
-        <Tab.Screen
-          name="Home"
-          component={HomeNew}
-          options={{
-            title: tr('Express'),
-            headerTitleStyle: headerTitleStyle,
-            headerShown: true,
-          }}
-        />
-      ) : (
-        <Tab.Screen
-          name="Home"
-          component={Home}
-          options={{ title: tr('Anasayfa'), headerTitleStyle: headerTitleStyle }}
-        />
-      )}
+      initialRouteName="Home">
       <Tab.Screen
-        name="Categories"
+        name="Home"
         component={BannerList}
         options={{
-          title: 'Market',
+          title: tr('Home') || 'Home',
           headerTitleStyle: headerTitleStyle,
         }}
       />
@@ -220,17 +150,18 @@ function AuthAfterTabNavigator() {
         name="Cart"
         component={Cart}
         options={{
-          title: tr('Sepet'),
+          title: tr('Cart') || 'Cart',
           headerTitleStyle: headerTitleStyle,
-          headerShown: true,
+          headerShown: false,
         }}
       />
       <Tab.Screen
         name="Orders"
         component={Orders}
         options={{
-          title: tr('Siparişler'),
+          title: tr('Orders') || 'Orders',
           headerTitleStyle: headerTitleStyle,
+          headerShown: false,
         }}
       />
       <Tab.Screen
@@ -408,7 +339,12 @@ export default function AppNavigator() {
         <Stack.Screen
           name="AuthAfter"
           component={AuthAfterTabNavigator}
-          options={headerNoShowOptionTitle('Anasayfa')}
+          options={headerNoShowOptionTitle('Home')}
+        />
+        <Stack.Screen
+          name="Categories"
+          component={BannerList}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="Webview"
@@ -433,9 +369,14 @@ export default function AppNavigator() {
           name="Cart"
           component={Cart}
           options={{
-            title: tr('Sepet'),
-            headerTitleStyle: headerTitleStyle,
-            headerShown: true,
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="ReviewOrder"
+          component={ReviewOrder}
+          options={{
+            headerShown: false,
           }}
         />
         <Stack.Screen
@@ -525,8 +466,14 @@ export default function AppNavigator() {
           name="OrderDetail"
           component={OrderDetail}
           options={{
-            title: t('Sipariş Detay'),
-            headerTitleStyle: headerTitleStyle,
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="TrackOrder"
+          component={TrackOrder}
+          options={{
+            headerShown: false,
           }}
         />
         <Stack.Screen
@@ -557,8 +504,7 @@ export default function AppNavigator() {
           name="PaymentStart"
           component={PaymentStart}
           options={{
-            title: t('Ödeme Yap'),
-            headerTitleStyle: headerTitleStyle,
+            headerShown: false,
           }}
         />
         <Stack.Screen

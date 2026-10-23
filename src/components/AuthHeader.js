@@ -1,6 +1,5 @@
 import React, { useContext, useEffect } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions } from "react-native";
-import ProfileIcon from "../assets/svg/profile1.svg";
 import NotificationButton from "./NotificationButton";
 import { EmContext } from "../contexts/EmContext";
 import { fetchAllNotifications } from "../helpers/notificationV2";
@@ -40,13 +39,8 @@ export default function AuthHeader(props) {
     }
   }, []);
 
-  let logoWidth = width > 500 ? 300 : width - 150;
-  let logoHeight = logoWidth / logoRatio;
-
-  if (props?.logoWidth) {
-    logoWidth = props.logoWidth;
-    logoHeight = props.logoHeight;
-  }
+  const logoMaxHeight = 36;
+  const logoMaxWidth = width - 130;
 
   // Figma Home Header Variant
   if (variant === "home") {
@@ -66,26 +60,30 @@ export default function AuthHeader(props) {
             navigation={navigation}
             ctx={ctx}
             color="#FFFFFF"
-            size={26}
+            size={24}
           />
         </View>
       </View>
     );
   }
 
-  // Standard Header Variant
+  const isDark = ctx?.isDark;
+  const headerBg = isDark ? "#111827" : "#FFFFFF";
+  const borderColor = isDark ? "#1F2937" : "#F1F5F9";
+
+  // Standard Header Variant (Market / Categories / Top Nav)
   return (
     <View
       style={[
         styles.header,
         {
-          backgroundColor: ctx.isLight ? "#FFF" : "#000",
-          borderBottomColor: ctx.isLight ? "#CCC" : "#333",
-          maxHeight: logoChanged ? 140 : 100,
+          backgroundColor: headerBg,
+          borderBottomColor: borderColor,
         },
       ]}>
+      {/* Col 1: Left Profile Avatar Button */}
       <View style={styles.col1}>
-        {route?.name !== "Profile" && (
+        {route?.name !== "Profile" ? (
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => navigation.navigate("Profile")}
@@ -96,21 +94,44 @@ export default function AuthHeader(props) {
               resizeMode="cover"
             />
           </TouchableOpacity>
+        ) : (
+          <View style={styles.placeholderBox} />
         )}
       </View>
+
+      {/* Col 2: Center Brand Logo */}
       <View style={styles.col2}>
-        {logoImage && (
+        {logoImage ? (
           <Image
-            style={{ width: logoWidth, height: logoHeight }}
+            style={{
+              width: logoMaxWidth,
+              height: logoMaxHeight,
+            }}
             source={logoImage}
             resizeMode="contain"
           />
-        )}
+        ) : null}
       </View>
+
+      {/* Col 3: Right Notification Button */}
       <View style={styles.col3}>
         {rightBtn}
-        {route?.name !== "Notifications" && (
-          <NotificationButton navigation={navigation} ctx={ctx} />
+        {route?.name !== "Notifications" ? (
+          <NotificationButton
+            navigation={navigation}
+            ctx={ctx}
+            size={22}
+            color={isDark ? "#F9FAFB" : "#1E293B"}
+            containerStyle={[
+              styles.notifBtnCircle,
+              {
+                borderColor: isDark ? "#374151" : "#F1F5F9",
+                backgroundColor: isDark ? "#1F2937" : "#F8FAFC",
+              },
+            ]}
+          />
+        ) : (
+          <View style={styles.placeholderBox} />
         )}
       </View>
     </View>
@@ -142,29 +163,39 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
 
-  // Standard Header
+  // Standard Market Header with Center-Aligned 3 Items
   header: {
-    paddingHorizontal: 15,
-    paddingVertical: 5,
+    height: 56,
+    paddingHorizontal: 16,
     flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     borderBottomWidth: 1,
-    paddingBottom: 10,
   },
   col1: {
-    flex: 1,
-    alignItems: "flex-start",
+    minWidth: 44,
+    height: 56,
+    flexDirection: "row",
+    alignItems: "center",
     justifyContent: "flex-start",
   },
   col2: {
-    flex: 6,
+    flex: 1,
+    height: 56,
     alignItems: "center",
-    overflow: "hidden",
-    backgroundColor: "#FFF",
+    justifyContent: "center",
+    paddingHorizontal: 6,
   },
   col3: {
-    flex: 1,
-    alignItems: "flex-end",
-    justifyContent: "flex-start",
+    minWidth: 44,
+    height: 56,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+  },
+  placeholderBox: {
+    width: 36,
+    height: 36,
   },
   profileAvatarBtn: {
     width: 36,
@@ -181,5 +212,13 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
+  },
+  notifBtnCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
