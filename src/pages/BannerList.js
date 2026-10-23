@@ -39,35 +39,74 @@ const cardHeight = Math.round(cardWidth * 1.05);
 
 const HERO_BANNER_IMG = require("../assets/img/home/home_hero_banner.png");
 
-const STORE_CARDS = [
+// Dedicated high-resolution assets exported from Figma
+const KNOWN_STORE_ASSETS = {
+  amazon: {
+    image: require("../assets/img/home/store_amazon.png"),
+    bgColor: "#FEF3E1",
+    subtitle: "Millions of products across every category.",
+  },
+  iherb: {
+    image: require("../assets/img/home/store_iherb.png"),
+    bgColor: "#E8F7E7",
+    subtitle: "Health, wellness & personal care products",
+  },
+  yesstyle: {
+    image: require("../assets/img/home/store_yesstyle.png"),
+    bgColor: "#EAF5EF",
+    subtitle: "Beauty, fashion and lifestyle products.",
+  },
+  shein: {
+    image: require("../assets/img/home/store_shein.png"),
+    bgColor: "#FCEFF5",
+    subtitle: "Fashion, beauty and lifestyle products",
+  },
+};
+
+const DEFAULT_FALLBACK_STORES = [
   {
     id: "amazon",
     name: "Amazon",
     url: "https://www.amazon.com",
     bgColor: "#FEF3E1",
-    image: require("../assets/img/home/store_amazon.png"),
+    knownAsset: require("../assets/img/home/store_amazon.png"),
+    subtitle: "Millions of products across every category.",
   },
   {
     id: "iherb",
     name: "iHerb",
     url: "https://www.iherb.com",
     bgColor: "#E8F7E7",
-    image: require("../assets/img/home/store_iherb.png"),
+    knownAsset: require("../assets/img/home/store_iherb.png"),
+    subtitle: "Health, wellness & personal care products",
   },
   {
     id: "yesstyle",
     name: "YESSTYLE",
     url: "https://www.yesstyle.com",
     bgColor: "#EAF5EF",
-    image: require("../assets/img/home/store_yesstyle.png"),
+    knownAsset: require("../assets/img/home/store_yesstyle.png"),
+    subtitle: "Beauty, fashion and lifestyle products.",
   },
   {
     id: "shein",
     name: "SHEIN",
     url: "https://www.shein.com",
     bgColor: "#FCEFF5",
-    image: require("../assets/img/home/store_shein.png"),
+    knownAsset: require("../assets/img/home/store_shein.png"),
+    subtitle: "Fashion, beauty and lifestyle products",
   },
+];
+
+const PASTEL_PALETTE = [
+  { bg: "#FEF3E1", text: "#B45309" },
+  { bg: "#E8F7E7", text: "#15803D" },
+  { bg: "#EAF5EF", text: "#0F766E" },
+  { bg: "#FCEFF5", text: "#BE185D" },
+  { bg: "#FFF7ED", text: "#C2410C" },
+  { bg: "#F0F9FF", text: "#0369A1" },
+  { bg: "#F5F3FF", text: "#6D28D9" },
+  { bg: "#FEF2F2", text: "#B91C1C" },
 ];
 
 const DEFAULT_MARKET_DATA = {
@@ -78,20 +117,7 @@ const DEFAULT_MARKET_DATA = {
     { id: 3, ad: "İngiltere", img: "https://flagcdn.com/w80/gb.png", width: 45, height: 30 },
     { id: 4, ad: "Çin", img: "https://flagcdn.com/w80/cn.png", width: 45, height: 30 },
   ],
-  sliders: [
-    {
-      id: 1,
-      ad_tr: "Trendyol Fırsatları",
-      img_tr: "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&auto=format&fit=crop&q=80",
-      link: "https://www.trendyol.com",
-    },
-    {
-      id: 2,
-      ad_tr: "Amazon İndirimleri",
-      img_tr: "https://images.unsplash.com/photo-1607083206869-4c7672e72a8a?w=1200&auto=format&fit=crop&q=80",
-      link: "https://www.amazon.com",
-    },
-  ],
+  sliders: [],
   banners_orta: [],
   banners: [],
 };
@@ -106,8 +132,8 @@ export default function BannerList({ route, navigation }) {
   const [ulkeID, setUlkeID] = useState(0);
 
   const [state, setState] = useState({
-    banners: DEFAULT_MARKET_DATA.banners,
-    sliders: DEFAULT_MARKET_DATA.sliders,
+    banners: [],
+    sliders: [],
     banners_orta: [],
     ulkes: DEFAULT_MARKET_DATA.ulkes,
     kur: "",
@@ -293,7 +319,7 @@ export default function BannerList({ route, navigation }) {
     return slides;
   }, [state.sliders, ctxDil]);
 
-  // Auto-slide effect
+  // Auto-slide effect for top carousel
   useEffect(() => {
     if (!carouselSlides || carouselSlides.length <= 1) return;
 
@@ -329,25 +355,71 @@ export default function BannerList({ route, navigation }) {
   };
 
   const handleStorePress = store => {
-    const matchingBanner = state.banners?.find(
-      b =>
-        b?.ad_tr?.toLowerCase().includes(store.id) ||
-        b?.link?.toLowerCase().includes(store.id)
-    );
-    const targetUrl = matchingBanner?.link || store.url;
+    const targetUrl = store.url || "https://www.amazon.com";
     navigation.navigate("Webview", {
       ad: store.name,
       url: targetUrl,
     });
   };
 
+  // Convert dynamic API banners into responsive Figma-styled 2-column cards
+  const displayStores = useMemo(() => {
+    if (!state.banners || state.banners.length === 0) {
+      return DEFAULT_FALLBACK_STORES;
+    }
+
+    return state.banners.map((item, index) => {
+      const rawName =
+        item["ad_" + ctxDil] || item.ad_tr || item.title || "Store";
+      const nameLower = rawName.toLowerCase();
+      const linkLower = (item.link || "").toLowerCase();
+
+      // Check if matches one of the 4 known Figma store assets
+      let matchedKey = null;
+      if (nameLower.includes("amazon") || linkLower.includes("amazon"))
+        matchedKey = "amazon";
+      else if (nameLower.includes("iherb") || linkLower.includes("iherb"))
+        matchedKey = "iherb";
+      else if (
+        nameLower.includes("yesstyle") ||
+        linkLower.includes("yesstyle")
+      )
+        matchedKey = "yesstyle";
+      else if (nameLower.includes("shein") || linkLower.includes("shein"))
+        matchedKey = "shein";
+
+      if (matchedKey && KNOWN_STORE_ASSETS[matchedKey]) {
+        const assetInfo = KNOWN_STORE_ASSETS[matchedKey];
+        return {
+          id: item.id ? `store-${item.id}` : `store-${index}`,
+          name: rawName,
+          url: item.link || "https://www.amazon.com",
+          bgColor: assetInfo.bgColor,
+          knownAsset: assetInfo.image,
+          subtitle: assetInfo.subtitle,
+        };
+      }
+
+      // Dynamic store from API rendered in the Figma card style
+      const colorConfig = PASTEL_PALETTE[index % PASTEL_PALETTE.length];
+      const remoteImg = item["img_" + ctxDil] || item.img_tr || "";
+
+      return {
+        id: item.id ? `store-${item.id}` : `store-${index}`,
+        name: rawName,
+        url: item.link || "https://www.amazon.com",
+        bgColor: colorConfig.bg,
+        accentColor: colorConfig.text,
+        remoteImg: remoteImg,
+        subtitle: tr("Öne Çıkan Mağaza") || "Featured Store",
+      };
+    });
+  }, [state.banners, ctxDil]);
+
   const isDark = ctx?.isDark;
   const pageBg = isDark ? "#111827" : "#FFFFFF";
   const textColor = isDark ? "#F9FAFB" : "#1E293B";
   const subTextColor = isDark ? "#9CA3AF" : "#64748B";
-
-  const imgRatio = 1684 / 777;
-  const calculatedHeight = (width - 32) / imgRatio;
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: "#F67922" }]}>
@@ -383,7 +455,7 @@ export default function BannerList({ route, navigation }) {
             {/* Orange Backdrop behind Carousel Top Portion */}
             <View style={styles.orangeBackdrop} />
 
-            {/* 1. Top Carousel Section */}
+            {/* 1. Top Carousel Section (Figma Banner + Dynamic API Sliders) */}
             <View style={styles.carouselContainer}>
               <ScrollView
                 ref={carouselRef}
@@ -472,14 +544,28 @@ export default function BannerList({ route, navigation }) {
               </View>
             </View>
 
-            {/* 2. Shop International Stores Section (Figma 2x2 Grid) */}
+            {/* 2. Country Filter Bar (Filter Dynamic Stores from API) */}
+            {state.ulkes && state.ulkes.length > 1 ? (
+              <View style={styles.countryBarWrap}>
+                <UlkeBar
+                  state={state}
+                  ulkeID={ulkeID}
+                  loading={state.loading}
+                  setUlkeID={setUlkeID}
+                />
+              </View>
+            ) : null}
+
+            {/* 3. Responsive Dynamic Stores Grid (Figma 2-Column Layout) */}
             <View style={styles.storesSection}>
-              <Text style={[styles.sectionTitle, { color: textColor }]}>
-                {tr("Shop International Stores") || "Shop International Stores"}
-              </Text>
+              <View style={styles.storesHeaderRow}>
+                <Text style={[styles.sectionTitle, { color: textColor }]}>
+                  {tr("Shop International Stores") || "Shop International Stores"}
+                </Text>
+              </View>
 
               <View style={styles.storesGrid}>
-                {STORE_CARDS.map(store => (
+                {displayStores.map(store => (
                   <TouchableOpacity
                     key={store.id}
                     activeOpacity={0.88}
@@ -492,79 +578,64 @@ export default function BannerList({ route, navigation }) {
                         backgroundColor: store.bgColor,
                       },
                     ]}>
-                    <Image
-                      source={store.image}
-                      style={styles.storeCardImage}
-                      resizeMode="cover"
-                    />
+                    {store.knownAsset ? (
+                      <Image
+                        source={store.knownAsset}
+                        style={styles.storeCardImage}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={styles.dynamicCardInner}>
+                        <View style={styles.dynamicCardHeader}>
+                          <Text
+                            style={[styles.dynamicStoreName, { color: textColor }]}
+                            numberOfLines={1}>
+                            {store.name}
+                          </Text>
+                          <Text
+                            style={[styles.dynamicStoreSub, { color: subTextColor }]}
+                            numberOfLines={2}>
+                            {store.subtitle}
+                          </Text>
+                        </View>
+
+                        <View style={styles.dynamicCardImageWrap}>
+                          {store.remoteImg ? (
+                            <FastImage
+                              source={{ uri: store.remoteImg }}
+                              style={styles.dynamicStoreImg}
+                              resizeMode={FastImage.resizeMode.contain}
+                            />
+                          ) : (
+                            <Text
+                              style={[
+                                styles.dynamicStoreInitial,
+                                { color: store.accentColor || Colors.primary },
+                              ]}>
+                              {store.name.charAt(0)}
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                    )}
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
 
-            {/* 3. Country Filter Bar */}
-            {state.ulkes && state.ulkes.length > 1 ? (
-              <View style={styles.countrySection}>
-                <View style={styles.countryHeaderRow}>
-                  <Text style={[styles.subSectionTitle, { color: textColor }]}>
-                    {tr("Ülkeye Göre Mağazalar") || "Stores by Country"}
-                  </Text>
-                </View>
-                <UlkeBar
-                  state={state}
-                  ulkeID={ulkeID}
-                  loading={state.loading}
-                  setUlkeID={setUlkeID}
-                />
-              </View>
-            ) : null}
-
-            {/* 4. Middle Sliders from API */}
+            {/* 4. Middle Sliders from API (if available, enclosed in Figma-styled container) */}
             {state.banners_orta && state.banners_orta.length > 0 ? (
               <View style={styles.middleSliderWrap}>
-                <CustomSlider
-                  ctxDil={ctxDil}
-                  state={state}
-                  navigation={navigation}
-                  width={430}
-                  height={241}
-                  data={state.banners_orta}
-                />
-              </View>
-            ) : null}
-
-            {/* 5. Dynamic Banners from API */}
-            {state.banners && state.banners.length > 0 ? (
-              <View style={styles.bannersSection}>
-                {state.banners.map((item, index) => {
-                  const img = item["img_" + ctxDil] || item.img_tr;
-                  if (!img) return null;
-
-                  return (
-                    <TouchableOpacity
-                      key={item.id ? `banner-${item.id}` : `banner-${index}`}
-                      activeOpacity={0.88}
-                      onPress={() => {
-                        navigation.navigate("Webview", {
-                          ad: item.ad_tr || "Store",
-                          url: item.link,
-                        });
-                      }}
-                      style={[
-                        styles.bannerCard,
-                        {
-                          height: calculatedHeight,
-                          borderColor: isDark ? "#374151" : "#F1F5F9",
-                        },
-                      ]}>
-                      <FastImage
-                        style={styles.bannerImage}
-                        source={{ uri: img }}
-                        resizeMode={FastImage.resizeMode.contain}
-                      />
-                    </TouchableOpacity>
-                  );
-                })}
+                <View style={styles.middleSliderCard}>
+                  <CustomSlider
+                    ctxDil={ctxDil}
+                    state={state}
+                    navigation={navigation}
+                    width={430}
+                    height={241}
+                    data={state.banners_orta}
+                  />
+                </View>
               </View>
             ) : null}
           </ScrollView>
@@ -673,7 +744,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginTop: 12,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   dot: {
     height: 6,
@@ -688,21 +759,25 @@ const styles = StyleSheet.create({
     width: 6,
     backgroundColor: "#E2E8F0",
   },
+  countryBarWrap: {
+    marginBottom: 10,
+  },
   storesSection: {
     paddingHorizontal: 16,
-    marginTop: 2,
+    marginTop: 6,
+  },
+  storesHeaderRow: {
+    marginBottom: 14,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "700",
     letterSpacing: -0.2,
-    marginBottom: 14,
   },
   storesGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
-    rowGap: 12,
+    gap: 12,
   },
   storeCard: {
     borderRadius: 16,
@@ -717,41 +792,54 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
-  countrySection: {
-    marginTop: 20,
+  dynamicCardInner: {
+    flex: 1,
+    padding: 14,
+    justifyContent: "space-between",
   },
-  countryHeaderRow: {
-    paddingHorizontal: 16,
+  dynamicCardHeader: {
+    marginBottom: 6,
+  },
+  dynamicStoreName: {
+    fontSize: 16,
+    fontWeight: "800",
+    letterSpacing: -0.2,
     marginBottom: 2,
   },
-  subSectionTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    letterSpacing: -0.2,
+  dynamicStoreSub: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  dynamicCardImageWrap: {
+    flex: 1,
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    borderRadius: 10,
+    backgroundColor: "rgba(255, 255, 255, 0.45)",
+    padding: 6,
+  },
+  dynamicStoreImg: {
+    width: "100%",
+    height: "100%",
+  },
+  dynamicStoreInitial: {
+    fontSize: 32,
+    fontWeight: "900",
   },
   middleSliderWrap: {
     marginTop: 18,
     paddingHorizontal: 16,
   },
-  bannersSection: {
-    marginTop: 16,
-    paddingHorizontal: 16,
-    gap: 14,
-  },
-  bannerCard: {
-    width: "100%",
+  middleSliderCard: {
     borderRadius: 16,
     overflow: "hidden",
     backgroundColor: "#FFFFFF",
-    borderWidth: 1,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
     elevation: 2,
-  },
-  bannerImage: {
-    width: "100%",
-    height: "100%",
   },
 });
