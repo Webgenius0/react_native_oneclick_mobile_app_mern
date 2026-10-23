@@ -121,8 +121,10 @@ export default function WaafiPay({ navigation, route }) {
   const cardBg = isDark ? '#1F2937' : '#FFFFFF';
   const textColor = isDark ? '#F9FAFB' : '#1E293B';
   const subTextColor = isDark ? '#9CA3AF' : '#64748B';
-  const borderColor = isDark ? '#374151' : '#F1F5F9';
-  const inputBg = isDark ? '#374151' : '#F8FAFC';
+  const borderColor = isDark ? '#374151' : '#E2E8F0';
+  const inputBg = isDark ? '#374151' : '#FFFFFF';
+  const exampleBg = isDark ? '#111827' : '#F1F5F9';
+  const exampleTextColor = isDark ? '#E2E8F0' : '#334155';
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: cardBg }]}>
@@ -135,7 +137,7 @@ export default function WaafiPay({ navigation, route }) {
         navigation={navigation}
         showBack={true}
         onBackPress={handleCancel}
-        title={tr('WaafiPay Payment') || 'WaafiPay Payment'}
+        title={tutar ? `WaafiPay $${tutar}` : 'WaafiPay'}
         style={{
           borderBottomWidth: 1,
           borderBottomColor: borderColor,
@@ -164,7 +166,7 @@ export default function WaafiPay({ navigation, route }) {
             </View>
             <View style={styles.brandTitleCol}>
               <Text style={[styles.brandTitle, { color: textColor }]}>
-                WaafiPay / ZAAD Service
+                WaafiPay ${tutar}
               </Text>
               <Text style={[styles.brandSub, { color: subTextColor }]}>
                 Mobile Wallet & Direct Checkout
@@ -180,16 +182,33 @@ export default function WaafiPay({ navigation, route }) {
           </View>
         </View>
 
-        {/* Input Card */}
+        {/* Input & Examples Card */}
         <View
           style={[
             styles.inputCard,
             { backgroundColor: cardBg, borderColor: borderColor },
           ]}>
           <Text style={[styles.cardHeaderTitle, { color: textColor }]}>
-            {tr('Phone Number') || 'ZAAD / WaafiPay Account Number'}
+            {tr('Phone') || 'Phone'}
           </Text>
 
+          <Text style={[styles.cardSubtitle, { color: subTextColor }]}>
+            WaafiPay - ZAAD, EVC+ iyo SAHAL
+          </Text>
+
+          {/* Example Box with Number Format Instructions */}
+          <View
+            style={[
+              styles.exampleBox,
+              { backgroundColor: exampleBg, borderColor: borderColor },
+            ]}>
+            <Text style={[styles.exampleText, { color: exampleTextColor }]}>
+              {tr('waafi_info') ||
+                'Please enter your number as\nZaad 063xxxxx\nEvc 061xxxx\nSahal 090xxxxxx\nLater Reply to outgoing messages.'}
+            </Text>
+          </View>
+
+          {/* Phone Input */}
           <View
             style={[
               styles.inputWrap,
@@ -208,58 +227,39 @@ export default function WaafiPay({ navigation, route }) {
               style={[styles.textInput, { color: textColor }]}
               value={accountNumber}
               onChangeText={setAccountNumber}
-              placeholder="e.g. 252615214249"
+              placeholder={tr('Phone') || 'Phone'}
               placeholderTextColor="#94A3B8"
               keyboardType="phone-pad"
               editable={!submitting}
             />
           </View>
 
-          {/* Info Notice */}
-          <View style={styles.infoNoticeBox}>
-            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-              <Path
-                d="M12 22a10 10 0 100-20 10 10 0 000 20zM12 16v-4M12 8h.01"
-                stroke="#F67922"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </Svg>
-            <Text style={styles.infoNoticeText}>
-              {tr(
-                'Enter your registered WaafiPay or ZAAD mobile number. You will receive a direct payment prompt on your phone.',
-              ) ||
-                'Enter your registered WaafiPay or ZAAD mobile number. You will receive a direct payment prompt on your phone.'}
-            </Text>
-          </View>
-        </View>
-
-        {/* Action Buttons */}
-        <View style={styles.actionWrap}>
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={handlePay}
-            disabled={submitting}
-            style={[styles.payBtn, submitting && styles.payBtnDisabled]}>
-            {submitting ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
-            ) : (
-              <Text style={styles.payBtnText}>
-                {tr('Pay') || 'Pay'} ${tutar}
+          {/* Action Buttons: Red Cancel & Green Pay */}
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={handleCancel}
+              disabled={submitting}
+              style={styles.cancelBtn}>
+              <Text style={styles.cancelBtnText}>
+                {tr('İptal') || 'Cancel'}
               </Text>
-            )}
-          </TouchableOpacity>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={handleCancel}
-            disabled={submitting}
-            style={[styles.cancelBtn, { borderColor: borderColor }]}>
-            <Text style={[styles.cancelBtnText, { color: subTextColor }]}>
-              {tr('İptal') || 'Cancel'}
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={handlePay}
+              disabled={submitting}
+              style={[styles.payBtn, submitting && styles.payBtnDisabled]}>
+              {submitting ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.payBtnText}>
+                  {tr('Pay') || 'Pay'}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   brandTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     marginBottom: 2,
   },
@@ -346,17 +346,33 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   cardHeaderTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
-    marginBottom: 12,
+    marginBottom: 4,
+  },
+  cardSubtitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 14,
+  },
+  exampleBox: {
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 16,
+  },
+  exampleText: {
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: '500',
   },
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 12,
+    borderRadius: 8,
     borderWidth: 1,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    height: 50,
     marginBottom: 12,
   },
   textInput: {
@@ -365,47 +381,49 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     padding: 0,
   },
-  infoNoticeBox: {
+  buttonRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#FFF7ED',
-    borderRadius: 10,
-    padding: 12,
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 20,
   },
-  infoNoticeText: {
+  cancelBtn: {
     flex: 1,
-    fontSize: 12,
-    lineHeight: 17,
-    color: '#9A3412',
-    marginLeft: 8,
-  },
-  actionWrap: {
-    rowGap: 12,
-  },
-  payBtn: {
-    backgroundColor: '#F67922',
-    borderRadius: 14,
-    paddingVertical: 15,
+    height: 48,
+    borderRadius: 8,
+    backgroundColor: '#EF4444',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  cancelBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  payBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 8,
+    backgroundColor: '#4CAF50',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
   },
   payBtnDisabled: {
-    backgroundColor: '#CBD5E1',
+    backgroundColor: '#A5D6A7',
   },
   payBtnText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
-  },
-  cancelBtn: {
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
   },
 });
