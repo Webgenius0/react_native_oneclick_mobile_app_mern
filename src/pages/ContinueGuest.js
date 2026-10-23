@@ -47,24 +47,27 @@ export default function ContinueGuest({ navigation }) {
           }));
         }
 
-        try {
-          const fcmToken = await getFcmToken();
-          if (fcmToken) {
-            await ai.post('update-language', {
-              dil: activeDil,
-              fcmToken,
-            });
-          }
-        } catch (fcmErr) {
-          console.log('fcm update error:', fcmErr?.message || fcmErr);
-        }
-
         navigation.dispatch(
           CommonActions.reset({
             index: 0,
             routes: [{ name: 'AuthAfter' }],
           }),
         );
+
+        // Run FCM and language update asynchronously in background (do not block UI navigation)
+        setTimeout(async () => {
+          try {
+            const fcmToken = await getFcmToken();
+            if (fcmToken) {
+              await ai.post('update-language', {
+                dil: activeDil,
+                fcmToken,
+              });
+            }
+          } catch (fcmErr) {
+            console.log('fcm update error:', fcmErr?.message || fcmErr);
+          }
+        }, 0);
       } else {
         const errorMsg = res?.data?.msg || 'Could not log in as guest.';
         Alert.alert('Guest Login', errorMsg);

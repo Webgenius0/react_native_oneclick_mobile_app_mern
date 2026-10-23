@@ -17,7 +17,6 @@ import AppHeader from '../components/common/AppHeader';
 const PAYMENT_OPTIONS = [
   {
     id: 'edahab',
-    target: 'EDahab',
     title: 'E-Dahab Mobile Money',
     subtitle: 'Telesom Somalia',
     desc: 'Instant direct checkout with your registered E-Dahab wallet. Fast, secure, and fee-free payment for international orders.',
@@ -28,7 +27,6 @@ const PAYMENT_OPTIONS = [
   },
   {
     id: 'waafipay',
-    target: 'WaafiPay',
     title: 'WaafiPay / ZAAD Service',
     subtitle: 'Mobile Wallet & Direct Checkout',
     desc: 'Seamless local mobile payment with WaafiPay and ZAAD. Fast order processing and instant verification.',
@@ -48,15 +46,6 @@ export default function PaymentMethods({ navigation, route }) {
   const textColor = isDark ? '#F9FAFB' : '#1E293B';
   const subTextColor = isDark ? '#9CA3AF' : '#64748B';
   const borderColor = isDark ? '#374151' : '#F1F5F9';
-
-  const handleSelectMethod = (target) => {
-    navigation.navigate(target, {
-      tutar: route?.params?.tutar || 0,
-      ana_tutar: route?.params?.ana_tutar || 0,
-      komisyon_tutar: route?.params?.komisyon_tutar || 0,
-      siparis_ids: route?.params?.siparis_ids || '',
-    });
-  };
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: cardBg }]}>
@@ -86,18 +75,18 @@ export default function PaymentMethods({ navigation, route }) {
             {tr('Supported Payment Methods') || 'Supported Payment Methods'}
           </Text>
           <Text style={[styles.introSub, { color: subTextColor }]}>
-            {tr('Choose a payment option below to view details and proceed with checkout.') ||
-              'Choose a payment option below to view details and proceed with checkout.'}
+            {tr(
+              '1 Click supports fast and secure local mobile payments for all orders.',
+            ) ||
+              '1 Click supports fast and secure local mobile payments for all orders.'}
           </Text>
         </View>
 
         {/* Payment Options (E-Dahab & WaafiPay Only) */}
         <View style={styles.cardsList}>
           {PAYMENT_OPTIONS.map(opt => (
-            <TouchableOpacity
+            <View
               key={opt.id}
-              activeOpacity={0.8}
-              onPress={() => handleSelectMethod(opt.target)}
               style={[
                 styles.paymentCard,
                 { backgroundColor: cardBg, borderColor: borderColor },
@@ -135,14 +124,7 @@ export default function PaymentMethods({ navigation, route }) {
               <Text style={[styles.cardDesc, { color: subTextColor }]}>
                 {opt.desc}
               </Text>
-
-              {/* Action link */}
-              <View style={[styles.actionRow, { borderTopColor: borderColor }]}>
-                <Text style={styles.actionText}>
-                  {tr('Open Payment') || 'Open Payment'} →
-                </Text>
-              </View>
-            </TouchableOpacity>
+            </View>
           ))}
         </View>
       </ScrollView>
@@ -244,17 +226,6 @@ const styles = StyleSheet.create({
   cardDesc: {
     fontSize: 13,
     lineHeight: 19,
-    marginBottom: 12,
-  },
-  actionRow: {
-    borderTopWidth: 1,
-    paddingTop: 10,
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  actionText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#F67922',
+    marginBottom: 4,
   },
 });
