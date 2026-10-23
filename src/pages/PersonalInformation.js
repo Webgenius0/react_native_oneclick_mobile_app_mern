@@ -41,7 +41,7 @@ export default function PersonalInformation({ navigation }) {
   // Form state
   const [fullName, setFullName] = useState(initialUser.ad || initialUser.name || '');
   const [phoneNumber, setPhoneNumber] = useState(initialUser.tel || '');
-  const [emailAddress, setEmailAddress] = useState(initialUser.email || '');
+  const [emailAddress, setEmailAddress] = useState(initialUser.email || initialUser.eposta || '');
   const [city, setCity] = useState(initialUser.sehir || initialUser.adres || '');
 
   const fetchData = async (isRefresh = false) => {
@@ -51,11 +51,11 @@ export default function PersonalInformation({ navigation }) {
       }
 
       const currentUser = (await storageGet('user')) || ctx?.user;
-      if (currentUser && !state.s?.ad) {
+      if (currentUser) {
         setState(prev => ({ ...prev, s: currentUser }));
         setFullName(prev => prev || currentUser.ad || currentUser.name || '');
         setPhoneNumber(prev => prev || currentUser.tel || '');
-        setEmailAddress(prev => prev || currentUser.email || '');
+        setEmailAddress(prev => prev || currentUser.email || currentUser.eposta || '');
         setCity(prev => prev || currentUser.sehir || currentUser.adres || '');
       }
 
@@ -77,7 +77,8 @@ export default function PersonalInformation({ navigation }) {
 
       if (userData.ad || userData.name) setFullName(userData.ad || userData.name);
       if (userData.tel) setPhoneNumber(userData.tel);
-      if (userData.email) setEmailAddress(userData.email);
+      const resolvedEmail = userData.email || userData.eposta || '';
+      if (resolvedEmail) setEmailAddress(resolvedEmail);
       if (userData.sehir || userData.adres) setCity(userData.sehir || userData.adres);
     } catch (err) {
       console.log('PersonalInformation fetch error:', err);
@@ -87,8 +88,17 @@ export default function PersonalInformation({ navigation }) {
   };
 
   useEffect(() => {
+    const isGuest =
+      !ctx?.token ||
+      ctx?.token === 'GUEST' ||
+      ctx?.user?.kod === 'GUEST' ||
+      ctx?.user?.kod === 'HG1000';
+    if (isGuest && !initialUser?.token) {
+      navigation.goBack();
+      return;
+    }
     fetchData();
-  }, []);
+  }, [ctx?.token]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -97,6 +107,7 @@ export default function PersonalInformation({ navigation }) {
         ad: fullName,
         tel: phoneNumber,
         email: emailAddress,
+        eposta: emailAddress,
         adres: city,
         sehir: city,
       };
@@ -141,10 +152,11 @@ export default function PersonalInformation({ navigation }) {
   };
 
   const handleCancel = () => {
-    setFullName(state.s.ad || 'Fatima Nour');
-    setPhoneNumber(state.s.tel || '+887315611353');
-    setEmailAddress(state.s.email || 'fatimanour0930@gmail.com');
-    setCity(state.s.sehir || state.s.adres || 'Borama');
+    const s = state.s || {};
+    setFullName(s.ad || s.name || '');
+    setPhoneNumber(s.tel || '');
+    setEmailAddress(s.email || s.eposta || '');
+    setCity(s.sehir || s.adres || '');
     setIsEditing(false);
   };
 

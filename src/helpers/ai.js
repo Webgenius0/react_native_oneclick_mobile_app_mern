@@ -28,7 +28,7 @@ ai.interceptors.request.use(
     }
 
     if (token && token !== 'GUEST') {
-      config.headers.Authorization = token;
+      config.headers.Authorization = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
       config.headers.token = token;
 
       const method = (config.method || 'get').toLowerCase();

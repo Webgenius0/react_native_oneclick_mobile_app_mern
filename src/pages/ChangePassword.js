@@ -13,7 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Circle } from 'react-native-svg';
 import { EmContext } from '../contexts/EmContext';
 import { tr } from '../translate/i18n';
 import ai from '../helpers/ai';
@@ -30,7 +30,7 @@ export default function ChangePassword({ navigation }) {
 
   const [loading, setLoading] = useState(false);
 
-  const isDark = ctx.isDark;
+  const isDark = ctx?.isDark;
   const pageBg = isDark ? '#111827' : '#FFFFFF';
   const cardBg = isDark ? '#1F2937' : '#FFFFFF';
   const textColor = isDark ? '#F9FAFB' : '#1E293B';
@@ -40,8 +40,8 @@ export default function ChangePassword({ navigation }) {
 
   const isFormFilled =
     currentPassword.trim().length > 0 &&
-    newPassword.trim().length >= 6 &&
-    confirmPassword.trim().length >= 6;
+    newPassword.trim().length >= 8 &&
+    confirmPassword.trim().length >= 8;
 
   const handleSave = async () => {
     if (!currentPassword) {
@@ -52,10 +52,10 @@ export default function ChangePassword({ navigation }) {
       return;
     }
 
-    if (!newPassword || newPassword.length < 6) {
+    if (!newPassword || newPassword.length < 8) {
       Alert.alert(
         tr('Hata') || 'Error',
-        tr('Şifreniz en az 6 karakter olmalıdır') || 'Password must be at least 6 characters.',
+        tr('Şifreniz en az 8 karakter olmalıdır') || 'Password must be at least 8 characters.',
       );
       return;
     }
@@ -71,17 +71,43 @@ export default function ChangePassword({ navigation }) {
     try {
       setLoading(true);
       const payload = {
-        old_password: currentPassword,
-        current_password: currentPassword,
-        new_password: newPassword,
-        password: newPassword,
+        current_password: currentPassword.trim(),
+        old_password: currentPassword.trim(),
+        eski_sifre: currentPassword.trim(),
+        new_password: newPassword.trim(),
+        password: newPassword.trim(),
+        yeni_sifre: newPassword.trim(),
+        confirm_password: confirmPassword.trim(),
+        password_confirmation: confirmPassword.trim(),
       };
 
-      const res = await ai.post('profile-update', payload);
+      let res = null;
+      let errorThrown = null;
+      try {
+        // 1. Primary dedicated API endpoint: POST /api/change-password
+        res = await ai.post('change-password', payload);
+      } catch (err1) {
+        errorThrown = err1;
+        // Only if 404 (endpoint not defined on current server), attempt legacy aliases
+        if (err1?.response?.status === 404) {
+          try {
+            res = await ai.post('update-password-old', payload);
+          } catch (_err2) {
+            try {
+              res = await ai.post('profile-update', payload);
+            } catch (err3) {
+              errorThrown = err3;
+            }
+          }
+        }
+      }
+
       if (res?.data && res.data.error === false) {
         Alert.alert(
           tr('Başarılı') || 'Success',
-          tr('Şifreniz başarıyla değiştirildi') || 'Your password has been changed successfully.',
+          res.data.msg ||
+            tr('Şifreniz başarıyla değiştirildi') ||
+            'Password updated successfully.',
           [
             {
               text: tr('Tamam') || 'OK',
@@ -90,44 +116,57 @@ export default function ChangePassword({ navigation }) {
           ],
         );
       } else {
-        Alert.alert(
-          tr('Hata') || 'Error',
-          res?.data?.msg ||
+        const serverData = res?.data || errorThrown?.response?.data;
+        let errorMsg =
+          serverData?.msg ||
+          serverData?.message ||
+          (serverData?.errors &&
+            (typeof serverData.errors === 'string'
+              ? serverData.errors
+              : Object.values(serverData.errors).flat().join('\n'))) ||
+          serverData?.error;
+        if (typeof errorMsg !== 'string' || !errorMsg) {
+          errorMsg =
             tr('Şifre değiştirme işlemi başarısız oldu') ||
-            'Failed to change password. Please verify current password and try again.',
-        );
+            'Failed to change password. Please verify your current password.';
+        }
+        Alert.alert(tr('Hata') || 'Error', errorMsg);
       }
     } catch (err) {
-      console.log('ChangePassword error:', err);
-      Alert.alert(
-        tr('Hata') || 'Error',
-        tr('Şifre değiştirme işlemi başarısız oldu') || 'Failed to change password.',
-      );
+      console.log('ChangePassword unexpected error:', err);
+      const errorMsg =
+        err?.response?.data?.msg ||
+        err?.response?.data?.message ||
+        tr('Şifre değiştirme işlemi başarısız oldu') ||
+        'Failed to change password. Please verify your current password.';
+      Alert.alert(tr('Hata') || 'Error', errorMsg);
     } finally {
       setLoading(false);
     }
   };
 
-  const renderEyeIcon = (visible) => (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+  const renderEyeIcon = visible => (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
       {visible ? (
+        // Open Eye (Active / Password visible)
         <>
           <Path
             d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
-            stroke="#94A3B8"
+            stroke="#F67922"
             strokeWidth={2}
             strokeLinecap="round"
             strokeLinejoin="round"
           />
-          <Path
-            d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 6z"
-            stroke="#94A3B8"
+          <Circle
+            cx={12}
+            cy={12}
+            r={3}
+            stroke="#F67922"
             strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
           />
         </>
       ) : (
+        // Slashed Eye (Hidden / Password obscured)
         <>
           <Path
             d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22"
@@ -179,7 +218,7 @@ export default function ChangePassword({ navigation }) {
             </Text>
             <Text style={[styles.subtitle, { color: subTextColor }]}>
               {tr(
-                'Protect your account by updating your password. Enter your current password and set a new one to keep your account safe.'
+                'Protect your account by updating your password. Enter your current password and set a new one to keep your account safe.',
               ) ||
                 'Protect your account by updating your password. Enter your current password and set a new one to keep your account safe.'}
             </Text>
@@ -202,10 +241,13 @@ export default function ChangePassword({ navigation }) {
                   value={currentPassword}
                   onChangeText={setCurrentPassword}
                   autoCapitalize="none"
+                  autoCorrect={false}
+                  textContentType="none"
                 />
                 <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => setShowCurrent(!showCurrent)}
+                  activeOpacity={0.6}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  onPress={() => setShowCurrent(prev => !prev)}
                   style={styles.eyeBtn}>
                   {renderEyeIcon(showCurrent)}
                 </TouchableOpacity>
@@ -230,10 +272,13 @@ export default function ChangePassword({ navigation }) {
                   value={newPassword}
                   onChangeText={setNewPassword}
                   autoCapitalize="none"
+                  autoCorrect={false}
+                  textContentType="none"
                 />
                 <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => setShowNew(!showNew)}
+                  activeOpacity={0.6}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  onPress={() => setShowNew(prev => !prev)}
                   style={styles.eyeBtn}>
                   {renderEyeIcon(showNew)}
                 </TouchableOpacity>
@@ -258,10 +303,13 @@ export default function ChangePassword({ navigation }) {
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   autoCapitalize="none"
+                  autoCorrect={false}
+                  textContentType="none"
                 />
                 <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => setShowConfirm(!showConfirm)}
+                  activeOpacity={0.6}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  onPress={() => setShowConfirm(prev => !prev)}
                   style={styles.eyeBtn}>
                   {renderEyeIcon(showConfirm)}
                 </TouchableOpacity>
@@ -357,9 +405,14 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     paddingVertical: 0,
+    marginRight: 4,
   },
   eyeBtn: {
-    padding: 6,
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: -8,
   },
   bottomBar: {
     paddingHorizontal: 20,

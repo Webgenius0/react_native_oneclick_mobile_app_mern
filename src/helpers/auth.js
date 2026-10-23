@@ -66,23 +66,40 @@ export const logoutUser = async (navigation, setCtx) => {
     } catch (e) {}
   }
 
-  // Navigate cleanly and directly to Login
+  const resetAction = CommonActions.reset({
+    index: 0,
+    routes: [{ name: 'Login' }],
+  });
+
+  // 1. Reset root navigation directly (clearing entire back history)
+  try {
+    if (RootNavigation.navigationRef && RootNavigation.navigationRef.isReady()) {
+      RootNavigation.navigationRef.dispatch(resetAction);
+      return;
+    }
+  } catch (e) {
+    console.log('logout reset root error:', e);
+  }
+
+  // 2. Reset parent navigation if inside a nested stack/tab
   try {
     const parentNav = navigation?.getParent ? navigation.getParent() : null;
-    if (parentNav && typeof parentNav.navigate === 'function') {
-      parentNav.navigate('Login');
+    if (parentNav?.dispatch) {
+      parentNav.dispatch(resetAction);
       return;
     }
   } catch (e) {}
 
+  // 3. Reset provided navigation
   try {
-    if (navigation?.navigate) {
-      navigation.navigate('Login');
+    if (navigation?.dispatch) {
+      navigation.dispatch(resetAction);
       return;
     }
   } catch (e) {}
 
+  // 4. Fallback to RootNavigation helper
   try {
-    RootNavigation.navigate('Login');
+    RootNavigation.reset('Login');
   } catch (e) {}
 };

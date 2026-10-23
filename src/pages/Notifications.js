@@ -27,37 +27,9 @@ import {
 import AppHeader from "../components/common/AppHeader";
 import NotificationBingIcon from "../assets/svg/notification_bing.svg";
 
-const FIGMA_SAMPLE_NOTIFICATIONS = [
-  {
-    id: "figma-sample-1",
-    baslik: "Order Confirmed",
-    mesaj: "Your order #1CLK-582941 has been confirmed successfully.",
-    timeText: "10 min ago",
-    read: false,
-    okundu: 0,
-  },
-  {
-    id: "figma-sample-2",
-    baslik: "Order Processing",
-    mesaj: "Your order is being prepared. We'll update you when it's shipped.",
-    timeText: "2 hours ago",
-    read: false,
-    okundu: 0,
-  },
-  {
-    id: "figma-sample-3",
-    baslik: "Order Shipped",
-    mesaj: "Your order #1CLK-582941 is on the way. Track your delivery for the latest updates.",
-    timeText: "3 days ago",
-    read: true,
-    okundu: 1,
-  },
-];
-
 export default function Notifications({ route, navigation }) {
   const { ctx, setCtx } = useContext(EmContext);
   const [loading, setLoading] = useState(false);
-  const [clearedSamples, setClearedSamples] = useState(false);
 
   const handleBack = useCallback(() => {
     if (navigation && navigation.canGoBack()) {
@@ -93,11 +65,8 @@ export default function Notifications({ route, navigation }) {
 
   const rawNotifications = ctx.notifications || [];
   const displayNotifications = useMemo(() => {
-    if (rawNotifications.length > 0) {
-      return rawNotifications;
-    }
-    return clearedSamples ? [] : FIGMA_SAMPLE_NOTIFICATIONS;
-  }, [rawNotifications, clearedSamples]);
+    return Array.isArray(rawNotifications) ? rawNotifications : [];
+  }, [rawNotifications]);
 
   const unreadCount = useMemo(() => {
     return displayNotifications.filter(
@@ -116,7 +85,6 @@ export default function Notifications({ route, navigation }) {
           text: tr("Temizle") || "Clear All",
           style: "destructive",
           onPress: async () => {
-            setClearedSamples(true);
             try {
               if (rawNotifications.length > 0) {
                 await ai.post("notifications", { islem: "delete" });

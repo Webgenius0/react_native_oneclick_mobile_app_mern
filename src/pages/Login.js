@@ -81,22 +81,25 @@ export default function Login({ navigation }) {
           token: res.data.s.token,
         }));
 
-        try {
-          const fcmToken = await getFcmToken();
-          await ai.post('update-language', {
-            dil: activeDil,
-            fcmToken,
-          });
-        } catch (fcmErr) {
-          console.log('fcm error:', fcmErr?.message);
-        }
-
         navigation.dispatch(
           CommonActions.reset({
             index: 0,
             routes: [{ name: 'AuthAfter' }],
           }),
         );
+
+        // Run FCM and language update asynchronously in background (do not block UI navigation)
+        setTimeout(async () => {
+          try {
+            const fcmToken = await getFcmToken();
+            await ai.post('update-language', {
+              dil: activeDil,
+              fcmToken,
+            });
+          } catch (fcmErr) {
+            console.log('fcm background sync error:', fcmErr?.message);
+          }
+        }, 0);
       } else {
         const rawMsg = res?.data?.msg || 'Hatalı Müşteri Kodu, Eposta veya Parola';
         let errorMsg = tr(rawMsg);

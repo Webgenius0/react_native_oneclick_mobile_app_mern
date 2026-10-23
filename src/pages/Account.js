@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState, useCallback } from 'react';
 import {
   Alert,
   Dimensions,
@@ -19,7 +19,7 @@ import {
 import { EmContext } from '../contexts/EmContext';
 import ai from '../helpers/ai';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CommonActions } from '@react-navigation/native';
+import { CommonActions, useFocusEffect } from '@react-navigation/native';
 import { availableLanguages, i18n, tr } from '../translate/i18n';
 import { storageDelete, storageGet, storageSet } from '../helpers/storage';
 import { getFcmToken } from '../helpers/notification';
@@ -46,8 +46,11 @@ export default function Account({ navigation }) {
 
   const initialUser = ctx?.user || null;
   const initialIsGuest =
+    !initialUser ||
+    (!initialUser?.token && !ctx?.token) ||
     initialUser?.kod === 'GUEST' ||
     initialUser?.kod === 'HG1000' ||
+    initialUser?.token === 'GUEST' ||
     ctx?.token === 'GUEST';
 
   const [state, setState] = useState({
@@ -123,6 +126,12 @@ export default function Account({ navigation }) {
     fetchData();
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [ctx?.user, ctx?.token]),
+  );
+
   const handleLogout = async () => {
     await logoutUser(navigation, setCtx);
   };
@@ -179,7 +188,7 @@ export default function Account({ navigation }) {
     setCtxDil(dil);
   };
 
-  const isDark = ctx.isDark;
+  const isDark = ctx?.isDark;
   const pageBg = isDark ? '#111827' : '#FFFFFF';
   const cardBg = isDark ? '#1F2937' : '#FFFFFF';
   const textColor = isDark ? '#F9FAFB' : '#252C34';
@@ -189,13 +198,17 @@ export default function Account({ navigation }) {
 
   const userDisplayName =
     state.s?.ad ||
+    state.s?.name ||
     (state.isGuest
       ? tr('Misafir Kullanıcı') || 'Guest User'
-      : 'Fatima Nour');
+      : tr('Kullanıcı') || 'User');
   const userSubtitle =
     state.s?.email ||
+    state.s?.eposta ||
     state.s?.tel ||
-    (state.s?.kod ? `ID: ${state.s.kod}` : 'fatimanour0930@gmail.com');
+    (state.s?.kod && state.s.kod !== 'GUEST' && state.s.kod !== 'HG1000'
+      ? `ID: ${state.s.kod}`
+      : '');
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: pageBg }]}>
@@ -448,7 +461,7 @@ export default function Account({ navigation }) {
                     <NotificationBingIcon width={20} height={20} stroke="#F67922" />
                   </View>
                   <Text style={[styles.menuText, { color: textColor }]}>
-                    {tr('Notification Settings') || 'Notification Settings'}
+                    {tr('Notifications') || 'Notifications'}
                   </Text>
                 </View>
                 <ChevronRightIcon width={18} height={18} />

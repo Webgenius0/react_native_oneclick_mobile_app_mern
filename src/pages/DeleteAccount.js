@@ -80,12 +80,23 @@ export default function DeleteAccount({ navigation }) {
 
     try {
       setLoading(true);
-      const res = await ai.get('delete-account');
+      const payload = { password, sifre: password };
+      let res = null;
+      try {
+        // Dedicated v3.0 specification: POST /api/delete-account
+        res = await ai.post('delete-account', payload);
+      } catch (postErr) {
+        console.log('delete-account POST note:', postErr?.message);
+        // Fallback to GET if server only exposes GET
+        res = await ai.get('delete-account');
+      }
+
       if (res?.data?.error === false) {
         setShowPasswordModal(false);
         Alert.alert(
           tr('Account Deleted') || 'Account Deleted',
-          tr('Hesabınız 24 saat içinde silinecektir') ||
+          res?.data?.msg ||
+            tr('Hesabınız 24 saat içinde silinecektir') ||
             'Your account and all associated data have been scheduled for permanent deletion.',
         );
 
@@ -102,7 +113,9 @@ export default function DeleteAccount({ navigation }) {
       console.log('Delete account error:', err);
       Alert.alert(
         tr('Hata') || 'Error',
-        tr('Hesap silme işlemi başarısız oldu') || 'Failed to delete account.',
+        err?.response?.data?.msg ||
+          tr('Hesap silme işlemi başarısız oldu') ||
+          'Failed to delete account.',
       );
     } finally {
       setLoading(false);

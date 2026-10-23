@@ -50,10 +50,11 @@ export default function Profile({ navigation }) {
   });
 
   const [tel, setTel] = useState(initialUser?.tel || '');
+  const [email, setEmail] = useState(initialUser?.email || initialUser?.eposta || '');
   const [adres, setAdres] = useState(initialUser?.adres || initialUser?.sehir || '');
   const [refreshing, setRefreshing] = useState(false);
 
-  const isDark = ctx.isDark;
+  const isDark = ctx?.isDark;
   const pageBg = isDark ? '#111827' : '#F8FAFC';
   const cardBg = isDark ? '#1F2937' : '#FFFFFF';
   const textColor = isDark ? '#F9FAFB' : '#252C34';
@@ -96,6 +97,9 @@ export default function Profile({ navigation }) {
         if (!adres && (currentUser.adres || currentUser.sehir)) {
           setAdres(currentUser.adres || currentUser.sehir);
         }
+        if (!email && (currentUser.email || currentUser.eposta)) {
+          setEmail(currentUser.email || currentUser.eposta);
+        }
       }
 
       const c = await ai.get('profile');
@@ -103,6 +107,9 @@ export default function Profile({ navigation }) {
       if (c?.data && c.data.error === false && c.data.s) {
         userData = c.data.s;
         await storageSet('user', userData);
+        if (setCtx) {
+          setCtx(prev => ({ ...prev, user: userData }));
+        }
       }
 
       setState({
@@ -114,6 +121,8 @@ export default function Profile({ navigation }) {
 
       if (userData.tel) setTel(userData.tel);
       if (userData.adres || userData.sehir) setAdres(userData.adres || userData.sehir);
+      const userEmail = userData.email || userData.eposta || '';
+      if (userEmail) setEmail(userEmail);
     } catch (err) {
       console.log('Profile fetchData error:', err);
     } finally {
@@ -137,6 +146,8 @@ export default function Profile({ navigation }) {
       const payload = {
         tel: tel,
         adres: adres,
+        email: email,
+        eposta: email,
       };
 
       const res = await ai.post('profile-update', payload);
@@ -149,6 +160,8 @@ export default function Profile({ navigation }) {
           ...(state.s || {}),
           tel: tel,
           adres: adres,
+          email: email,
+          eposta: email,
         };
         await storageSet('user', updated);
         if (setCtx) {
@@ -191,6 +204,7 @@ export default function Profile({ navigation }) {
   };
 
   const displayName = state.s.ad || state.s.name || tr('Kullanıcı') || 'Kullanıcı';
+  const displayEmail = email || state.s?.email || state.s?.eposta || '';
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: cardBg }]}>
@@ -242,6 +256,11 @@ export default function Profile({ navigation }) {
               <Text style={[styles.userNameText, { color: textColor }]}>
                 {displayName}
               </Text>
+              {displayEmail ? (
+                <Text style={[styles.userEmailText, { color: subTextColor }]}>
+                  {displayEmail}
+                </Text>
+              ) : null}
               {state.s.kod && state.s.kod !== 'GUEST' && state.s.kod !== 'HG1000' ? (
                 <Text style={[styles.userCodeText, { color: subTextColor }]}>
                   {state.s.kod}
@@ -334,6 +353,25 @@ export default function Profile({ navigation }) {
                   placeholder={tr('Telefon numaranız') || 'Your phone number'}
                   placeholderTextColor={subTextColor}
                   keyboardType="phone-pad"
+                />
+              </View>
+
+              {/* Email */}
+              <View style={styles.formGroup}>
+                <Text style={[styles.formLabel, { color: subTextColor }]}>
+                  {tr('Email address') || tr('E-posta') || 'Email'}
+                </Text>
+                <TextInput
+                  style={[
+                    styles.formInput,
+                    { backgroundColor: inputBg, borderColor: borderColor, color: textColor },
+                  ]}
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder={tr('E-posta adresiniz') || 'Your email address'}
+                  placeholderTextColor={subTextColor}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
                 />
               </View>
 
@@ -470,6 +508,11 @@ const styles = StyleSheet.create({
   userNameText: {
     fontSize: 19,
     fontWeight: '700',
+    textAlign: 'center',
+  },
+  userEmailText: {
+    fontSize: 13,
+    marginTop: 4,
     textAlign: 'center',
   },
   userCodeText: {

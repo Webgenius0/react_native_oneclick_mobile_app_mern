@@ -25,22 +25,26 @@ export const getLocalNotifications = async () => {
 
 
 export const getServerNotifications = async (id) => {
-  // console.log('getServerNotifications', 'lastId', id);
-  if(id === null || id === "undefined" || isNaN(id)) id = 0;
+  if (id === null || id === "undefined" || isNaN(id)) id = 0;
 
   let n = [];
 
   try {
-    const response = await ai.post("notifications", {id: id});
-    // console.log('getServerNotifications Response', response);
-    // console.log('getServerNotifications Response', response.data);
-    if (response.data.error === false) {
-      n = response.data.ss;
+    let response = null;
+    try {
+      // API Guide v3.0: GET /api/notifications
+      response = await ai.get("notifications");
+    } catch (_getErr) {
+      // Fallback to legacy POST /api/notifications
+      response = await ai.post("notifications", { id: id });
+    }
+
+    if (response?.data?.error === false) {
+      n = response.data.notifications || response.data.ss || [];
     }
   } catch (e) {
     console.log('getServerNotifications error', e);
   }
-
 
   return n;
 };

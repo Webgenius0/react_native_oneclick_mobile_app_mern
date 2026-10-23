@@ -1,9 +1,11 @@
 import React, { useContext, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Dimensions,
   Linking,
   Platform,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -15,6 +17,8 @@ import {
 import { EmContext } from '../contexts/EmContext';
 import ai from '../helpers/ai';
 import { tr } from '../translate/i18n';
+import { storageGet, storageSet } from '../helpers/storage';
+import { supportPhone } from '../../config';
 import AppHeader from '../components/common/AppHeader';
 
 // Icons
@@ -30,27 +34,46 @@ export default function ContactOneClick({ navigation, route }) {
   const { ctx } = useContext(EmContext);
   const [phoneList, setPhoneList] = useState([]);
   const [socialMedia, setSocialMedia] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchData = async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      }
+      if (!isRefresh) {
+        const cached = await storageGet('contact_cache');
+        if (cached) {
+          if (Array.isArray(cached.phone)) setPhoneList(cached.phone);
+          if (Array.isArray(cached.social)) setSocialMedia(cached.social);
+          setLoading(false);
+        }
+      }
+
+      const res = await ai.get('contact');
+      if (res?.data && res.data.error === false) {
+        if (Array.isArray(res.data.phone)) {
+          setPhoneList(res.data.phone);
+        }
+        if (Array.isArray(res.data.social)) {
+          setSocialMedia(res.data.social);
+        }
+        await storageSet('contact_cache', res.data);
+      }
+    } catch (err) {
+      console.log('ContactOneClick fetch error:', err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await ai.get('contact');
-        if (res?.data && res.data.error === false) {
-          if (Array.isArray(res.data.phone)) {
-            setPhoneList(res.data.phone);
-          }
-          if (Array.isArray(res.data.social)) {
-            setSocialMedia(res.data.social);
-          }
-        }
-      } catch (err) {
-        console.log('ContactOneClick fetch error:', err);
-      }
-    };
     fetchData();
   }, []);
 
-  const isDark = ctx.isDark;
+  const isDark = ctx?.isDark;
   const pageBg = isDark ? '#111827' : '#F8FAFC';
   const cardBg = isDark ? '#1F2937' : '#FFFFFF';
   const textColor = isDark ? '#F9FAFB' : '#252C34';
@@ -59,10 +82,11 @@ export default function ContactOneClick({ navigation, route }) {
   const heroBg = isDark ? '#282015' : '#FEF7EC';
   const heroBorder = isDark ? '#45331E' : '#FEEBD3';
 
-  // Determine phone number to call
+  // Determine phone number to call (from API or official supportPhone)
   const primaryPhone =
     phoneList.find(p => p.tel)?.tel ||
-    '+88016546463';
+    supportPhone ||
+    '';
 
   const emailAddress = 'support@1click.com';
 
@@ -71,11 +95,12 @@ export default function ContactOneClick({ navigation, route }) {
       s => s.ad?.toLowerCase() === 'whatsapp' || s.url?.includes('wa.me'),
     );
     const waPhone = phoneList.find(p => p.link?.includes('wa.me'));
-    const url =
-      waSocial?.url ||
-      waPhone?.link ||
-      'https://wa.me/905556664433?text=' +
-        encodeURIComponent('Hello 1 Click, I need assistance.');
+    const phoneWithTel = phoneList.find(p => p.tel)?.tel || supportPhone;
+    const cleanPhone = phoneWithTel ? phoneWithTel.replace(/[^0-9]/g, '') : '252637979636';
+    const fallbackWa =
+      `https://wa.me/${cleanPhone}?text=` +
+      encodeURIComponent('Hello 1 Click, I need assistance.');
+    const url = waSocial?.url || waPhone?.link || fallbackWa;
 
     try {
       await Linking.openURL(url);
@@ -93,6 +118,10 @@ export default function ContactOneClick({ navigation, route }) {
   };
 
   const handleCall = async () => {
+    if (!primaryPhone) {
+      Alert.alert(tr('Hata') || 'Error', 'No phone number available');
+      return;
+    }
     try {
       await Linking.openURL(`tel:${primaryPhone.replace(/\s+/g, '')}`);
     } catch (e) {
@@ -122,95 +151,119 @@ export default function ContactOneClick({ navigation, route }) {
       <ScrollView
         style={[styles.container, { backgroundColor: pageBg }]}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
-        {/* Top Hero Card: Cream Background */}
-        <View
-          style={[
-            styles.heroCard,
-            { backgroundColor: heroBg, borderColor: heroBorder },
-          ]}>
-          <View style={styles.heroIconWrap}>
-            <SupportIcon width={36} height={36} fill="#F67922" />
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => fetchData(true)}
+            colors={['#F67922']}
+            tintColor="#F67922"
+          />
+        }>
+        {loading && !refreshing ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="large" color="#F67922" />
           </View>
-          <Text style={[styles.heroTitle, { color: textColor }]}>
-            We're here to help!
-          </Text>
-          <Text style={[styles.heroSub, { color: subTextColor }]}>
-            Have a question or need assistance? Our support team is ready to help you.
-          </Text>
-        </View>
+        ) : (
+          <>
+            {/* Top Hero Card: Cream Background */}
+            <View
+              style={[
+                styles.heroCard,
+                { backgroundColor: heroBg, borderColor: heroBorder },
+              ]}>
+              <View style={styles.heroIconWrap}>
+                <SupportIcon width={36} height={36} fill="#F67922" />
+              </View>
+              <Text style={[styles.heroTitle, { color: textColor }]}>
+                {tr("We're here to help!") || "We're here to help!"}
+              </Text>
+              <Text style={[styles.heroSub, { color: subTextColor }]}>
+                {tr(
+                  'Have a question or need assistance? Our support team is ready to help you.',
+                ) ||
+                  'Have a question or need assistance? Our support team is ready to help you.'}
+              </Text>
+            </View>
 
-        {/* WhatsApp Button: Full Width Green */}
-        <TouchableOpacity
-          activeOpacity={0.88}
-          style={styles.whatsappButton}
-          onPress={handleWhatsApp}>
-          <WhatsappIcon width={22} height={22} />
-          <Text style={styles.whatsappButtonText}>
-            Chat with us on WhatsApp
-          </Text>
-        </TouchableOpacity>
+            {/* WhatsApp Button: Full Width Green */}
+            <TouchableOpacity
+              activeOpacity={0.88}
+              style={styles.whatsappButton}
+              onPress={handleWhatsApp}>
+              <WhatsappIcon width={22} height={22} />
+              <Text style={styles.whatsappButtonText}>
+                {tr('Chat with us on WhatsApp') || 'Chat with us on WhatsApp'}
+              </Text>
+            </TouchableOpacity>
 
-        {/* Email Us Card */}
-        <TouchableOpacity
-          activeOpacity={0.75}
-          style={[
-            styles.actionCard,
-            { backgroundColor: cardBg, borderColor: borderColor },
-          ]}
-          onPress={handleEmail}>
-          <View style={styles.actionIconBadge}>
-            <MailIcon width={22} height={22} />
-          </View>
-          <View style={styles.actionTextWrap}>
-            <Text style={[styles.actionLabel, { color: subTextColor }]}>
-              Email Us
-            </Text>
-            <Text style={[styles.actionValue, { color: textColor }]}>
-              {emailAddress}
-            </Text>
-          </View>
-        </TouchableOpacity>
+            {/* Email Us Card */}
+            <TouchableOpacity
+              activeOpacity={0.75}
+              style={[
+                styles.actionCard,
+                { backgroundColor: cardBg, borderColor: borderColor },
+              ]}
+              onPress={handleEmail}>
+              <View style={styles.actionIconBadge}>
+                <MailIcon width={22} height={22} />
+              </View>
+              <View style={styles.actionTextWrap}>
+                <Text style={[styles.actionLabel, { color: subTextColor }]}>
+                  {tr('Email Us') || 'Email Us'}
+                </Text>
+                <Text style={[styles.actionValue, { color: textColor }]}>
+                  {emailAddress}
+                </Text>
+              </View>
+            </TouchableOpacity>
 
-        {/* Call Us Card */}
-        <TouchableOpacity
-          activeOpacity={0.75}
-          style={[
-            styles.actionCard,
-            { backgroundColor: cardBg, borderColor: borderColor },
-          ]}
-          onPress={handleCall}>
-          <View style={styles.actionIconBadge}>
-            <PhoneIcon width={22} height={22} fill="#F67922" />
-          </View>
-          <View style={styles.actionTextWrap}>
-            <Text style={[styles.actionLabel, { color: subTextColor }]}>
-              Call Us
-            </Text>
-            <Text style={[styles.actionValue, { color: textColor }]}>
-              {primaryPhone}
-            </Text>
-          </View>
-        </TouchableOpacity>
+            {/* Call Us Card - only if phone exists */}
+            {primaryPhone ? (
+              <TouchableOpacity
+                activeOpacity={0.75}
+                style={[
+                  styles.actionCard,
+                  { backgroundColor: cardBg, borderColor: borderColor },
+                ]}
+                onPress={handleCall}>
+                <View style={styles.actionIconBadge}>
+                  <PhoneIcon width={22} height={22} fill="#F67922" />
+                </View>
+                <View style={styles.actionTextWrap}>
+                  <Text style={[styles.actionLabel, { color: subTextColor }]}>
+                    {tr('Call Us') || 'Call Us'}
+                  </Text>
+                  <Text style={[styles.actionValue, { color: textColor }]}>
+                    {primaryPhone}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ) : null}
 
-        {/* Expected Response Time Card */}
-        <View
-          style={[
-            styles.infoCard,
-            { backgroundColor: cardBg, borderColor: borderColor },
-          ]}>
-          <View style={styles.infoIconWrap}>
-            <InfoCircleIcon width={24} height={24} />
-          </View>
-          <View style={styles.infoTextWrap}>
-            <Text style={[styles.infoTitle, { color: textColor }]}>
-              Expected Response Time
-            </Text>
-            <Text style={[styles.infoSub, { color: subTextColor }]}>
-              We usually respond within a few hours during working hours.
-            </Text>
-          </View>
-        </View>
+            {/* Expected Response Time Card */}
+            <View
+              style={[
+                styles.infoCard,
+                { backgroundColor: cardBg, borderColor: borderColor },
+              ]}>
+              <View style={styles.infoIconWrap}>
+                <InfoCircleIcon width={24} height={24} />
+              </View>
+              <View style={styles.infoTextWrap}>
+                <Text style={[styles.infoTitle, { color: textColor }]}>
+                  {tr('Expected Response Time') || 'Expected Response Time'}
+                </Text>
+                <Text style={[styles.infoSub, { color: subTextColor }]}>
+                  {tr(
+                    'We usually respond within a few hours during working hours.',
+                  ) ||
+                    'We usually respond within a few hours during working hours.'}
+                </Text>
+              </View>
+            </View>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -353,5 +406,10 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     color: '#64748B',
     marginTop: 4,
+  },
+  loadingWrap: {
+    paddingTop: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
