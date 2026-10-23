@@ -774,6 +774,7 @@ export default function Webview({ route, navigation }) {
     injectScript ? 'pending' : 'waiting',
   );
   const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [isProductPage, setIsProductPage] = useState(() => isProductUrl(sourceUrl));
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -2673,9 +2674,20 @@ export default function Webview({ route, navigation }) {
               resetOptionsRef();
             }
             currentUrlRef.current = nextUrl;
+            setIsProductPage(isProductUrl(nextUrl));
 
             const isShein = nextUrl.includes('shein.com');
             scheduleInject(nextUrl, { delays: isShein ? [300, 1000, 2500, 5000] : SPA_INJECT_DELAYS });
+            return;
+          }
+          case 'isProductPage': {
+            const isProd = !!message?.data?.isProduct;
+            const msgUrl = message?.data?.url;
+            if (isProd) {
+              setIsProductPage(true);
+            } else if (msgUrl && !isProductUrl(msgUrl)) {
+              setIsProductPage(false);
+            }
             return;
           }
           case INJECT_STATUS_MESSAGE_TYPE: {
@@ -2714,6 +2726,9 @@ export default function Webview({ route, navigation }) {
           }
           case 'productDetailsSnapshot': {
             if (message.data && typeof message.data === 'object') {
+              if (message.data.isProduct === true || (message.data.title && (message.data.price || message.data.image))) {
+                setIsProductPage(true);
+              }
               if (message.data.title) titleRef.current = cleanProductTitle(String(message.data.title).trim(), currentUrlRef.current);
               if (message.data.image) imageRef.current = normalizeProductImageUrl(String(message.data.image).trim());
               if (message.data.price) priceRef.current = String(message.data.price).trim();
@@ -2811,6 +2826,9 @@ export default function Webview({ route, navigation }) {
     loadingRef.current = false;
     injectTrendyolCookies(currentUrlRef.current);
     scheduleInject(currentUrlRef.current);
+    if (isProductUrl(currentUrlRef.current)) {
+      setIsProductPage(true);
+    }
   }, [injectTrendyolCookies, scheduleInject]);
 
   const onNavigationStateChange = useCallback(
@@ -2830,6 +2848,7 @@ export default function Webview({ route, navigation }) {
       loadingRef.current = !!navState.loading;
       setTranslateUrl(currentUrlRef.current);
       injectTrendyolCookies(currentUrlRef.current);
+      setIsProductPage(isProductUrl(currentUrlRef.current));
 
       if (!navState.loading) {
         scheduleInject(currentUrlRef.current);
@@ -3008,7 +3027,9 @@ export default function Webview({ route, navigation }) {
             }
           }}
         />
-        <AddToCart addChart={addChart} loading={isAddingToCart} />
+        {isProductPage && (
+          <AddToCart addChart={addChart} loading={isAddingToCart} />
+        )}
         {isAddingToCart && (
           <View style={styles.addingOverlay} pointerEvents="auto">
             <View style={styles.addingCard}>

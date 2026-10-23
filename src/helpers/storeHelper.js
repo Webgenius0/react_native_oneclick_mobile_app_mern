@@ -157,7 +157,11 @@ export const isProductUrl = url => {
     }
 
     if (host.includes('amazon.')) {
-      return /\/(dp|gp\/product|d)\/[a-z0-9]{8,12}/i.test(path);
+      return (
+        /\/(?:dp|gp\/product|gp\/aw\/d|d)\/[a-z0-9]{8,12}/i.test(path) ||
+        /\/dp\/[a-z0-9]{8,12}/i.test(cleanUrl) ||
+        /\/gp\/product\/[a-z0-9]{8,12}/i.test(cleanUrl)
+      );
     }
 
     if (host.includes('shein.')) {
@@ -173,16 +177,32 @@ export const isProductUrl = url => {
     }
 
     if (host.includes('iherb.')) {
-      return /\/pr\/[a-z0-9_-]+/i.test(path);
+      return /\/pr\/[a-z0-9_-]+/i.test(path) || path.includes('/pr/');
     }
 
     if (host.includes('yesstyle.')) {
-      return /\/pid\.[a-z0-9]+/i.test(path) || path.includes('/info.html/pid.');
+      return /\/pid\.[a-z0-9]+/i.test(path) || path.includes('/info.html/pid.') || path.includes('/pid.');
+    }
+
+    if (host.includes('zara.')) {
+      return /-p\d+\.html/i.test(path) || /\/p\d+\.html/i.test(path) || /-p0[0-9a-z]+/i.test(path);
+    }
+
+    if (host.includes('hm.com')) {
+      return /productpage/i.test(path);
+    }
+
+    if (host.includes('ebay.')) {
+      return /\/itm\/[0-9]+/i.test(path);
+    }
+
+    if (host.includes('aliexpress.')) {
+      return /\/item\/[0-9]+\.html/i.test(path);
     }
 
     // Generic e-commerce indicators
     if (
-      /\/(products?|items?|goods|p|pr)\/[^/?#]+/i.test(path) ||
+      /\/(products?|items?|goods|p|pr|detail|product-detail)\/[^/?#]+/i.test(path) ||
       /-p-\d+/i.test(path) ||
       /\/pid\.[a-z0-9]+/i.test(path)
     ) {
