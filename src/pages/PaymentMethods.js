@@ -16,16 +16,6 @@ import AppHeader from '../components/common/AppHeader';
 
 const PAYMENT_OPTIONS = [
   {
-    id: 'edahab',
-    title: 'E-Dahab Mobile Money',
-    subtitle: 'Telesom Somalia',
-    desc: 'Instant direct checkout with your registered E-Dahab wallet. Fast, secure, and fee-free payment for international orders.',
-    badge: 'Active',
-    logo: require('../assets/img/edahab.png'),
-    logoWidth: 70,
-    logoHeight: 32,
-  },
-  {
     id: 'waafipay',
     title: 'WaafiPay / ZAAD Service',
     subtitle: 'Mobile Wallet & Direct Checkout',
@@ -34,6 +24,16 @@ const PAYMENT_OPTIONS = [
     logo: require('../assets/img/waafipay.png'),
     logoWidth: 75,
     logoHeight: 28,
+  },
+  {
+    id: 'edahab',
+    title: 'E-Dahab Mobile Money',
+    subtitle: 'Telesom Somalia',
+    desc: 'Instant direct checkout with your registered E-Dahab wallet. Fast, secure, and fee-free payment for international orders.',
+    badge: 'Active',
+    logo: require('../assets/img/edahab.png'),
+    logoWidth: 70,
+    logoHeight: 32,
   },
 ];
 

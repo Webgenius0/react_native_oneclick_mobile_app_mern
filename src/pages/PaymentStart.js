@@ -32,7 +32,7 @@ export default function PaymentStart({ navigation, route }) {
   const itemCountParam = route.params?.itemCount;
 
   const [tutar, setTutar] = useState(initialTutar);
-  const [selectedMethodId, setSelectedMethodId] = useState('edahab');
+  const [selectedMethodId, setSelectedMethodId] = useState('waafipay');
   const [isProcessing, setIsProcessing] = useState(false);
 
   const numTutar = parseFloat(tutar) || 0;
@@ -92,40 +92,7 @@ export default function PaymentStart({ navigation, route }) {
           {tr('Select Payment Option') || 'Select Payment Option'}
         </Text>
 
-        {/* Option 1: E-Dahab */}
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => setSelectedMethodId('edahab')}
-          style={[
-            styles.methodCard,
-            { backgroundColor: cardBg, borderColor: borderColor },
-            selectedMethodId === 'edahab' && styles.methodCardSelected,
-          ]}>
-          <View style={styles.cardLeft}>
-            <AppCheckbox
-              checked={selectedMethodId === 'edahab'}
-              onChange={() => setSelectedMethodId('edahab')}
-              style={styles.checkbox}
-            />
-            <View style={[styles.logoWrap, { borderColor: borderColor }]}>
-              <Image
-                source={require('../assets/img/edahab.png')}
-                style={styles.logoImg}
-                resizeMode="contain"
-              />
-            </View>
-            <View style={styles.cardDetailsCol}>
-              <Text style={[styles.cardTitle, { color: textColor }]}>
-                E-Dahab Mobile Money
-              </Text>
-              <Text style={[styles.cardExpiry, { color: subTextColor }]}>
-                Telesom Mobile Wallet
-              </Text>
-            </View>
-          </View>
-        </TouchableOpacity>
-
-        {/* Option 2: WaafiPay */}
+        {/* Option 1: WaafiPay (First) */}
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={() => setSelectedMethodId('waafipay')}
@@ -153,6 +120,39 @@ export default function PaymentStart({ navigation, route }) {
               </Text>
               <Text style={[styles.cardExpiry, { color: subTextColor }]}>
                 Mobile Wallet & Direct Checkout
+              </Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+
+        {/* Option 2: E-Dahab */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => setSelectedMethodId('edahab')}
+          style={[
+            styles.methodCard,
+            { backgroundColor: cardBg, borderColor: borderColor },
+            selectedMethodId === 'edahab' && styles.methodCardSelected,
+          ]}>
+          <View style={styles.cardLeft}>
+            <AppCheckbox
+              checked={selectedMethodId === 'edahab'}
+              onChange={() => setSelectedMethodId('edahab')}
+              style={styles.checkbox}
+            />
+            <View style={[styles.logoWrap, { borderColor: borderColor }]}>
+              <Image
+                source={require('../assets/img/edahab.png')}
+                style={styles.logoImg}
+                resizeMode="contain"
+              />
+            </View>
+            <View style={styles.cardDetailsCol}>
+              <Text style={[styles.cardTitle, { color: textColor }]}>
+                E-Dahab Mobile Money
+              </Text>
+              <Text style={[styles.cardExpiry, { color: subTextColor }]}>
+                Telesom Mobile Wallet
               </Text>
             </View>
           </View>

@@ -233,33 +233,33 @@ export default function WaafiPay({ navigation, route }) {
               editable={!submitting}
             />
           </View>
+        </View>
 
-          {/* Action Buttons: Red Cancel & Green Pay */}
-          <View style={styles.buttonRow}>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={handleCancel}
-              disabled={submitting}
-              style={styles.cancelBtn}>
-              <Text style={styles.cancelBtnText}>
-                {tr('İptal') || 'Cancel'}
+        {/* Action Buttons (Consistent with EDahab & 1 Click design system) */}
+        <View style={styles.actionWrap}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={handlePay}
+            disabled={submitting}
+            style={[styles.payBtn, submitting && styles.payBtnDisabled]}>
+            {submitting ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Text style={styles.payBtnText}>
+                {tr('Pay') || 'Pay'} ${tutar}
               </Text>
-            </TouchableOpacity>
+            )}
+          </TouchableOpacity>
 
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={handlePay}
-              disabled={submitting}
-              style={[styles.payBtn, submitting && styles.payBtnDisabled]}>
-              {submitting ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <Text style={styles.payBtnText}>
-                  {tr('Pay') || 'Pay'}
-                </Text>
-              )}
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={handleCancel}
+            disabled={submitting}
+            style={[styles.cancelBtn, { borderColor: borderColor }]}>
+            <Text style={[styles.cancelBtnText, { color: subTextColor }]}>
+              {tr('İptal') || 'Cancel'}
+            </Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -338,7 +338,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     padding: 16,
-    marginBottom: 24,
+    marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 14,
     height: 50,
-    marginBottom: 12,
+    marginBottom: 4,
   },
   textInput: {
     flex: 1,
@@ -381,49 +381,33 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     padding: 0,
   },
-  buttonRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginTop: 20,
-  },
-  cancelBtn: {
-    flex: 1,
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: '#EF4444',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#EF4444',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  cancelBtnText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
+  actionWrap: {
+    rowGap: 12,
   },
   payBtn: {
-    flex: 1,
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#F67922',
+    borderRadius: 14,
+    paddingVertical: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#4CAF50',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
   },
   payBtnDisabled: {
-    backgroundColor: '#A5D6A7',
+    backgroundColor: '#CBD5E1',
   },
   payBtnText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
+  },
+  cancelBtn: {
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
 });
