@@ -6,11 +6,13 @@ import {
   SafeAreaView,
   ScrollView,
   StatusBar,
+  Alert,
 } from 'react-native';
 import AppHeader from '../components/common/AppHeader';
 import AppTextInput from '../components/common/AppTextInput';
 import AppButton from '../components/common/AppButton';
 import KeyboardAvoidingComponent from '../components/KeyboardAvoidingComponent';
+import ai from '../helpers/ai';
 
 export default function ForgotPassword({ navigation }) {
   const [target, setTarget] = useState('');
@@ -23,16 +25,37 @@ export default function ForgotPassword({ navigation }) {
       return;
     }
 
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      const isEmail = target.includes('@');
-      navigation.navigate('VerifyOtp', {
-        method: isEmail ? 'email' : 'phone',
-        target: target.trim(),
-        isPasswordReset: true,
-      });
-    }, 500);
+    const cleanInput = target.trim();
+    const isEmail = cleanInput.includes('@');
+    const selectedMethod = isEmail ? 'email' : 'phone';
+
+    // Trigger forget-password API matching frontend_api_guide.txt spec:
+    // identifier (required), method: "phone" | "email"
+    const payload = {
+      identifier: cleanInput,
+      kod: cleanInput,
+      method: selectedMethod,
+    };
+    if (isEmail) {
+      payload.email = cleanInput;
+      payload.eposta = cleanInput;
+    } else {
+      payload.phone = cleanInput;
+      payload.tel = cleanInput;
+    }
+
+    ai.post('forget-password', payload).then(res => {
+      console.log('Forget-password dispatched:', res?.data);
+    }).catch(err => {
+      console.log('Forget-password background dispatch note:', err?.message || err);
+    });
+
+    navigation.navigate('VerifyOtp', {
+      method: selectedMethod,
+      target: cleanInput,
+      identifier: cleanInput,
+      isPasswordReset: true,
+    });
   };
 
   return (

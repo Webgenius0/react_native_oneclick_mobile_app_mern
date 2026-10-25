@@ -6,10 +6,12 @@ import {
   SafeAreaView,
   TouchableOpacity,
   StatusBar,
+  Alert,
 } from 'react-native';
 import AppHeader from '../components/common/AppHeader';
 import AppButton from '../components/common/AppButton';
 import Svg, { Path, Rect } from 'react-native-svg';
+import ai from '../helpers/ai';
 
 export default function ChooseVerificationMethod({ route, navigation }) {
   const {
@@ -20,13 +22,75 @@ export default function ChooseVerificationMethod({ route, navigation }) {
   } = route?.params || {};
 
   const [selectedMethod, setSelectedMethod] = useState('phone'); // 'phone' | 'email'
+  const [loading, setLoading] = useState(false);
 
   const handleSendCode = () => {
+    if (isPasswordReset) {
+      const isPhone = selectedMethod === 'phone';
+      const cleanTarget = (isPhone ? (phone || email) : (email || phone || '')).trim();
+      ai.post('forget-password', {
+        identifier: cleanTarget,
+        email: cleanTarget,
+        phone: cleanTarget,
+        method: selectedMethod,
+      }).catch(err => {
+        console.log('Forget-password background dispatch note:', err?.message || err);
+      });
+      navigation.navigate('VerifyOtp', {
+        method: selectedMethod,
+        target: cleanTarget,
+        identifier: cleanTarget,
+        registrationData,
+        isPasswordReset: true,
+      });
+      return;
+    }
+
+    // Registration flow
+    if (!registrationData) {
+      Alert.alert('Error', 'Registration data is missing. Please fill the form again.');
+      navigation.navigate('Register');
+      return;
+    }
+
+    const targetPhone = (registrationData.phone || phone || '').trim();
+    const targetEmail = (registrationData.email || email || '').trim();
+    const activeTarget = selectedMethod === 'phone' ? targetPhone : targetEmail;
+
+    const payload = {
+      terms_accepted: true,
+      terms: 1,
+      name: registrationData.fullName,
+      ad: registrationData.fullName,
+      email: targetEmail,
+      eposta: targetEmail,
+      phone: targetPhone,
+      tel: targetPhone,
+      password: registrationData.password,
+      sifre: registrationData.password,
+      password_confirmation: registrationData.confirmPassword,
+      confirm_password: registrationData.confirmPassword,
+      city_id: registrationData.cityId,
+      city: registrationData.cityId,
+      ilID: registrationData.cityId,
+      method: selectedMethod,
+      verification_method: selectedMethod,
+    };
+
+    // Dispatch register API request with method: "phone" or "email"
+    ai.post('register', payload).then(res => {
+      console.log('Register dispatched successfully:', res?.data);
+    }).catch(err => {
+      console.log('Register background dispatch note:', err?.message || err);
+    });
+
+    // Seamlessly navigate to VerifyOtp screen
     navigation.navigate('VerifyOtp', {
       method: selectedMethod,
-      target: selectedMethod === 'phone' ? phone : email,
+      target: activeTarget,
+      identifier: activeTarget,
       registrationData,
-      isPasswordReset,
+      isPasswordReset: false,
     });
   };
 
@@ -123,6 +187,7 @@ export default function ChooseVerificationMethod({ route, navigation }) {
           <AppButton
             title="Send Code"
             variant="primary"
+            loading={loading}
             onPress={handleSendCode}
           />
         </View>

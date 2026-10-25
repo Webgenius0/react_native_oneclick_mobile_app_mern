@@ -8,7 +8,7 @@ const ai = axios.create();
 const aiLog = false;
 const aiErrorLog = true;
 ai.defaults.baseURL = API_URL;
-ai.defaults.timeout = 10000;
+ai.defaults.timeout = 30000;
 ai.defaults.headers = ai.defaults.headers || {};
 ai.defaults.headers.common = ai.defaults.headers.common || {};
 ai.defaults.headers.post = ai.defaults.headers.post || {};
@@ -28,8 +28,15 @@ ai.interceptors.request.use(
     }
 
     if (token && token !== 'GUEST') {
-      config.headers.Authorization = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
-      config.headers.token = token;
+      const authVal = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+      if (config.headers?.set) {
+        config.headers.set('Authorization', authVal);
+        config.headers.set('token', token);
+      } else {
+        config.headers = config.headers || {};
+        config.headers.Authorization = authVal;
+        config.headers.token = token;
+      }
 
       const method = (config.method || 'get').toLowerCase();
       if (method === 'post' || method === 'put' || method === 'patch' || method === 'delete') {
@@ -66,10 +73,108 @@ ai.interceptors.response.use(
       console.log('error status ======> ', JSON.stringify(error));
     }
 
-    // react native error
-    if (!error?.response) {
+    // React Native network error (Axios XHR failure)
+    if (!error?.response && error?.config) {
+      const cfg = error.config;
+      const method = (cfg.method || 'get').toUpperCase();
+      const base = (cfg.baseURL || API_URL || '').replace(/\/+$/, '');
+      const rel = (cfg.url || '').replace(/^\/+/, '');
+      const fullUrl = rel.startsWith('http://') || rel.startsWith('https://')
+        ? rel
+        : `${base}/${rel}`;
+
       if (aiErrorLog) {
-        console.warn('API network error:', error?.message || error, ai.defaults.baseURL);
+        console.warn(
+          'API network error on Axios:',
+          error?.code || 'NO_CODE',
+          error?.message,
+          method,
+          fullUrl,
+        );
+        console.log('Attempting native fetch fallback for:', fullUrl);
+      }
+
+      try {
+        const fetchHeaders = {
+          Accept: 'application/json, text/plain, */*',
+          'Content-Type': 'application/json',
+        };
+
+        if (cfg.headers) {
+          if (typeof cfg.headers.toJSON === 'function') {
+            Object.assign(fetchHeaders, cfg.headers.toJSON());
+          } else {
+            Object.assign(fetchHeaders, cfg.headers);
+          }
+        }
+
+        const fetchOptions = {
+          method,
+          headers: fetchHeaders,
+        };
+
+        if (method !== 'GET' && method !== 'HEAD' && cfg.data) {
+          fetchOptions.body =
+            typeof cfg.data === 'string'
+              ? cfg.data
+              : JSON.stringify(cfg.data);
+        }
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        fetchOptions.signal = controller.signal;
+
+        let fetchRes;
+        try {
+          fetchRes = await fetch(fullUrl, fetchOptions);
+        } finally {
+          clearTimeout(timeoutId);
+        }
+
+        const text = await fetchRes.text();
+        let parsedData = null;
+        try {
+          parsedData = JSON.parse(text);
+        } catch (_) {
+          parsedData = text;
+        }
+
+        if (aiErrorLog) {
+          console.log('Native fetch fallback response:', fetchRes.status);
+        }
+
+        const isHtml = typeof parsedData === 'string' && parsedData.includes('<html');
+
+        if (!fetchRes.ok || isHtml) {
+          const errorMsg = isHtml
+            ? `Server Error (${fetchRes.status} ${fetchRes.statusText || 'Gateway Timeout'}). Upstream server did not respond.`
+            : (parsedData?.msg || `Server Error ${fetchRes.status}`);
+
+          const errorObj = new Error(errorMsg);
+          errorObj.response = {
+            status: fetchRes.status,
+            statusText: fetchRes.statusText,
+            data: isHtml ? { error: true, msg: errorMsg } : parsedData,
+            headers: fetchRes.headers,
+          };
+          errorObj.config = cfg;
+          return Promise.reject(errorObj);
+        }
+
+        return {
+          data: parsedData,
+          status: fetchRes.status,
+          statusText: fetchRes.statusText,
+          headers: fetchRes.headers,
+          config: cfg,
+        };
+      } catch (fetchErr) {
+        if (aiErrorLog) {
+          console.warn(
+            'Native fetch fallback also failed:',
+            fetchErr?.message || fetchErr,
+          );
+        }
       }
     }
 

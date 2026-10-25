@@ -15,11 +15,21 @@ import { EmContext } from '../contexts/EmContext';
 
 export default function AccountCreatedSuccess({ route, navigation }) {
   const { setCtx } = useContext(EmContext);
-  const { registrationData = null } = route?.params || {};
+  const { registrationData = null, user = null } = route?.params || {};
 
   const handleStartShopping = async () => {
     try {
-      if (registrationData) {
+      if (user) {
+        await setUser(user);
+        await storageSet('has_seen_onboarding', '1');
+        if (setCtx) {
+          setCtx(prev => ({
+            ...prev,
+            user: user,
+            token: user.token,
+          }));
+        }
+      } else if (registrationData) {
         const newUser = {
           name: registrationData.fullName || 'User',
           ad: registrationData.fullName || 'User',

@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { View, TextInput, StyleSheet } from 'react-native';
 
-export default function OtpInput({ length = 5, value = '', onChangeCode }) {
+export default function OtpInput({ length = 6, value = '', onChangeCode }) {
   const inputRefs = useRef([]);
   const [focusedIndex, setFocusedIndex] = useState(0);
 
@@ -77,13 +77,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     width: '100%',
-    paddingHorizontal: 10,
+    paddingHorizontal: 4,
     marginVertical: 18,
   },
   box: {
-    width: 54,
-    height: 58,
-    borderRadius: 14,
+    width: 46,
+    height: 54,
+    borderRadius: 12,
     backgroundColor: '#F9FAFB',
     borderWidth: 1.5,
     borderColor: '#E5E7EB',

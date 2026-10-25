@@ -7,6 +7,7 @@ import {
   ScrollView,
   Modal,
   StatusBar,
+  Alert,
 } from 'react-native';
 import AppHeader from '../components/common/AppHeader';
 import AppTextInput from '../components/common/AppTextInput';
@@ -14,15 +15,17 @@ import AppButton from '../components/common/AppButton';
 import IllustrationPlaceholder from '../components/common/IllustrationPlaceholder';
 import KeyboardAvoidingComponent from '../components/KeyboardAvoidingComponent';
 import { CommonActions } from '@react-navigation/native';
+import ai from '../helpers/ai';
 
-export default function SetNewPassword({ navigation }) {
+export default function SetNewPassword({ route, navigation }) {
+  const { email, resetToken, otp } = route?.params || {};
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errors, setErrors] = useState({});
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleUpdatePassword = () => {
+  const handleUpdatePassword = async () => {
     const newErrors = {};
     if (!password) {
       newErrors.password = 'Password is required';
@@ -42,10 +45,35 @@ export default function SetNewPassword({ navigation }) {
     }
 
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const payload = {
+        reset_token: resetToken,
+        email: email,
+        otp: otp,
+        new_password: password,
+        password: password,
+        confirm_password: confirmPassword,
+        password_confirmation: confirmPassword,
+      };
+
+      const res = await ai.post('reset-password', payload);
+
+      if (res?.data && res.data.error === false) {
+        setSuccessModalVisible(true);
+      } else {
+        const errorMsg =
+          res?.data?.msg || 'Could not reset password. Please try again.';
+        Alert.alert('Reset Failed', errorMsg);
+      }
+    } catch (err) {
+      const errorMsg =
+        err?.response?.data?.msg ||
+        err?.message ||
+        'Failed to reset password. Please check your connection and try again.';
+      Alert.alert('Error', errorMsg);
+    } finally {
       setLoading(false);
-      setSuccessModalVisible(true);
-    }, 600);
+    }
   };
 
   const handleLoginNow = () => {
