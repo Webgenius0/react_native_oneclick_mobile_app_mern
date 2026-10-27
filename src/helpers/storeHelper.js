@@ -197,7 +197,19 @@ export const isProductUrl = url => {
     }
 
     if (host.includes('aliexpress.')) {
-      return /\/item\/[0-9]+\.html/i.test(path);
+      return (
+        /\/item\/[0-9]+/i.test(cleanUrl) ||
+        /\/i\/[0-9]+/i.test(cleanUrl) ||
+        /\/p\/[0-9]+/i.test(cleanUrl) ||
+        /[?&](?:productId|itemId)=[0-9]+/i.test(cleanUrl)
+      );
+    }
+
+    if (host.includes('carrefour')) {
+      return (
+        /\/p\/[0-9]+/i.test(cleanUrl) ||
+        /\/product\/[a-z0-9_-]+/i.test(cleanUrl)
+      );
     }
 
     // Generic e-commerce indicators

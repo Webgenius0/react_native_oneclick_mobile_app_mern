@@ -645,7 +645,28 @@ export const getMetaTagPriceAndCurrency = page_url => {
           '[class*="salePrice"]',
           '.product-price-container',
           '.product-price',
-          '.pdp-price'
+          '.pdp-price',
+
+          // AliExpress / Carrefour / iHerb / YesStyle price selectors
+          '[class*="currentPriceText"]',
+          '[class*="price--currentPriceText"]',
+          '[class*="price--current"]',
+          '[class*="product-price-current"]',
+          '[class*="product-price-value"]',
+          '.uniform-banner-box-price',
+          '[class*="uniform-banner-box-price"]',
+          '.price-current',
+          '.es--wrap-- [class*="price"]',
+          '[class*="snow-price"]',
+          '[data-pl="product-price"]',
+          '.product-price-value',
+          '#our-price',
+          '.our-price',
+          '.item-price',
+          '.price-tag',
+          '[class*="itemPrice"]',
+          '[class*="price-now"]',
+          '[class*="now-price"]'
         ];
 
         var priceEl = null;
@@ -786,7 +807,30 @@ export const getMetaTagPriceAndCurrency = page_url => {
           } catch(_eMp) {}
         }
 
-        // 2b. JSON-LD schema price check (Amazon, Shopify, etc.)
+        // 2b. Check AliExpress application state
+        if (!price) {
+          try {
+            var rp = window.runParams && (window.runParams.data || window.runParams);
+            var initD = window.__INITIAL_DATA__ && (window.__INITIAL_DATA__.data || window.__INITIAL_DATA__);
+            var didaD = window._dida_config_ && window._dida_config_._init_data_ && (window._dida_config_._init_data_.data || window._dida_config_._init_data_);
+            var aliObj = rp || initD || didaD;
+            if (aliObj) {
+              var pc = aliObj.priceComponent || (aliObj.productInfoComponent && aliObj.productInfoComponent.priceComponent) || (aliObj.skuComponent && aliObj.skuComponent.selectedSkuPrice);
+              if (pc) {
+                var rawAli = pc.formatedActivityPrice || pc.formatedPrice || (pc.activityAmount && pc.activityAmount.value) || (pc.origPriceComponent && pc.origPriceComponent.formatedPrice);
+                if (rawAli) {
+                  var pResAli = parsePriceAndCurrency(String(rawAli));
+                  if (pResAli.price) {
+                    price = pResAli.price;
+                    if (pResAli.currency && !currency) currency = pResAli.currency;
+                  }
+                }
+              }
+            }
+          } catch(_eAli) {}
+        }
+
+        // 2c. JSON-LD schema price check (AliExpress, Amazon, Shopify, etc.)
         if (!price) {
           var jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
           for (var jld = 0; jld < jsonLdScripts.length; jld++) {
@@ -798,10 +842,14 @@ export const getMetaTagPriceAndCurrency = page_url => {
                 var offers = item && (item.offers || (item['@graph'] && Array.isArray(item['@graph']) && item['@graph'].find(function(g) { return g.offers; }) ? item['@graph'].find(function(g) { return g.offers; }).offers : null));
                 if (offers) {
                   var offer = Array.isArray(offers) ? offers[0] : offers;
-                  if (offer && offer.price) {
-                    price = String(offer.price).trim();
-                    if (offer.priceCurrency && !currency) currency = String(offer.priceCurrency).trim();
-                    break;
+                  var offPrice = offer && (offer.price || offer.lowPrice || offer.highPrice);
+                  if (offer && offPrice) {
+                    var offPStr = String(offPrice).trim();
+                    if (offPStr && offPStr !== '0') {
+                      price = offPStr;
+                      if (offer.priceCurrency && !currency) currency = String(offer.priceCurrency).trim();
+                      break;
+                    }
                   }
                 }
               }
@@ -855,7 +903,7 @@ export const getMetaTagPriceAndCurrency = page_url => {
               currency = 'EUR';
             } else if (href.indexOf('amazon.co.uk') > -1) {
               currency = 'GBP';
-            } else if (href.indexOf('amazon.com') > -1 || href.indexOf('shein.com') > -1) {
+            } else if (href.indexOf('amazon.com') > -1 || href.indexOf('shein.com') > -1 || href.indexOf('aliexpress.com') > -1 || href.indexOf('iherb.com') > -1 || href.indexOf('yesstyle.com') > -1) {
               currency = 'USD';
             }
           }

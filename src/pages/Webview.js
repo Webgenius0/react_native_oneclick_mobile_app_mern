@@ -159,6 +159,30 @@ const isDifferentProduct = (urlA, urlB) => {
     if (gpA && gpB && gpA[1] === gpB[1]) {
       return false;
     }
+    // AliExpress item ID match: /item/100500... or /i/100500... or productId/itemId query
+    const aliA = urlA.match(/\/(?:item|i)\/([0-9]+)/i) || urlA.match(/[?&](?:productId|itemId)=([0-9]+)/i);
+    const aliB = urlB.match(/\/(?:item|i)\/([0-9]+)/i) || urlB.match(/[?&](?:productId|itemId)=([0-9]+)/i);
+    if (aliA && aliB && aliA[1] === aliB[1]) {
+      return false;
+    }
+    // iHerb product ID match: /pr/.../61864 or /pr/61864
+    const ihA = urlA.match(/\/pr\/(?:.*\/)?([0-9]+)/i);
+    const ihB = urlB.match(/\/pr\/(?:.*\/)?([0-9]+)/i);
+    if (ihA && ihB && ihA[1] === ihB[1]) {
+      return false;
+    }
+    // YesStyle pid match: pid.1074495834
+    const ysA = urlA.match(/\/pid\.([a-z0-9]+)/i);
+    const ysB = urlB.match(/\/pid\.([a-z0-9]+)/i);
+    if (ysA && ysB && ysA[1] === ysB[1]) {
+      return false;
+    }
+    // Carrefour product ID match: /p/12345
+    const cfA = urlA.match(/\/p\/([0-9]+)/i);
+    const cfB = urlB.match(/\/p\/([0-9]+)/i);
+    if (cfA && cfB && cfA[1] === cfB[1]) {
+      return false;
+    }
   } catch (_e) { }
   return true;
 };
@@ -1271,6 +1295,12 @@ export default function Webview({ route, navigation }) {
                 '.product-intro__head-name',
                 '.product-intro__title',
                 '.goods-title',
+                '[data-pl="product-title"]',
+                '.title--wrap--',
+                '[class*="title--wrap"]',
+                '.detail-title',
+                '.product-detail-title',
+                '#product-title',
                 'h1[data-test-id="product-title"]',
                 'h1[itemprop="name"]',
                 'h1#title',
@@ -1379,6 +1409,30 @@ export default function Webview({ route, navigation }) {
               '.gallery-container img',
               '[data-test-id="product-image"] img',
               '.a-carousel-card img',
+
+              // AliExpress
+              'img[src*="alicdn.com"]',
+              'img[data-src*="alicdn.com"]',
+              '.image-view--previewBox-- img',
+              '.magnifier-image',
+              '.detail-gallery-img',
+              '.gallery-preview-panel img',
+
+              // iHerb
+              'img[src*="images.iherb.com"]',
+              'img[data-src*="images.iherb.com"]',
+              '#product-image img',
+              '.product-image-container img',
+
+              // YesStyle
+              'img[src*="ys-cdn.com"]',
+              'img[data-src*="ys-cdn.com"]',
+              '.gallery-image img',
+
+              // Carrefour
+              'img[src*="carrefour"]',
+              'img[data-src*="carrefour"]',
+
               'img.product-image'
             ];
             for (var sIdx = 0; sIdx < imgSelectors.length; sIdx++) {
@@ -1626,7 +1680,30 @@ export default function Webview({ route, navigation }) {
               '[class*="salePrice"]',
               '.product-price-container',
               '.product-price',
-              '.pdp-price'
+              '.pdp-price',
+
+              // AliExpress / Carrefour / iHerb / YesStyle price selectors
+              '[class*="currentPriceText"]',
+              '[class*="price--currentPriceText"]',
+              '[class*="price--current"]',
+              '[class*="product-price-current"]',
+              '[class*="product-price-value"]',
+              '.uniform-banner-box-price',
+              '[class*="uniform-banner-box-price"]',
+              '.price-current',
+              '.es--wrap-- [class*="price"]',
+              '[class*="snow-price"]',
+              'span[class*="price--"]',
+              'div[class*="price--"]',
+              '[data-pl="product-price"]',
+              '.product-price-value',
+              '#our-price',
+              '.our-price',
+              '.item-price',
+              '.price-tag',
+              '[class*="itemPrice"]',
+              '[class*="price-now"]',
+              '[class*="now-price"]'
             ];
 
             for (var s = 0; s < candidatePriceSelectors.length; s++) {
@@ -1788,6 +1865,29 @@ export default function Webview({ route, navigation }) {
               } catch(_eSh) {}
             }
 
+            // 3c-0. Check AliExpress application state
+            if (!price) {
+              try {
+                var rp = window.runParams && (window.runParams.data || window.runParams);
+                var initD = window.__INITIAL_DATA__ && (window.__INITIAL_DATA__.data || window.__INITIAL_DATA__);
+                var didaD = window._dida_config_ && window._dida_config_._init_data_ && (window._dida_config_._init_data_.data || window._dida_config_._init_data_);
+                var aliObj = rp || initD || didaD;
+                if (aliObj) {
+                  var pc = aliObj.priceComponent || (aliObj.productInfoComponent && aliObj.productInfoComponent.priceComponent) || (aliObj.skuComponent && aliObj.skuComponent.selectedSkuPrice);
+                  if (pc) {
+                    var rawAli = pc.formatedActivityPrice || pc.formatedPrice || (pc.activityAmount && pc.activityAmount.value) || (pc.origPriceComponent && pc.origPriceComponent.formatedPrice);
+                    if (rawAli) {
+                      var pResAli = parsePriceAndCurrency(String(rawAli));
+                      if (pResAli.price) {
+                        price = pResAli.price;
+                        if (pResAli.currency && !currency) currency = pResAli.currency;
+                      }
+                    }
+                  }
+                }
+              } catch(_eAli) {}
+            }
+
             // 3c-1. OpenGraph / Product Meta Price
             if (!price) {
               try {
@@ -1806,7 +1906,7 @@ export default function Webview({ route, navigation }) {
               } catch(_eMp) {}
             }
 
-            // 3c-2. JSON-LD schema price check (Amazon, Shopify, etc.)
+            // 3c-2. JSON-LD schema price check (AliExpress, Amazon, Shopify, etc.)
             if (!price) {
               var jsonLdPriceScripts = document.querySelectorAll('script[type="application/ld+json"]');
               for (var jld = 0; jld < jsonLdPriceScripts.length; jld++) {
@@ -1818,10 +1918,14 @@ export default function Webview({ route, navigation }) {
                     var offers = pItem && (pItem.offers || (pItem['@graph'] && Array.isArray(pItem['@graph']) && pItem['@graph'].find(function(g) { return g.offers; }) ? pItem['@graph'].find(function(g) { return g.offers; }).offers : null));
                     if (offers) {
                       var offer = Array.isArray(offers) ? offers[0] : offers;
-                      if (offer && offer.price) {
-                        price = String(offer.price).trim();
-                        if (offer.priceCurrency && !currency) currency = String(offer.priceCurrency).trim();
-                        break;
+                      var offPrice = offer && (offer.price || offer.lowPrice || offer.highPrice);
+                      if (offer && offPrice) {
+                        var offPStr = String(offPrice).trim();
+                        if (offPStr && offPStr !== '0') {
+                          price = offPStr;
+                          if (offer.priceCurrency && !currency) currency = String(offer.priceCurrency).trim();
+                          break;
+                        }
                       }
                     }
                   }
@@ -1860,7 +1964,7 @@ export default function Webview({ route, navigation }) {
                 currency = 'EUR';
               } else if (href.indexOf('amazon.co.uk') > -1) {
                 currency = 'GBP';
-              } else if (href.indexOf('amazon.com') > -1 || href.indexOf('shein.com') > -1) {
+              } else if (href.indexOf('amazon.com') > -1 || href.indexOf('shein.com') > -1 || href.indexOf('aliexpress.com') > -1 || href.indexOf('iherb.com') > -1 || href.indexOf('yesstyle.com') > -1) {
                 currency = 'USD';
               }
             }
@@ -2325,6 +2429,30 @@ export default function Webview({ route, navigation }) {
                 return false;
               }
 
+              // AliExpress specific
+              if (pHost.indexOf('aliexpress.') > -1) {
+                if (new RegExp('/(item|i)/[0-9]+', 'i').test(pPath) || pLoc.indexOf('productId=') > -1 || pLoc.indexOf('itemId=') > -1) return true;
+                if (document.querySelector('.buy-now-wrap, .add-to-cart-wrap, [action-type="buynow"], [action-type="addcart"], [class*="action--action--"], [class*="UniformBanner"]')) return true;
+              }
+
+              // Carrefour specific
+              if (pHost.indexOf('carrefour') > -1) {
+                if (pPath.indexOf('/p/') > -1 || pPath.indexOf('/product/') > -1) return true;
+                if (document.querySelector('[data-qa="btn-addToCart"], [class*="add-to-cart"], [class*="addToCart"]')) return true;
+              }
+
+              // iHerb specific
+              if (pHost.indexOf('iherb.') > -1) {
+                if (pPath.indexOf('/pr/') > -1) return true;
+                if (document.querySelector('#add-to-cart, [name="AddToCart"]')) return true;
+              }
+
+              // YesStyle specific
+              if (pHost.indexOf('yesstyle.') > -1) {
+                if (pPath.indexOf('/pid.') > -1 || pLoc.indexOf('pid.') > -1) return true;
+                if (document.querySelector('[class*="addToBagBtn"], [class*="btnAddToBag"], .addToBag')) return true;
+              }
+
               // Schema.org Product check
               var ldScripts = document.querySelectorAll('script[type="application/ld+json"]');
               for (var li = 0; li < ldScripts.length; li++) {
@@ -2356,7 +2484,6 @@ export default function Webview({ route, navigation }) {
               if (ogEl && ogEl.content) {
                 var ogContent = ogEl.content.toLowerCase().trim();
                 if (ogContent === 'product' || ogContent === 'og:product') return true;
-                if (ogContent === 'website') return false;
               }
 
               // Generic add-to-cart button or detail elements
@@ -2364,14 +2491,17 @@ export default function Webview({ route, navigation }) {
                 'button[name="add"], form[action*="cart/add"] button, ' +
                 '#add-to-cart, .add-to-cart, #addToCart, .addToCart, ' +
                 '[data-action="add-to-cart"], [data-action="addToCart"], ' +
-                'button[id*="add-to-cart"], button[class*="add-to-cart"]'
+                'button[id*="add-to-cart"], button[class*="add-to-cart"], ' +
+                '[class*="add-to-cart"], [class*="addToCart"], [class*="add-cart"], ' +
+                '[class*="buy-now"], [class*="buyNow"], [class*="addToBag"], ' +
+                '.buy-now-wrap, .add-to-cart-wrap'
               )) return true;
 
-              if (document.querySelector('#productTitle, #title, #title_feature_div span, #title_feature_div, [data-feature-name="title"], h1#title, .product-title, .pdp-title, .goods-detail-info__name')) {
+              if (document.querySelector('#productTitle, #title, #title_feature_div span, #title_feature_div, [data-feature-name="title"], h1#title, .product-title, .pdp-title, .goods-detail-info__name, [data-pl="product-title"], .detail-title')) {
                 return true;
               }
 
-              if (new RegExp('/(products?|items?|goods|p|pr)/[^/?#]+', 'i').test(pPath) || new RegExp('-p-[0-9]+', 'i').test(pPath) || new RegExp('/pid\\.[a-z0-9]+', 'i').test(pPath)) {
+              if (new RegExp('/(products?|items?|goods|p|pr)/[^/?#]+', 'i').test(pPath) || new RegExp('-p-[0-9]+', 'i').test(pPath) || new RegExp('/pid\\.[a-z0-9]+', 'i').test(pPath) || new RegExp('/(item|i)/[0-9]+', 'i').test(pPath)) {
                 return true;
               }
 
@@ -2587,9 +2717,14 @@ export default function Webview({ route, navigation }) {
 
       const isShein = isSheinUrl(currentUrlRef.current);
       const isAmazonUsUrl = currentUrlRef.current.includes('amazon.com');
+      const isAliExpress = currentUrlRef.current.includes('aliexpress.com');
+      const isIherb = currentUrlRef.current.includes('iherb.com');
+      const isYesStyle = currentUrlRef.current.includes('yesstyle.com');
       const isUaeUrl = currentUrlRef.current.includes('amazon.ae') || currentUrlRef.current.includes('noon.com');
       const isSaUrl = currentUrlRef.current.includes('amazon.sa');
-      const fallbackCurrency = isAmazonUsUrl ? 'USD' : (isUaeUrl ? 'AED' : (isSaUrl ? 'SAR' : (isShein ? 'USD' : 'TL')));
+      const fallbackCurrency = (isAmazonUsUrl || isAliExpress || isIherb || isYesStyle || isShein)
+        ? 'USD'
+        : (isUaeUrl ? 'AED' : (isSaUrl ? 'SAR' : 'TL'));
 
       const resolvedImage = normalizeProductImageUrl(finalImage || freshSnapshot?.image || imageRef.current || '');
       let resolvedPrice = freshSnapshot?.price || priceRef.current || '';
