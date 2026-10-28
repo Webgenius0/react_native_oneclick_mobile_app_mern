@@ -26,16 +26,14 @@ import OrdersLoading from '../components/orders/Loading';
 import AppHeader from '../components/common/AppHeader';
 import { FIREBASE_ENABLED } from '../../config';
 import BagIcon from '../assets/svg/bag.svg';
+import {
+  FILTER_TABS,
+  getOrderStatusCategory,
+  matchesOrderSearch,
+  filterOrdersByTabAndSearch,
+} from '../helpers/orderStatus';
 
 const CACHE_ORDERS_KEY = 'cached_orders_list';
-
-const FILTER_TABS = [
-  { id: 'all', label: 'All', durums: 0 },
-  { id: 'pending', label: 'Pending', durums: [1, 14, 15, 16, 18, 19] },
-  { id: 'in_progress', label: 'In Progress', durums: [2, 3, 4, 5, 11] },
-  { id: 'delivered', label: 'Delivered', durums: [6] },
-  { id: 'cancelled', label: 'Cancelled', durums: [7, 8, 9, 10, 12, 13, 17] },
-];
 
 export default function Orders({ route, navigation }) {
   const insets = useSafeAreaInsets();
@@ -101,16 +99,17 @@ export default function Orders({ route, navigation }) {
       isRefresh = false,
       isSilent = false,
     } = {}) => {
-      if (pageNum === 1 && !isRefresh && !isSilent && orders.length === 0) {
+      if (pageNum === 1 && !isRefresh && !isSilent) {
         setLoading(true);
       } else if (pageNum > 1) {
         setLoadingMore(true);
       }
 
       try {
+        const activeTabObj = FILTER_TABS.find(t => t.id === tabId) || FILTER_TABS[0];
         const queryParams = {
           page: pageNum,
-          per_page: 10,
+          per_page: 20,
           filter: tabId,
         };
         if (search) {
@@ -122,13 +121,13 @@ export default function Orders({ route, navigation }) {
 
         let res = null;
         try {
-          // Primary specification: GET /api/orders?page=X&per_page=10&filter=X&search=X
+          // Primary specification: GET /api/orders?page=X&per_page=20&filter=X&search=X
           res = await ai.get('orders', { params: queryParams });
         } catch (_getErr) {
           // Fallback to POST orders if GET fails on legacy server
           res = await ai.post('orders', {
             ...queryParams,
-            durum: 0,
+            durum: activeTabObj.durums || 0,
             grupID: route?.params?.grupID || 0,
           });
         }
@@ -136,30 +135,22 @@ export default function Orders({ route, navigation }) {
         if (res?.data && res.data.error === false) {
           let rawList = res.data.ss || res.data.grups || [];
 
-          // If server is legacy and didn't perform server-side tab/search filtering
-          const isServerFiltered = res.data.filter !== undefined || res.data.ss !== undefined;
-          if (!isServerFiltered && Array.isArray(rawList)) {
-            // Apply client-side filtering fallback for legacy servers
-            const activeTabObj = FILTER_TABS.find(t => t.id === tabId) || FILTER_TABS[0];
-            if (tabId !== 'all' && Array.isArray(activeTabObj.durums)) {
-              rawList = rawList.filter(g => {
-                const inner = g.orders || [g];
-                const sNum = parseInt(g.durum !== undefined ? g.durum : inner[0]?.durum || 1, 10);
-                return activeTabObj.durums.includes(sNum);
-              });
+          // Tab-level status validation:
+          // If server didn't perform status filtering (returns mixed/unfiltered list on legacy server),
+          // ensure rawList strictly matches the requested tab.
+          if (tabId !== 'all' && Array.isArray(rawList)) {
+            const hasMismatched = rawList.some(
+              item => getOrderStatusCategory(item) !== tabId,
+            );
+            if (hasMismatched) {
+              rawList = rawList.filter(
+                item => getOrderStatusCategory(item) === tabId,
+              );
             }
-            if (search) {
-              const q = search.toLowerCase();
-              rawList = rawList.filter(g => {
-                const inner = g.orders || [g];
-                const matchId = String(g.id || inner[0]?.id || '').toLowerCase().includes(q);
-                const matchOrders = inner.some(o =>
-                  String(o.ad || '').toLowerCase().includes(q) ||
-                  String(o.magaza || o.store || '').toLowerCase().includes(q),
-                );
-                return matchId || matchOrders;
-              });
-            }
+          }
+
+          if (search && Array.isArray(rawList)) {
+            rawList = rawList.filter(item => matchesOrderSearch(item, search));
           }
 
           const hasMore = Boolean(
@@ -191,7 +182,7 @@ export default function Orders({ route, navigation }) {
         setRefreshing(false);
       }
     },
-    [activeTabId, debouncedSearch, orders.length, route?.params?.grupID],
+    [activeTabId, debouncedSearch, route?.params?.grupID],
   );
 
   // Trigger fetch when tab or debounced search changes
@@ -239,6 +230,10 @@ export default function Orders({ route, navigation }) {
   const subTextColor = isDark ? '#9CA3AF' : '#64748B';
   const borderColor = isDark ? '#374151' : '#F1F5F9';
 
+  const displayedOrders = useMemo(() => {
+    return filterOrdersByTabAndSearch(orders, activeTabId, debouncedSearch);
+  }, [orders, activeTabId, debouncedSearch]);
+
   const renderOrderItem = useCallback(
     ({ item, index }) => (
       <GroupItem
@@ -278,7 +273,7 @@ export default function Orders({ route, navigation }) {
           {tr('No orders found') || 'No orders found'}
         </Text>
         <Text style={[styles.emptySubtitle, { color: subTextColor }]}>
-          {searchQuery
+          {debouncedSearch
             ? tr('Try adjusting your search query') ||
               'No orders match your search keyword.'
             : tr('You have no orders in this category yet') ||
@@ -286,7 +281,7 @@ export default function Orders({ route, navigation }) {
         </Text>
       </View>
     );
-  }, [loading, searchQuery, textColor, subTextColor]);
+  }, [loading, debouncedSearch, textColor, subTextColor]);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: cardBg }]}>
@@ -358,7 +353,12 @@ export default function Orders({ route, navigation }) {
                   key={tab.id}
                   activeOpacity={0.7}
                   onPress={() => {
-                    setActiveTabId(tab.id);
+                    if (activeTabId !== tab.id) {
+                      setActiveTabId(tab.id);
+                      setOrders([]);
+                      setLoading(true);
+                      setPage(1);
+                    }
                   }}
                   style={[
                     styles.tabPill,
@@ -388,11 +388,11 @@ export default function Orders({ route, navigation }) {
         </View>
 
         {/* Orders List / Optimized Animated Skeleton */}
-        {loading && orders.length === 0 ? (
+        {loading && displayedOrders.length === 0 ? (
           <OrdersLoading loading={loading} />
         ) : (
           <FlatList
-            data={orders}
+            data={displayedOrders}
             keyExtractor={keyExtractor}
             renderItem={renderOrderItem}
             initialNumToRender={6}
