@@ -20,13 +20,16 @@ import Svg, { Path } from 'react-native-svg';
 import ai from '../helpers/ai';
 
 const DEFAULT_CITIES = [
-  { id: 1, name: 'Erbil' },
-  { id: 2, name: 'Baghdad' },
-  { id: 3, name: 'Sulaymaniyah' },
-  { id: 4, name: 'Basra' },
-  { id: 5, name: 'Duhok' },
-  { id: 6, name: 'Kirkuk' },
-  { id: 7, name: 'Istanbul' },
+  { id: 11, name: 'Hargeisa' },
+  { id: 2, name: 'Mogadishu' },
+  { id: 14, name: 'Borama' },
+  { id: 13, name: 'Burco' },
+  { id: 23, name: 'Berbera' },
+  { id: 15, name: 'Garowe' },
+  { id: 22, name: 'Bosaso' },
+  { id: 24, name: 'Galkayo' },
+  { id: 12, name: 'Djibouti' },
+  { id: 16, name: 'Dubai' },
 ];
 
 export default function Register({ navigation }) {
@@ -48,16 +51,26 @@ export default function Register({ navigation }) {
   useEffect(() => {
     const fetchCities = async () => {
       try {
-        const res = await ai.get('register-data');
-        if (res?.data?.cities && Array.isArray(res.data.cities) && res.data.cities.length > 0) {
-          const mapped = res.data.cities.map(c => ({
-            id: c.id || c.key,
-            name: c.name || c.value || c.ad,
+        // Primary API guide endpoint: GET /api/city-list
+        let res = await ai.get('city-list').catch(() => null);
+        let rawList = res?.data?.list || res?.data?.ss || res?.data?.cities;
+
+        // Fallback to register-data if city-list is empty
+        if (!rawList || !Array.isArray(rawList) || rawList.length === 0) {
+          res = await ai.get('register-data').catch(() => null);
+          rawList = res?.data?.list || res?.data?.ss || res?.data?.cities;
+        }
+
+        if (Array.isArray(rawList) && rawList.length > 0) {
+          const mapped = rawList.map(c => ({
+            id: c.id !== undefined ? c.id : c.key,
+            name: c.name || c.ad || c.value,
+            fiyat: c.fiyat || c.price || '0.00',
           }));
           setCities(mapped);
         }
       } catch (e) {
-        // Fallback to default cities
+        // Graceful fallback to default cities on offline/error
         console.log('City fetch fallback:', e?.message || e);
       }
     };

@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
 import {
   SafeAreaView,
   Text,
@@ -9,6 +9,7 @@ import {
   StatusBar,
   Linking,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import FastImage from 'react-native-fast-image';
 import Svg, { Path } from 'react-native-svg';
@@ -19,6 +20,7 @@ import { tr } from '../translate/i18n';
 import { EmContext } from '../contexts/EmContext';
 import ai from '../helpers/ai';
 import { cleanProductTitle, getStoreName } from '../helpers/storeHelper';
+import { supportPhone } from '../../config';
 import WhatsAppIcon from '../assets/svg/whatsapp.svg';
 
 export default function OrderDetail({ route, navigation }) {
@@ -26,28 +28,51 @@ export default function OrderDetail({ route, navigation }) {
   const { ctx } = useContext(EmContext);
 
   const [order, setOrder] = useState(route.params?.s || null);
+  const [customerTracking, setCustomerTracking] = useState(null);
   const [loading, setLoading] = useState(!route.params?.s && Boolean(route.params?.id));
+  const [refreshing, setRefreshing] = useState(false);
 
-  const fetchOrderDetail = async () => {
+  const fetchOrderDetail = useCallback(async (isRefresh = false) => {
     try {
       const orderId = route.params?.id || order?.id;
       if (!orderId) return;
-      const c = await ai.get('order-detail', { id: orderId });
-      if (c.data && c.data.error === false && c.data.data) {
-        setOrder(c.data.data);
+      if (!isRefresh) {
+        setLoading(true);
+      }
+
+      let c = null;
+      try {
+        // Primary v4 API: GET /api/order-detail?id={orderId}
+        c = await ai.get('order-detail', { params: { id: orderId } });
+      } catch (_getErr) {
+        c = await ai.post('order-detail', { id: orderId });
+      }
+
+      if (c?.data && c.data.error === false) {
+        const orderData = c.data.data || c.data.order || c.data.s;
+        if (orderData) {
+          setOrder(orderData);
+        }
+        if (c.data.customer_tracking) {
+          setCustomerTracking(c.data.customer_tracking);
+        }
       }
     } catch (e) {
       console.log('fetchOrderDetail error:', e?.message || e);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, [route.params?.id, order?.id]);
 
   useEffect(() => {
-    if (!order && route.params?.id) {
-      fetchOrderDetail();
-    }
-  }, [route.params?.id]);
+    fetchOrderDetail();
+  }, [fetchOrderDetail]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchOrderDetail(true);
+  };
 
   const orders = order?.orders || (order ? [order] : []);
   const firstItem = orders[0] || {};
@@ -102,10 +127,11 @@ export default function OrderDetail({ route, navigation }) {
   const isPaid = statusNum !== 1 && statusNum !== 14 && statusNum !== 18;
 
   const handleOpenWhatsApp = () => {
+    const phoneClean = (supportPhone || '+252637979636').replace(/[^0-9]/g, '');
     const text = encodeURIComponent(
-      `Hello 1Click Support, I need assistance with Order #${orderId}`,
+      `Hello 1Click Support, I need assistance with ${displayOrderNumber}`,
     );
-    Linking.openURL(`https://wa.me/+90?text=${text}`).catch(e => {
+    Linking.openURL(`https://wa.me/${phoneClean}?text=${text}`).catch(e => {
       console.log('WhatsApp open error:', e);
     });
   };
@@ -117,6 +143,22 @@ export default function OrderDetail({ route, navigation }) {
   const subTextColor = isDark ? '#9CA3AF' : '#64748B';
   const borderColor = isDark ? '#374151' : '#F1F5F9';
 
+  const displayOrderNumber = customerTracking?.order_number || `Order #${orderId}`;
+  const displayDate = customerTracking?.order_date || formattedDate;
+  const displayStatusTitle = customerTracking?.status_title || statusTitle;
+  const displayStatusDesc = customerTracking?.status_subtitle || statusDesc;
+  const displayBadgeColor = customerTracking?.status_badge_color === 'green'
+    ? '#16A34A'
+    : customerTracking?.status_badge_color === 'red'
+    ? '#DC2626'
+    : customerTracking?.status_badge_color === 'orange'
+    ? '#D97706'
+    : statusBadgeColor;
+
+  const canTrackOrder = customerTracking?.can_track !== undefined
+    ? Boolean(customerTracking.can_track)
+    : statusNum !== 6 && statusNum !== 7 && statusNum !== 8 && statusNum !== 9 && statusNum !== 10;
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: cardBg }]}>
       <StatusBar
@@ -124,7 +166,7 @@ export default function OrderDetail({ route, navigation }) {
         backgroundColor={cardBg}
       />
 
-      {/* Figma Header */}
+      {/* Header */}
       <AppHeader
         navigation={navigation}
         showBack={true}
@@ -144,8 +186,16 @@ export default function OrderDetail({ route, navigation }) {
         <ScrollView
           style={[styles.container, { backgroundColor: pageBg }]}
           contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}>
-          {/* Top Order & Status Card (Figma) */}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#F67922']}
+              tintColor="#F67922"
+            />
+          }>
+          {/* Top Order & Status Card */}
           <View
             style={[
               styles.sectionCard,
@@ -153,27 +203,27 @@ export default function OrderDetail({ route, navigation }) {
             ]}>
             <View style={styles.orderTopHeader}>
               <Text style={[styles.orderNumberTitle, { color: textColor }]}>
-                Order #{orderId}
+                {displayOrderNumber}
               </Text>
               <Text style={[styles.orderDateTitle, { color: subTextColor }]}>
-                {formattedDate}
+                {displayDate}
               </Text>
             </View>
 
-            {/* In Progress / Status Banner */}
+            {/* Status Banner */}
             <View style={styles.statusBannerWrap}>
               <View style={styles.statusTruckCircle}>
                 <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
                   <Path
                     d="M1 3h15v13H1zM16 8h4l3 3v5h-7V8z"
-                    stroke="#2563EB"
+                    stroke={displayBadgeColor}
                     strokeWidth={2}
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />
                   <Path
                     d="M5.5 18a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM18.5 18a2.5 2.5 0 100-5 2.5 2.5 0 000 5z"
-                    fill="#2563EB"
+                    fill={displayBadgeColor}
                   />
                 </Svg>
               </View>
@@ -181,16 +231,34 @@ export default function OrderDetail({ route, navigation }) {
                 <Text
                   style={[
                     styles.statusBannerTitle,
-                    { color: statusBadgeColor },
+                    { color: displayBadgeColor },
                   ]}>
-                  {tr(statusTitle) || statusTitle}
+                  {tr(displayStatusTitle) || displayStatusTitle}
                 </Text>
                 <Text
                   style={[styles.statusBannerDesc, { color: subTextColor }]}>
-                  {statusDesc}
+                  {displayStatusDesc}
                 </Text>
               </View>
             </View>
+
+            {canTrackOrder ? (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => {
+                  navigation.navigate('TrackOrder', {
+                    id: orderId,
+                    s: order,
+                    statusText: displayStatusTitle,
+                    formattedDate: displayDate,
+                  });
+                }}
+                style={styles.trackOrderInlineBtn}>
+                <Text style={styles.trackOrderInlineBtnText}>
+                  {tr('Track Order Timeline') || 'Track Order Timeline'} →
+                </Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
 
           {/* Delivery Information Card (Figma) */}
@@ -509,6 +577,22 @@ const styles = StyleSheet.create({
   statusBannerDesc: {
     fontSize: 12,
     lineHeight: 16,
+  },
+  trackOrderInlineBtn: {
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trackOrderInlineBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#EA580C',
   },
   sectionTitle: {
     fontSize: 15,

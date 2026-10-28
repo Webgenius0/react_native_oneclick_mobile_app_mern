@@ -24,19 +24,20 @@ export const getLocalNotifications = async () => {
 };
 
 
-export const getServerNotifications = async (id) => {
+export const getServerNotifications = async (id, options = {}) => {
   if (id === null || id === "undefined" || isNaN(id)) id = 0;
 
   let n = [];
 
   try {
     let response = null;
+    const params = options?.unreadOnly ? { unread: 1 } : {};
     try {
-      // API Guide v3.0: GET /api/notifications
-      response = await ai.get("notifications");
+      // API Guide v4.0: GET /api/notifications (with optional ?unread=1)
+      response = await ai.get("notifications", { params });
     } catch (_getErr) {
       // Fallback to legacy POST /api/notifications
-      response = await ai.post("notifications", { id: id });
+      response = await ai.post("notifications", { id: id, ...params });
     }
 
     if (response?.data?.error === false) {
@@ -47,6 +48,49 @@ export const getServerNotifications = async (id) => {
   }
 
   return n;
+};
+
+/**
+ * Mark notification(s) as read on server (POST /api/notifications with islem: "read")
+ * @param {number|string} id - Notification ID, or 0 / "0" to mark all notifications as read
+ */
+export const markNotificationAsReadServer = async (id = 0) => {
+  try {
+    const payload = {
+      islem: 'read',
+      id: Number(id) || 0,
+      ...(Number(id) === 0 ? { all: true } : {}),
+    };
+    const res = await ai.post('notifications', payload).catch(() => null);
+    return res?.data?.error === false;
+  } catch (e) {
+    console.log('markNotificationAsReadServer error:', e?.message || e);
+    return false;
+  }
+};
+
+/**
+ * Fetch latest notifications for widgets/headers (GET /api/notifications-latest?limit=5)
+ * @param {number} limit - Default 5 (max 50)
+ */
+export const getLatestNotifications = async (limit = 5) => {
+  try {
+    const safeLimit = Math.min(50, Math.max(1, limit));
+    const res = await ai.get('notifications-latest', {
+      params: { limit: safeLimit },
+    }).catch(() => null);
+
+    if (res?.data && res.data.error === false) {
+      return {
+        notifications: res.data.notifications || res.data.ss || [],
+        unreadCount: res.data.unread_count || 0,
+        total: res.data.total || (res.data.notifications?.length || 0),
+      };
+    }
+  } catch (e) {
+    console.log('getLatestNotifications error:', e?.message || e);
+  }
+  return { notifications: [], unreadCount: 0, total: 0 };
 };
 
 

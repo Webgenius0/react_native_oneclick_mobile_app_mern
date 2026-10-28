@@ -12,7 +12,7 @@ import AppButton from '../components/common/AppButton';
 import IllustrationPlaceholder from '../components/common/IllustrationPlaceholder';
 import AppHeader from '../components/common/AppHeader';
 import { CommonActions } from '@react-navigation/native';
-import { storageGet, storageSet } from '../helpers/storage';
+import { storageDelete, storageGet, storageSet } from '../helpers/storage';
 import { setUser } from '../helpers/auth';
 import { EmContext } from '../contexts/EmContext';
 import ai from '../helpers/ai';
@@ -29,7 +29,9 @@ export default function ContinueGuest({ navigation }) {
       const activeDil = (await storageGet('language')) || i18n.locale || 'en';
 
       const res = await ai.post('login', {
+        email: 'HG1000',
         kod: 'HG1000',
+        password: '123',
         sifre: '123',
         dil: activeDil,
       });

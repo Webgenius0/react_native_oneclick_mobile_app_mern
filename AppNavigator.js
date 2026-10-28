@@ -126,7 +126,9 @@ function AuthAfterTabNavigator() {
                 <AccountTabIcon
                   width={24}
                   height={24}
+                  size={size}
                   stroke={fill}
+                  color={fill}
                 />
               );
           }
@@ -236,6 +238,7 @@ export default function AppNavigator() {
         () => {},
       );
     } catch (e) {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (state.loading) {

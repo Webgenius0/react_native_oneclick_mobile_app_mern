@@ -98,13 +98,16 @@ export default function PersonalInformation({ navigation }) {
       return;
     }
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctx?.token]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
       const payload = {
+        name: fullName,
         ad: fullName,
+        phone: phoneNumber,
         tel: phoneNumber,
         email: emailAddress,
         eposta: emailAddress,

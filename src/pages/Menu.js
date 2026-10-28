@@ -1,18 +1,12 @@
 import { Text, TouchableOpacity, View, StyleSheet, ScrollView, SafeAreaView } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import GlobalStyle from "../assets/GlobalStyle";
 
-import { CommonActions } from "@react-navigation/native";
-import { storageDelete } from "../helpers/storage";
 import { useContext } from "react";
 import { EmContext } from "../contexts/EmContext";
-import * as RootNavigation from "../services/RootNavigation";
 
-import { useUserStore } from "../store/useUserStore";
 import { logoutUser } from "../helpers/auth";
 
 export default function ({ navigation }) {
-  const { setCtx } = useContext(EmContext);
   const { setCtx } = useContext(EmContext);
 
 
