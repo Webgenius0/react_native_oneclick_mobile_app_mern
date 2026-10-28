@@ -11,7 +11,8 @@ import * as RootNavigation from "../services/RootNavigation";
 import { useUserStore } from "../store/useUserStore";
 import { logoutUser } from "../helpers/auth";
 
-export default function ({navigation}) {
+export default function ({ navigation }) {
+  const { setCtx } = useContext(EmContext);
   const { setCtx } = useContext(EmContext);
 
 
@@ -29,16 +30,16 @@ export default function ({navigation}) {
 
   const getParam = (t) => {
     let obj = null;
-    switch(t) {
+    switch (t) {
       case 'Category':
-        obj = {id: 1};
-      break;
+        obj = { id: 1 };
+        break;
       case 'Webview':
-        obj = {url: 'https://www.trendyol.com/mango/relaxed-fit-pamuklu-tisort-p-251948038', ad: "Trendyol"};
-      break;
+        obj = { url: 'https://www.trendyol.com/mango/relaxed-fit-pamuklu-tisort-p-251948038', ad: "Trendyol" };
+        break;
       case 'Cart':
-        obj = {url: 'https://www.trendyol.com/mango/relaxed-fit-pamuklu-tisort-p-251948038', ad: "Trendyol"};
-      break;
+        obj = { url: 'https://www.trendyol.com/mango/relaxed-fit-pamuklu-tisort-p-251948038', ad: "Trendyol" };
+        break;
     }
     return obj;
   }
@@ -51,28 +52,28 @@ export default function ({navigation}) {
   return (
     <SafeAreaView style={GlobalStyle.safeArea}>
 
-    <ScrollView style={{flex: 1,}}>
-      {
-        menus.map((text, index) => (
-          <View style={styles.row} key={index}>
-            <TouchableOpacity
-              onPress={() => navigation.navigate(text, getParam(text))}
-              style={styles.button}>
-              <Text style={styles.text}>{text}</Text>
-            </TouchableOpacity>
-          </View>
-        ))
-      }
+      <ScrollView style={{ flex: 1, }}>
+        {
+          menus.map((text, index) => (
+            <View style={styles.row} key={index}>
+              <TouchableOpacity
+                onPress={() => navigation.navigate(text, getParam(text))}
+                style={styles.button}>
+                <Text style={styles.text}>{text}</Text>
+              </TouchableOpacity>
+            </View>
+          ))
+        }
 
-      <View style={styles.row}>
-        <TouchableOpacity
-          onPress={async () => handleLogout()}
-          style={styles.button}>
-          <Text style={styles.text}>Logout</Text>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.row}>
+          <TouchableOpacity
+            onPress={async () => handleLogout()}
+            style={styles.button}>
+            <Text style={styles.text}>Logout</Text>
+          </TouchableOpacity>
+        </View>
 
-    </ScrollView>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -88,7 +89,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "gray",
   },
-  button:{
+  button: {
     backgroundColor: '#DDDDDD',
     width: '100%',
     padding: 10,
