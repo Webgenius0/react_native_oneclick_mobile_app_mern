@@ -81,8 +81,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   leftContainer: {
-    width: 60,
+    minWidth: 44,
     alignItems: 'flex-start',
+    justifyContent: 'center',
   },
   backButton: {
     width: 40,
@@ -103,6 +104,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 6,
   },
   title: {
     fontSize: 18,
@@ -110,8 +112,9 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
   rightContainer: {
-    width: 60,
+    minWidth: 44,
     alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   rightButton: {
     paddingVertical: 6,

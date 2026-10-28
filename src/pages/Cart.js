@@ -31,6 +31,7 @@ import {
 } from '../helpers/currencyHelper';
 import { cleanProductTitle, getStoreName } from '../helpers/storeHelper';
 import CartIcon from '../assets/svg/cart.svg';
+import TrashIcon from '../assets/svg/trash.svg';
 
 if (
   Platform.OS === 'android' &&
@@ -263,21 +264,33 @@ export default function CartPage({ navigation }) {
         backgroundColor={cardBg}
       />
 
-      {/* Figma Header: Cart (X items) & Clear Cart */}
+      {/* Header: Cart (item count) & Clear Cart */}
       <AppHeader
         navigation={navigation}
         showBack={navigation.canGoBack()}
-        title={`${tr('Cart') || 'Cart'} (${totalItems} ${
-          tr('items') || 'items'
-        })`}
+        title={`${tr('Cart') || 'Cart'}${
+          items.length > 0 ? ` (${items.length})` : ''
+        }`}
         rightComponent={
           items.length > 0 ? (
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={handleClearCart}
-              style={styles.clearCartBtn}>
-              <Text style={styles.clearCartText}>
-                {tr('Clear Cart') || 'Clear Cart'}
+              style={[
+                styles.clearCartBtn,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(239, 68, 68, 0.15)'
+                    : '#FEF2F2',
+                  borderColor: isDark
+                    ? 'rgba(239, 68, 68, 0.3)'
+                    : '#FEE2E2',
+                },
+              ]}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <TrashIcon width={13} height={13} fill="#EF4444" />
+              <Text style={styles.clearCartText} numberOfLines={1}>
+                {tr('Clear') || 'Clear'}
               </Text>
             </TouchableOpacity>
           ) : null
@@ -452,13 +465,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   clearCartBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 5,
+    paddingHorizontal: 9,
+    borderRadius: 16,
+    borderWidth: 1,
   },
   clearCartText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
-    color: '#F67922',
+    color: '#EF4444',
+    marginLeft: 4,
   },
   scroll: {
     flex: 1,

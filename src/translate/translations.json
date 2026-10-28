@@ -368,7 +368,8 @@
         "Color": "Renk",
         "Weight": "Ağırlık",
         "Volume": "Hacim / Kapasite",
-        "Variant": "Varyant"
+        "Variant": "Varyant",
+        "Clear": "Temizle"
     },
     "en": {
         "Express": "Express",
@@ -739,7 +740,8 @@
         "Color": "Color",
         "Weight": "Weight",
         "Volume": "Volume",
-        "Variant": "Variant"
+        "Variant": "Variant",
+        "Clear": "Clear"
     },
     "som": {
         "Express": "Express",
@@ -1110,6 +1112,7 @@
         "Color": "Midab",
         "Weight": "Miisaan",
         "Volume": "Mug / Awood",
-        "Variant": "Kala duwanaansho"
+        "Variant": "Kala duwanaansho",
+        "Clear": "Tirtir"
     }
 }

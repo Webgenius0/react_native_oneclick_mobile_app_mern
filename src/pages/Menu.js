@@ -13,7 +13,6 @@ import { logoutUser } from "../helpers/auth";
 
 export default function ({ navigation }) {
   const { setCtx } = useContext(EmContext);
-  const { setCtx } = useContext(EmContext);
 
 
   const menus = [
