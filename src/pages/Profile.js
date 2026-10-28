@@ -133,6 +133,7 @@ export default function Profile({ navigation }) {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSave = async () => {
@@ -144,6 +145,7 @@ export default function Profile({ navigation }) {
     setState(prev => ({ ...prev, updating: true }));
     try {
       const payload = {
+        phone: tel,
         tel: tel,
         adres: adres,
         email: email,

@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
 import {
   Text,
   View,
@@ -7,6 +7,8 @@ import {
   ScrollView,
   StatusBar,
   Linking,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
@@ -14,55 +16,79 @@ import moment from 'moment';
 import AppHeader from '../components/common/AppHeader';
 import { tr } from '../translate/i18n';
 import { EmContext } from '../contexts/EmContext';
+import ai from '../helpers/ai';
+import { supportPhone } from '../../config';
 import WhatsAppIcon from '../assets/svg/whatsapp.svg';
 
-const TIMELINE_STEPS = [
-  { id: 1, title: 'Order Placed', durums: [1] },
-  { id: 2, title: 'Order Confirmed', durums: [18, 19, 73] },
-  { id: 3, title: 'Preparing Your Order', durums: [2, 14, 15] },
-  { id: 4, title: 'Shipped', durums: [3, 4] },
-  { id: 5, title: 'Out for Delivery', durums: [5, 11] },
-  { id: 6, title: 'Delivered', durums: [6] },
+const DEFAULT_TIMELINE_STEPS = [
+  { step: 1, key: 'order_placed', title: 'Order Placed', description: 'Your order has been submitted successfully.', state: 'completed', is_completed: true, is_current: false, date: null },
+  { step: 2, key: 'order_confirmed', title: 'Order Confirmed', description: 'Payment confirmed and order verified.', state: 'completed', is_completed: true, is_current: false, date: null },
+  { step: 3, key: 'preparing', title: 'Preparing Your Order', description: 'Items are being procured and prepared at the fulfillment hub.', state: 'current', is_completed: false, is_current: true, date: null },
+  { step: 4, key: 'shipped', title: 'Shipped', description: 'Package dispatched in international cargo transit.', state: 'pending', is_completed: false, is_current: false, date: null },
+  { step: 5, key: 'out_for_delivery', title: 'Out for Delivery', description: 'Assigned to local delivery agent for doorstep delivery.', state: 'pending', is_completed: false, is_current: false, date: null },
+  { step: 6, key: 'delivered', title: 'Delivered', description: 'Package has been delivered to customer.', state: 'pending', is_completed: false, is_current: false, date: null },
 ];
 
 export default function TrackOrder({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { ctx } = useContext(EmContext);
 
-  const order = route.params?.s || {};
-  const orderId = route.params?.id || order.id || '1CLK-582941';
-  const rawDate = order.tarih || new Date();
-  const formattedDate = route.params?.formattedDate || moment(rawDate).format('MMM DD, YYYY');
-  const expectedDate = moment(rawDate).add(3, 'days').format('MMM DD, YYYY');
+  const orderParam = route.params?.s || {};
+  const orderId = route.params?.id || orderParam.id || '1CLK-582941';
+  const grupId = route.params?.grupID || orderParam.grupID || orderParam.id;
 
-  const statusNum = parseInt(order.durum || 2, 10);
-  let activeStepIndex = 2; // Default to 'Preparing Your Order' (index 2 in 0-indexed)
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [customerTracking, setCustomerTracking] = useState(null);
 
-  if (statusNum === 6) {
-    activeStepIndex = 5;
-  } else if ([5, 11].includes(statusNum)) {
-    activeStepIndex = 4;
-  } else if ([3, 4].includes(statusNum)) {
-    activeStepIndex = 3;
-  } else if ([2, 14, 15].includes(statusNum)) {
-    activeStepIndex = 2;
-  } else if ([18, 19, 73].includes(statusNum)) {
-    activeStepIndex = 1;
-  } else {
-    activeStepIndex = 0;
-  }
+  // Fallback defaults if API call fails or while loading
+  const rawDate = orderParam.tarih || new Date();
+  const initialFormattedDate = route.params?.formattedDate || moment(rawDate).format('MMM DD, YYYY');
+  const initialExpectedDate = moment(rawDate).add(3, 'days').format('MMM DD, YYYY');
 
-  const statusTitle =
-    activeStepIndex === 5
-      ? 'Delivered'
-      : activeStepIndex >= 2
-      ? 'In Progress'
-      : 'Order Confirmed';
+  const fetchTracking = useCallback(async (isRefresh = false) => {
+    if (!isRefresh) {
+      setLoading(true);
+    }
+    try {
+      // Primary v4 endpoint: GET /api/order-tracking?id={orderId}
+      const res = await ai.get('order-tracking', {
+        params: {
+          id: orderId,
+          ...(grupId ? { grupID: grupId } : {}),
+        },
+      });
 
-  const statusDesc =
-    activeStepIndex === 5
-      ? 'Your order has been delivered successfully.'
-      : `Your order is on the way. Expected delivery on ${expectedDate}`;
+      if (res?.data && res.data.error === false && res.data.customer_tracking) {
+        setCustomerTracking(res.data.customer_tracking);
+      }
+    } catch (e) {
+      console.log('fetchTracking API note:', e?.message || e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [orderId, grupId]);
+
+  useEffect(() => {
+    fetchTracking();
+  }, [fetchTracking]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchTracking(true);
+  }, [fetchTracking]);
+
+  // Derive display values from customer_tracking or fallback to params
+  const orderNumber = customerTracking?.order_number || `Order #${orderId}`;
+  const orderDate = customerTracking?.order_date || initialFormattedDate;
+  const statusTitle = customerTracking?.status_title || route.params?.statusText || 'In Progress';
+  const statusDesc = customerTracking?.status_subtitle || `Your order is on the way. Expected delivery on ${initialExpectedDate}`;
+  const badgeColor = customerTracking?.status_badge_color || 'blue';
+
+  const steps = (customerTracking?.steps && Array.isArray(customerTracking.steps) && customerTracking.steps.length > 0)
+    ? customerTracking.steps
+    : DEFAULT_TIMELINE_STEPS;
 
   const isDark = ctx?.isDark;
   const pageBg = isDark ? '#111827' : '#F8FAFC';
@@ -80,7 +106,7 @@ export default function TrackOrder({ route, navigation }) {
         backgroundColor={cardBg}
       />
 
-      {/* Figma Header */}
+      {/* Header */}
       <AppHeader
         navigation={navigation}
         showBack={true}
@@ -95,139 +121,192 @@ export default function TrackOrder({ route, navigation }) {
       <ScrollView
         style={[styles.container, { backgroundColor: pageBg }]}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
-        {/* Top Order Card (Figma) */}
-        <View
-          style={[
-            styles.sectionCard,
-            { backgroundColor: cardBg, borderColor: borderColor },
-          ]}>
-          <View style={styles.orderTopHeader}>
-            <Text style={[styles.orderNumberTitle, { color: textColor }]}>
-              Order #{orderId}
-            </Text>
-            <Text style={[styles.orderDateTitle, { color: subTextColor }]}>
-              {formattedDate}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#F67922']}
+            tintColor="#F67922"
+          />
+        }>
+        {loading && !customerTracking ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="large" color="#F67922" />
+            <Text style={[styles.loadingText, { color: subTextColor }]}>
+              {tr('Tracking order status...') || 'Tracking order status...'}
             </Text>
           </View>
+        ) : (
+          <>
+            {/* Top Order Info Card */}
+            <View
+              style={[
+                styles.sectionCard,
+                { backgroundColor: cardBg, borderColor: borderColor },
+              ]}>
+              <View style={styles.orderTopHeader}>
+                <Text style={[styles.orderNumberTitle, { color: textColor }]}>
+                  {orderNumber}
+                </Text>
+                <Text style={[styles.orderDateTitle, { color: subTextColor }]}>
+                  {orderDate}
+                </Text>
+              </View>
 
-          {/* Status Banner */}
-          <View style={styles.statusBannerWrap}>
-            <View style={styles.statusTruckCircle}>
-              <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-                <Path
-                  d="M1 3h15v13H1zM16 8h4l3 3v5h-7V8z"
-                  stroke="#2563EB"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <Path
-                  d="M5.5 18a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM18.5 18a2.5 2.5 0 100-5 2.5 2.5 0 000 5z"
-                  fill="#2563EB"
-                />
-              </Svg>
-            </View>
-            <View style={styles.statusBannerTextCol}>
-              <Text style={styles.statusBannerTitle}>
-                {tr(statusTitle) || statusTitle}
-              </Text>
-              <Text style={[styles.statusBannerDesc, { color: subTextColor }]}>
-                {statusDesc}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Order Tracking Timeline Card (Figma) */}
-        <View
-          style={[
-            styles.sectionCard,
-            { backgroundColor: cardBg, borderColor: borderColor },
-          ]}>
-          <Text style={[styles.sectionTitle, { color: textColor }]}>
-            {tr('Order Tracking') || 'Order Tracking'}
-          </Text>
-
-          <View style={styles.timelineList}>
-            {TIMELINE_STEPS.map((step, idx) => {
-              const isCompleted = idx < activeStepIndex;
-              const isCurrent = idx === activeStepIndex;
-              const isPending = idx > activeStepIndex;
-              const isLast = idx === TIMELINE_STEPS.length - 1;
-
-              return (
-                <View key={step.id} style={styles.stepRow}>
-                  {/* Stepper Indicator & Vertical Line */}
-                  <View style={styles.indicatorCol}>
-                    {isCompleted ? (
-                      <View style={styles.completedCircle}>
-                        <Text style={styles.checkmark}>✓</Text>
-                      </View>
-                    ) : isCurrent ? (
-                      <View style={styles.currentOuterCircle}>
-                        <View style={styles.currentInnerDot} />
-                      </View>
-                    ) : (
-                      <View style={styles.pendingCircle} />
-                    )}
-
-                    {!isLast && (
-                      <View
-                        style={[
-                          styles.verticalLine,
-                          {
-                            backgroundColor:
-                              idx < activeStepIndex ? '#16A34A' : '#E2E8F0',
-                          },
-                        ]}
-                      />
-                    )}
-                  </View>
-
-                  {/* Step Content */}
-                  <View style={styles.stepContentCol}>
-                    <Text
-                      style={[
-                        styles.stepTitle,
-                        {
-                          color: isPending ? subTextColor : textColor,
-                          fontWeight: isCurrent ? '700' : '600',
-                        },
-                      ]}>
-                      {tr(step.title) || step.title}
-                    </Text>
-
-                    {(isCompleted || isCurrent) ? (
-                      <Text
-                        style={[styles.stepTimestamp, { color: subTextColor }]}>
-                        {formattedDate} • 10:32 AM
-                      </Text>
-                    ) : null}
-                  </View>
+              {/* Status Banner */}
+              <View
+                style={[
+                  styles.statusBannerWrap,
+                  badgeColor === 'green'
+                    ? { backgroundColor: '#DCFCE7' }
+                    : badgeColor === 'red'
+                    ? { backgroundColor: '#FEE2E2' }
+                    : { backgroundColor: '#EFF6FF' },
+                ]}>
+                <View
+                  style={[
+                    styles.statusTruckCircle,
+                    badgeColor === 'green'
+                      ? { backgroundColor: '#BBF7D0' }
+                      : badgeColor === 'red'
+                      ? { backgroundColor: '#FECACA' }
+                      : { backgroundColor: '#DBEAFE' },
+                  ]}>
+                  <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+                    <Path
+                      d="M1 3h15v13H1zM16 8h4l3 3v5h-7V8z"
+                      stroke={badgeColor === 'green' ? '#16A34A' : badgeColor === 'red' ? '#DC2626' : '#2563EB'}
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <Path
+                      d="M5.5 18a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM18.5 18a2.5 2.5 0 100-5 2.5 2.5 0 000 5z"
+                      fill={badgeColor === 'green' ? '#16A34A' : badgeColor === 'red' ? '#DC2626' : '#2563EB'}
+                    />
+                  </Svg>
                 </View>
-              );
-            })}
-          </View>
-        </View>
+                <View style={styles.statusBannerTextCol}>
+                  <Text
+                    style={[
+                      styles.statusBannerTitle,
+                      badgeColor === 'green'
+                        ? { color: '#16A34A' }
+                        : badgeColor === 'red'
+                        ? { color: '#DC2626' }
+                        : { color: '#2563EB' },
+                    ]}>
+                    {tr(statusTitle) || statusTitle}
+                  </Text>
+                  <Text style={[styles.statusBannerDesc, { color: subTextColor }]}>
+                    {statusDesc}
+                  </Text>
+                </View>
+              </View>
+            </View>
 
-        {/* Help CTA */}
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={() => {
-            const text = encodeURIComponent(
-              `Hello 1Click Support, I want to track my Order #${orderId}`,
-            );
-            Linking.openURL(`https://wa.me/+90?text=${text}`).catch(e => {
-              console.log('WhatsApp open error:', e);
-            });
-          }}
-          style={styles.whatsAppBtn}>
-          <WhatsAppIcon width={20} height={20} fill="#FFFFFF" />
-          <Text style={styles.whatsAppBtnText}>
-            {tr('Need Help? Contact Support') || 'Need Help? Contact Support'}
-          </Text>
-        </TouchableOpacity>
+            {/* 6-Step Order Tracking Timeline Card */}
+            <View
+              style={[
+                styles.sectionCard,
+                { backgroundColor: cardBg, borderColor: borderColor },
+              ]}>
+              <Text style={[styles.sectionTitle, { color: textColor }]}>
+                {tr('Order Tracking') || 'Order Tracking'}
+              </Text>
+
+              <View style={styles.timelineList}>
+                {steps.map((stepItem, idx) => {
+                  const state = stepItem.state || (stepItem.is_completed ? 'completed' : stepItem.is_current ? 'current' : 'pending');
+                  const isCompleted = state === 'completed';
+                  const isCurrent = state === 'current';
+                  const isPending = state === 'pending';
+                  const isLast = idx === steps.length - 1;
+
+                  return (
+                    <View key={stepItem.key || stepItem.step || idx} style={styles.stepRow}>
+                      {/* Stepper Indicator & Vertical Line */}
+                      <View style={styles.indicatorCol}>
+                        {isCompleted ? (
+                          <View style={styles.completedCircle}>
+                            <Text style={styles.checkmark}>✓</Text>
+                          </View>
+                        ) : isCurrent ? (
+                          <View style={styles.currentOuterCircle}>
+                            <View style={styles.currentInnerDot} />
+                          </View>
+                        ) : (
+                          <View style={styles.pendingCircle} />
+                        )}
+
+                        {!isLast && (
+                          <View
+                            style={[
+                              styles.verticalLine,
+                              {
+                                backgroundColor: isCompleted ? '#10B981' : isCurrent ? '#F97316' : '#E2E8F0',
+                              },
+                            ]}
+                          />
+                        )}
+                      </View>
+
+                      {/* Step Content */}
+                      <View style={styles.stepContentCol}>
+                        <Text
+                          style={[
+                            styles.stepTitle,
+                            {
+                              color: isPending ? subTextColor : textColor,
+                              fontWeight: isCurrent ? '700' : '600',
+                            },
+                          ]}>
+                          {tr(stepItem.title) || stepItem.title}
+                        </Text>
+
+                        {stepItem.description ? (
+                          <Text style={[styles.stepDesc, { color: subTextColor }]}>
+                            {tr(stepItem.description) || stepItem.description}
+                          </Text>
+                        ) : null}
+
+                        {stepItem.date ? (
+                          <Text style={[styles.stepTimestamp, { color: subTextColor }]}>
+                            {stepItem.date}
+                          </Text>
+                        ) : isCompleted || isCurrent ? (
+                          <Text style={[styles.stepTimestamp, { color: subTextColor }]}>
+                            {orderDate}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Help / WhatsApp CTA */}
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => {
+                const phoneClean = (supportPhone || '+252637979636').replace(/[^0-9]/g, '');
+                const text = encodeURIComponent(
+                  `Hello 1Click Support, I want to track my ${orderNumber}`,
+                );
+                Linking.openURL(`https://wa.me/${phoneClean}?text=${text}`).catch(e => {
+                  console.log('WhatsApp open error:', e);
+                });
+              }}
+              style={styles.whatsAppBtn}>
+              <WhatsAppIcon width={20} height={20} fill="#FFFFFF" />
+              <Text style={styles.whatsAppBtnText}>
+                {tr('Need Help? Contact Support') || 'Need Help? Contact Support'}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -244,6 +323,15 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     paddingBottom: 40,
+  },
+  loadingWrap: {
+    paddingVertical: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
   },
   sectionCard: {
     borderRadius: 14,
@@ -318,7 +406,7 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: '#16A34A',
+    backgroundColor: '#10B981',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -332,7 +420,7 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     borderWidth: 2.5,
-    borderColor: '#F67922',
+    borderColor: '#F97316',
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
@@ -341,32 +429,39 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#F67922',
+    backgroundColor: '#F97316',
   },
   pendingCircle: {
     width: 14,
     height: 14,
     borderRadius: 7,
-    backgroundColor: '#CBD5E1',
+    backgroundColor: '#E2E8F0',
     marginVertical: 4,
   },
   verticalLine: {
     width: 2,
-    height: 42,
+    minHeight: 46,
+    flex: 1,
     marginVertical: 2,
   },
   stepContentCol: {
     flex: 1,
     paddingLeft: 12,
     paddingTop: 1,
-    marginBottom: 18,
+    marginBottom: 20,
   },
   stepTitle: {
     fontSize: 14,
-    marginBottom: 3,
+    marginBottom: 2,
+  },
+  stepDesc: {
+    fontSize: 12,
+    lineHeight: 16,
+    marginBottom: 4,
   },
   stepTimestamp: {
-    fontSize: 12,
+    fontSize: 11,
+    marginTop: 2,
   },
   whatsAppBtn: {
     flexDirection: 'row',

@@ -26,43 +26,81 @@ const GroupItem = React.memo(function GroupItem({
   const orders = s.orders || [s];
   const firstOrder = orders[0] || {};
   const orderId = s.id || firstOrder.id || '1CLK-582941';
-  const totalAmount = parseFloat(s.tutar || firstOrder.tutar || 0).toFixed(2);
-  const itemCount = orders.reduce((sum, o) => sum + (Number(o.sayi) || 1), 0);
+  const orderNumber = s.order_number || `Order #${orderId}`;
 
-  // Status mapping
+  // Item count calculation (supports both new items_count/items_text and legacy orders array)
+  const legacyItemCount = orders.reduce((sum, o) => sum + (Number(o.sayi) || 1), 0);
+  const itemsText = s.items_text || (s.items_count !== undefined
+    ? `${s.items_count} ${s.items_count === 1 ? 'item' : 'items'}`
+    : `${legacyItemCount} ${legacyItemCount === 1 ? 'item' : 'items'}`);
+
+  // Format Date (supports s.formatted_date or calculates from s.tarih)
+  const rawDate = s.tarih || firstOrder.tarih;
+  const formattedDate = s.formatted_date || (rawDate
+    ? moment(rawDate).format('MMM DD, YYYY')
+    : 'Sep 29, 2026');
+
+  // Status mapping & badges
   const statusNum = parseInt(s.durum !== undefined ? s.durum : firstOrder.durum || 1, 10);
-  let statusText = 'Pending';
+  let statusText = s.app_status_text || s.durum_text || 'Pending';
   let badgeBg = '#FEF3C7';
   let badgeColor = '#D97706';
-  let isTrackable = true;
+  let isTrackable = s.can_track !== undefined ? Boolean(s.can_track) : true;
 
-  if ([6].includes(statusNum)) {
-    statusText = 'Delivered';
-    badgeBg = '#DCFCE7';
-    badgeColor = '#16A34A';
-    isTrackable = false;
-  } else if ([2, 3, 4, 5, 11].includes(statusNum)) {
-    statusText = 'In Progress';
-    badgeBg = '#EFF6FF';
-    badgeColor = '#2563EB';
-    isTrackable = true;
-  } else if ([7, 8, 9, 10, 12, 13, 17].includes(statusNum)) {
-    statusText = 'Canceled';
-    badgeBg = '#FEE2E2';
-    badgeColor = '#DC2626';
-    isTrackable = false;
+  if (s.app_badge_color) {
+    switch (s.app_badge_color.toLowerCase()) {
+      case 'green':
+        badgeBg = '#DCFCE7';
+        badgeColor = '#16A34A';
+        break;
+      case 'blue':
+        badgeBg = '#EFF6FF';
+        badgeColor = '#2563EB';
+        break;
+      case 'red':
+        badgeBg = '#FEE2E2';
+        badgeColor = '#DC2626';
+        break;
+      case 'orange':
+      default:
+        badgeBg = '#FEF3C7';
+        badgeColor = '#D97706';
+        break;
+    }
   } else {
-    statusText = 'Pending';
-    badgeBg = '#FEF3C7';
-    badgeColor = '#D97706';
-    isTrackable = true;
+    // Fallback to numeric status mapping
+    if ([6].includes(statusNum)) {
+      statusText = 'Delivered';
+      badgeBg = '#DCFCE7';
+      badgeColor = '#16A34A';
+      isTrackable = false;
+    } else if ([2, 3, 4, 5, 11].includes(statusNum)) {
+      statusText = 'In Progress';
+      badgeBg = '#EFF6FF';
+      badgeColor = '#2563EB';
+      isTrackable = true;
+    } else if ([7, 8, 9, 10, 12, 13, 17].includes(statusNum)) {
+      statusText = 'Canceled';
+      badgeBg = '#FEE2E2';
+      badgeColor = '#DC2626';
+      isTrackable = false;
+    } else {
+      statusText = 'Pending';
+      badgeBg = '#FEF3C7';
+      badgeColor = '#D97706';
+      isTrackable = true;
+    }
   }
 
-  // Format Date
-  const rawDate = s.tarih || firstOrder.tarih;
-  const formattedDate = rawDate
-    ? moment(rawDate).format('MMM DD, YYYY')
-    : 'Sep 29, 2026';
+  // Total price formatted
+  const displayTotal = s.total_formatted || (s.total_usd !== undefined
+    ? `$${parseFloat(s.total_usd).toFixed(2)}`
+    : `$${parseFloat(s.tutar || firstOrder.tutar || 0).toFixed(2)}`);
+
+  // Images list (supports s.images array or legacy order items)
+  const imageList = Array.isArray(s.images) && s.images.length > 0
+    ? s.images
+    : orders.map(o => o.resim || o.img || o.image).filter(Boolean);
 
   const handleViewDetails = () => {
     navigation.navigate('OrderDetail', {
@@ -90,7 +128,7 @@ const GroupItem = React.memo(function GroupItem({
       {/* Top Header Row */}
       <View style={styles.topRow}>
         <Text style={[styles.orderNumber, { color: textColor }]}>
-          Order #{orderId}
+          {orderNumber}
         </Text>
         <View style={[styles.statusBadge, { backgroundColor: badgeBg }]}>
           <Text style={[styles.statusBadgeText, { color: badgeColor }]}>
@@ -101,39 +139,36 @@ const GroupItem = React.memo(function GroupItem({
 
       {/* Date & Item Count */}
       <Text style={[styles.dateText, { color: subTextColor }]}>
-        {formattedDate} • {itemCount} {itemCount === 1 ? 'item' : 'items'}
+        {formattedDate} • {itemsText}
       </Text>
 
       {/* Thumbnails Row & Total Price */}
       <View style={styles.middleRow}>
         <View style={styles.thumbsRow}>
-          {orders.slice(0, 4).map((order, idx) => {
-            const imgUri = order.resim || order.img || order.image;
-            return (
-              <View
-                key={idx}
-                style={[
-                  styles.thumbBox,
-                  { borderColor: borderColor, backgroundColor: '#FFFFFF' },
-                ]}>
-                {imgUri ? (
-                  <FastImage
-                    source={{ uri: imgUri }}
-                    style={styles.thumbImage}
-                    resizeMode={FastImage.resizeMode.contain}
-                  />
-                ) : (
-                  <View style={styles.thumbPlaceholder}>
-                    <Text style={styles.thumbPlaceholderText}>IMG</Text>
-                  </View>
-                )}
-              </View>
-            );
-          })}
+          {(imageList.length > 0 ? imageList.slice(0, 4) : [null]).map((imgUri, idx) => (
+            <View
+              key={idx}
+              style={[
+                styles.thumbBox,
+                { borderColor: borderColor, backgroundColor: '#FFFFFF' },
+              ]}>
+              {imgUri ? (
+                <FastImage
+                  source={{ uri: imgUri }}
+                  style={styles.thumbImage}
+                  resizeMode={FastImage.resizeMode.contain}
+                />
+              ) : (
+                <View style={styles.thumbPlaceholder}>
+                  <Text style={styles.thumbPlaceholderText}>IMG</Text>
+                </View>
+              )}
+            </View>
+          ))}
         </View>
 
         <Text style={[styles.totalPriceText, { color: textColor }]}>
-          {tr('Total') || 'Total'}: ${totalAmount}
+          {tr('Total') || 'Total'}: {displayTotal}
         </Text>
       </View>
 

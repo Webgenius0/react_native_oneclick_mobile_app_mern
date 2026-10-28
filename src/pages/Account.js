@@ -1,10 +1,6 @@
 import React, { useContext, useEffect, useState, useCallback } from 'react';
 import {
-  Alert,
-  Dimensions,
   Image,
-  Linking,
-  Platform,
   RefreshControl,
   ScrollView,
   StatusBar,
@@ -19,13 +15,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmContext } from '../contexts/EmContext';
 import ai from '../helpers/ai';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CommonActions, useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import { availableLanguages, i18n, tr } from '../translate/i18n';
 import { storageDelete, storageGet, storageSet } from '../helpers/storage';
 import { getFcmToken } from '../helpers/notification';
-import { useUserStore } from '../store/useUserStore';
 import * as RootNavigation from '../services/RootNavigation';
-import { logoutUser } from '../helpers/auth';
+import { logoutUser, setUser } from '../helpers/auth';
 
 // SVG Icons matching Figma design
 import ProfileIcon from '../assets/svg/profile1.svg';
@@ -39,19 +34,11 @@ import DocIcon from '../assets/svg/menu_doc.svg';
 import LogoutIcon from '../assets/svg/menu_logout.svg';
 import ChevronRightIcon from '../assets/svg/chevron_right.svg';
 
-const { width } = Dimensions.get('window');
-
 export default function Account({ navigation }) {
   const { ctx, setCtx, ctxDil, setCtxDil } = useContext(EmContext);
 
   const initialUser = ctx?.user || null;
-  const initialIsGuest =
-    !initialUser ||
-    (!initialUser?.token && !ctx?.token) ||
-    initialUser?.kod === 'GUEST' ||
-    initialUser?.kod === 'HG1000' ||
-    initialUser?.token === 'GUEST' ||
-    ctx?.token === 'GUEST';
+  const initialIsGuest = !initialUser || !Object.keys(initialUser).length;
 
   const [state, setState] = useState({
     s: initialUser || {},
@@ -63,78 +50,112 @@ export default function Account({ navigation }) {
   const [langModalVisible, setLangModalVisible] = useState(false);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
 
-  const fetchData = async (isRefresh = false) => {
-    try {
-      if (isRefresh) {
-        setRefreshing(true);
-      }
-
-      const isGuestStorage = (await storageGet('is_guest')) === '1';
-      const currentUser = (await storageGet('user')) || ctx?.user;
-      const isGuest =
-        isGuestStorage ||
-        currentUser?.kod === 'GUEST' ||
-        currentUser?.kod === 'HG1000' ||
-        currentUser?.token === 'GUEST' ||
-        ctx?.user?.kod === 'GUEST' ||
-        ctx?.user?.kod === 'HG1000' ||
-        ctx?.token === 'GUEST';
-
-      if (isGuest || !currentUser || (!currentUser.token && !ctx?.token)) {
-        setState({
-          s: currentUser || { kod: 'HG1000', ad: 'Guest' },
-          loading: false,
-          isGuest: true,
-        });
-        return;
-      }
-
-      setState(prev => ({
-        ...prev,
-        s: currentUser,
-        isGuest: false,
-        loading: false,
-      }));
-
-      const c = await ai.get('profile');
-      if (c?.data && c.data.error === false) {
-        const freshUser = c.data.s || currentUser || {};
-        setState({
-          s: freshUser,
-          loading: false,
-          isGuest: false,
-        });
-        if (c.data.s) {
-          await storageSet('user', c.data.s);
-        }
-      } else if (!currentUser) {
-        setState({
-          s: {},
-          loading: false,
-          isGuest: false,
-        });
-      }
-    } catch (err) {
-      console.log('Account fetchData error:', err);
-    } finally {
-      setRefreshing(false);
-      setState(prev => ({ ...prev, loading: false }));
-    }
+  const handleLogout = async () => {
+    await logoutUser(navigation, setCtx);
   };
+
+  const fetchData = useCallback(
+    async (isRefresh = false) => {
+      try {
+        if (isRefresh) {
+          setRefreshing(true);
+        }
+
+        const currentUser = (await storageGet('user')) || ctx?.user;
+        const storedToken =
+          (await storageGet('auth_token')) ||
+          (await AsyncStorage.getItem('auth_token')) ||
+          currentUser?.token ||
+          ctx?.token;
+
+        // Check if user has an active session (real user or dummy user)
+        const hasUserSession = Boolean(
+          currentUser &&
+          (currentUser.id || currentUser.kod || currentUser.email || currentUser.ad || currentUser.name || currentUser.tel || storedToken),
+        );
+
+        if (!hasUserSession) {
+          setState({
+            s: {},
+            loading: false,
+            isGuest: true,
+          });
+          return;
+        }
+
+        // Active authenticated session (real user or dummy/mock user)
+        const activeUser = {
+          ...currentUser,
+          token: storedToken || currentUser?.token,
+        };
+
+        setState({
+          s: activeUser,
+          isGuest: false,
+          loading: false,
+        });
+
+        if (setCtx && (!ctx?.user || !ctx?.token)) {
+          setCtx(prev => ({
+            ...prev,
+            user: activeUser,
+            token: activeUser.token,
+          }));
+        }
+
+        // Only call profile API if token looks like a real server JWT/bearer token (not offline mock)
+        if (
+          storedToken &&
+          storedToken !== 'GUEST' &&
+          !String(storedToken).startsWith('mock-token-') &&
+          String(storedToken).trim().length > 10
+        ) {
+          try {
+            const c = await ai.get('profile');
+            if (c?.data && c.data.error === false) {
+              const profileData = c.data.user || c.data.s || {};
+              const freshUser = {
+                ...activeUser,
+                ...profileData,
+                token: storedToken,
+              };
+              setState({
+                s: freshUser,
+                loading: false,
+                isGuest: false,
+              });
+              await setUser(freshUser);
+              if (setCtx) {
+                setCtx(prev => ({
+                  ...prev,
+                  user: freshUser,
+                  token: storedToken,
+                }));
+              }
+            }
+          } catch (profileErr) {
+            console.log('Account profile fetch note:', profileErr?.message);
+          }
+        }
+      } catch (err) {
+        console.log('Account fetchData error:', err);
+      } finally {
+        setRefreshing(false);
+        setState(prev => ({ ...prev, loading: false }));
+      }
+    },
+    [ctx?.user, ctx?.token, setCtx],
+  );
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   useFocusEffect(
     useCallback(() => {
       fetchData();
-    }, [ctx?.user, ctx?.token]),
+    }, [fetchData]),
   );
-
-  const handleLogout = async () => {
-    await logoutUser(navigation, setCtx);
-  };
 
   const handleGoToLogin = async () => {
     try {
@@ -199,16 +220,13 @@ export default function Account({ navigation }) {
   const userDisplayName =
     state.s?.ad ||
     state.s?.name ||
-    (state.isGuest
-      ? tr('Misafir Kullanıcı') || 'Guest User'
-      : tr('Kullanıcı') || 'User');
+    (state.s?.kod ? (state.s.kod === 'HG1000' ? 'Dummy User' : `User ${state.s.kod}`) : '') ||
+    tr('User');
   const userSubtitle =
     state.s?.email ||
     state.s?.eposta ||
     state.s?.tel ||
-    (state.s?.kod && state.s.kod !== 'GUEST' && state.s.kod !== 'HG1000'
-      ? `ID: ${state.s.kod}`
-      : '');
+    (state.s?.kod ? `ID: ${state.s.kod}` : '');
 
   return (
     <SafeAreaView
@@ -376,18 +394,6 @@ export default function Account({ navigation }) {
               </TouchableOpacity>
             </View>
 
-            {/* Log Out Button */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={handleLogout}
-              style={[styles.logoutPillBtn, { backgroundColor: cardBg }]}>
-              <LogoutIcon width={20} height={20} />
-              <Text style={styles.logoutPillText}>
-                {tr('Log Out') || 'Log Out'}
-              </Text>
-              <ChevronRightIcon width={18} height={18} stroke="#EF4444" />
-            </TouchableOpacity>
-
             <Text style={[styles.versionText, { color: subTextColor }]}>
               1 Click version 1.0.0
             </Text>
@@ -460,7 +466,7 @@ export default function Account({ navigation }) {
                 style={[styles.menuItem, { borderBottomColor: borderColor }]}>
                 <View style={styles.menuLeft}>
                   <View style={styles.menuIconWrap}>
-                    <NotificationBingIcon width={20} height={20} stroke="#F67922" />
+                    <NotificationBingIcon width={20} height={20} stroke="#F67922" color="#F67922" />
                   </View>
                   <Text style={[styles.menuText, { color: textColor }]}>
                     {tr('Notifications') || 'Notifications'}

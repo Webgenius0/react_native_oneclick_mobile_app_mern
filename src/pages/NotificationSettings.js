@@ -27,6 +27,7 @@ import {
   NOTIFICATION_COUNT_KEY,
   NOTIFICATION_KEY,
   setLocalNotifications,
+  markNotificationAsReadServer,
 } from '../helpers/notificationV2';
 
 const STORAGE_PREFS_KEY = 'notification_settings_prefs';
@@ -109,7 +110,7 @@ export default function NotificationSettings({ navigation }) {
 
   useEffect(() => {
     loadNotifications();
-  }, []);
+  }, [loadNotifications]);
 
   const rawNotifications = useMemo(() => {
     return Array.isArray(ctx.notifications) ? ctx.notifications : [];
@@ -144,6 +145,10 @@ export default function NotificationSettings({ navigation }) {
 
   const handleMarkAsRead = async (item, indexInFiltered) => {
     try {
+      if (item?.id) {
+        markNotificationAsReadServer(item.id);
+      }
+
       const globalIndex = rawNotifications.findIndex(n => n.id === item.id);
       if (globalIndex !== -1) {
         const list = [...rawNotifications];
@@ -185,7 +190,10 @@ export default function NotificationSettings({ navigation }) {
           style: 'destructive',
           onPress: async () => {
             try {
-              await ai.post('notifications', { islem: 'delete' });
+              await Promise.allSettled([
+                ai.post('notifications', { islem: 'delete' }),
+                markNotificationAsReadServer(0),
+              ]);
             } catch (e) {}
 
             await storageSet(NOTIFICATION_KEY, { notifications: [], lastId: 0 });

@@ -23,6 +23,7 @@ import {
   NOTIFICATION_COUNT_KEY,
   NOTIFICATION_KEY,
   setLocalNotifications,
+  markNotificationAsReadServer,
 } from "../helpers/notificationV2";
 import AppHeader from "../components/common/AppHeader";
 import NotificationBingIcon from "../assets/svg/notification_bing.svg";
@@ -61,12 +62,13 @@ export default function Notifications({ route, navigation }) {
 
   useEffect(() => {
     init();
-  }, []);
+  }, [init]);
 
-  const rawNotifications = ctx.notifications || [];
-  const displayNotifications = useMemo(() => {
-    return Array.isArray(rawNotifications) ? rawNotifications : [];
-  }, [rawNotifications]);
+  const rawNotifications = useMemo(() => {
+    return Array.isArray(ctx.notifications) ? ctx.notifications : [];
+  }, [ctx.notifications]);
+
+  const displayNotifications = rawNotifications;
 
   const unreadCount = useMemo(() => {
     return displayNotifications.filter(
@@ -87,7 +89,11 @@ export default function Notifications({ route, navigation }) {
           onPress: async () => {
             try {
               if (rawNotifications.length > 0) {
-                await ai.post("notifications", { islem: "delete" });
+                // Delete & mark all read on server in parallel
+                await Promise.allSettled([
+                  ai.post("notifications", { islem: "delete" }),
+                  markNotificationAsReadServer(0),
+                ]);
               }
               await storageSet(NOTIFICATION_KEY, { notifications: [], lastId: 0 });
               if (setCtx) {
@@ -109,6 +115,11 @@ export default function Notifications({ route, navigation }) {
   const handleItemPress = useCallback(
     async (item, index) => {
       try {
+        // 1. Dispatch mark-read to server (POST /api/notifications with islem: "read", id: X)
+        if (item?.id) {
+          markNotificationAsReadServer(item.id);
+        }
+
         const list = [...displayNotifications];
         if (list[index]) {
           list[index] = { ...list[index], read: true, okundu: 1 };

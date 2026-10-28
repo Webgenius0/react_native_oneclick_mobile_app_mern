@@ -63,9 +63,17 @@ export default function Login({ navigation }) {
         setCtxDil(activeDil);
       }
 
+      let fcmToken = '';
+      try {
+        fcmToken = await getFcmToken();
+      } catch (e) {}
+
       const res = await ai.post('login', {
+        email: cleanKod,
         kod: cleanKod,
+        password: cleanSifre,
         sifre: cleanSifre,
+        device_token: fcmToken || '',
         dil: activeDil,
       });
 
@@ -91,10 +99,10 @@ export default function Login({ navigation }) {
         // Run FCM and language update asynchronously in background (do not block UI navigation)
         setTimeout(async () => {
           try {
-            const fcmToken = await getFcmToken();
+            const latestFcmToken = await getFcmToken();
             await ai.post('update-language', {
               dil: activeDil,
-              fcmToken,
+              fcmToken: latestFcmToken,
             });
           } catch (fcmErr) {
             console.log('fcm background sync error:', fcmErr?.message);
