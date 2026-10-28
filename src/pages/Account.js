@@ -49,9 +49,20 @@ export default function Account({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [langModalVisible, setLangModalVisible] = useState(false);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const handleLogout = async () => {
-    await logoutUser(navigation, setCtx);
+    if (loggingOut) {
+      return;
+    }
+    try {
+      setLoggingOut(true);
+      await logoutUser(navigation, setCtx);
+    } catch (e) {
+      console.log('Logout error:', e);
+    } finally {
+      setLoggingOut(false);
+    }
   };
 
   const fetchData = useCallback(
@@ -559,13 +570,29 @@ export default function Account({ navigation }) {
             {/* Log Out Button */}
             <TouchableOpacity
               activeOpacity={0.8}
+              disabled={loggingOut}
               onPress={handleLogout}
-              style={[styles.logoutPillBtn, { backgroundColor: cardBg }]}>
-              <LogoutIcon width={20} height={20} />
-              <Text style={styles.logoutPillText}>
-                {tr('Log Out') || 'Log Out'}
-              </Text>
-              <ChevronRightIcon width={18} height={18} stroke="#EF4444" />
+              style={[
+                styles.logoutPillBtn,
+                { backgroundColor: cardBg },
+                loggingOut && styles.logoutBtnDisabled,
+              ]}>
+              {loggingOut ? (
+                <>
+                  <ActivityIndicator size="small" color="#EF4444" style={styles.logoutIndicator} />
+                  <Text style={styles.logoutPillText}>
+                    {tr('Logging Out...') || 'Logging Out...'}
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <LogoutIcon width={20} height={20} />
+                  <Text style={styles.logoutPillText}>
+                    {tr('Log Out') || 'Log Out'}
+                  </Text>
+                  <ChevronRightIcon width={18} height={18} stroke="#EF4444" />
+                </>
+              )}
             </TouchableOpacity>
 
             <Text style={[styles.versionText, { color: subTextColor }]}>
@@ -905,6 +932,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#EF4444',
+  },
+  logoutIndicator: {
+    marginRight: 6,
+  },
+  logoutBtnDisabled: {
+    opacity: 0.8,
   },
   versionText: {
     textAlign: 'center',
