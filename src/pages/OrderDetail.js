@@ -1,6 +1,5 @@
 import React, { useContext, useEffect, useState } from 'react';
 import {
-  SafeAreaView,
   Text,
   View,
   StyleSheet,
@@ -12,7 +11,7 @@ import {
 } from 'react-native';
 import FastImage from 'react-native-fast-image';
 import Svg, { Path } from 'react-native-svg';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import moment from 'moment';
 import AppHeader from '../components/common/AppHeader';
 import { tr } from '../translate/i18n';
@@ -118,7 +117,9 @@ export default function OrderDetail({ route, navigation }) {
   const borderColor = isDark ? '#374151' : '#F1F5F9';
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: cardBg }]}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: cardBg }]}
+      edges={['top', 'left', 'right']}>
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}
         backgroundColor={cardBg}

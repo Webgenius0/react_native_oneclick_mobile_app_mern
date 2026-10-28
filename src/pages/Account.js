@@ -6,7 +6,6 @@ import {
   Linking,
   Platform,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -16,6 +15,7 @@ import {
   ActivityIndicator,
   Modal,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmContext } from '../contexts/EmContext';
 import ai from '../helpers/ai';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -211,7 +211,9 @@ export default function Account({ navigation }) {
       : '');
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: pageBg }]}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: pageBg }]}
+      edges={['top', 'left', 'right']}>
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}
         backgroundColor={pageBg}

@@ -1,6 +1,5 @@
 import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
-  SafeAreaView,
   Text,
   View,
   StyleSheet,
@@ -13,7 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { getMessaging, onMessage } from '@react-native-firebase/messaging';
 import { tr } from '../translate/i18n';
@@ -214,7 +213,9 @@ export default function Orders({ route, navigation }) {
   }, [loading, searchQuery, textColor, subTextColor]);
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: cardBg }]}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: cardBg }]}
+      edges={['top', 'left', 'right']}>
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}
         backgroundColor={cardBg}

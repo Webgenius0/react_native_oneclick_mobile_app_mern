@@ -13,12 +13,13 @@ import {
   TouchableOpacity,
   Dimensions,
   ScrollView,
-  SafeAreaView,
   StatusBar,
   RefreshControl,
   ActivityIndicator,
   Image,
+  useWindowDimensions,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import FastImage from "react-native-fast-image";
 import { useFocusEffect } from "@react-navigation/native";
 import AuthHeader from "../components/AuthHeader";
@@ -30,12 +31,6 @@ import { storageGet, storageSet } from "../helpers/storage";
 import { EmContext } from "../contexts/EmContext";
 import { tr } from "../translate/i18n";
 import Colors from "../assets/Colors";
-
-const { width } = Dimensions.get("window");
-const bannerWidth = width - 32;
-const heroBannerHeight = Math.round(bannerWidth * (202 / 335));
-const cardWidth = (width - 44) / 2;
-const cardHeight = Math.round(cardWidth * 1.05);
 
 const HERO_BANNER_IMG = require("../assets/img/home/home_hero_banner.png");
 
@@ -125,6 +120,14 @@ const DEFAULT_MARKET_DATA = {
 export default function BannerList({ route, navigation }) {
   const { ctx, setCtx, ctxDil } = useContext(EmContext);
   const carouselRef = useRef(null);
+  const { width: windowWidth } = useWindowDimensions();
+  const [containerWidth, setContainerWidth] = useState(windowWidth || Dimensions.get("window").width);
+
+  const activeWidth = containerWidth > 0 ? containerWidth : (windowWidth || Dimensions.get("window").width);
+  const bannerWidth = activeWidth - 32;
+  const heroBannerHeight = Math.round(bannerWidth * (202 / 335));
+  const cardWidth = Math.floor((activeWidth - 44) / 2);
+  const cardHeight = Math.round(cardWidth * 1.05);
 
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
   const [subLoading, setSubLoading] = useState(false);
@@ -327,7 +330,7 @@ export default function BannerList({ route, navigation }) {
       setActiveSlideIndex(prev => {
         const next = (prev + 1) % carouselSlides.length;
         carouselRef.current?.scrollTo({
-          x: next * width,
+          x: next * activeWidth,
           animated: true,
         });
         return next;
@@ -335,11 +338,11 @@ export default function BannerList({ route, navigation }) {
     }, 4500);
 
     return () => clearInterval(timer);
-  }, [carouselSlides.length]);
+  }, [carouselSlides.length, activeWidth]);
 
   const handleCarouselScroll = event => {
     const offsetX = event.nativeEvent.contentOffset.x;
-    const pageIndex = Math.round(offsetX / width);
+    const pageIndex = Math.round(offsetX / (activeWidth || 1));
     if (pageIndex !== activeSlideIndex && pageIndex >= 0 && pageIndex < carouselSlides.length) {
       setActiveSlideIndex(pageIndex);
     }
@@ -422,7 +425,9 @@ export default function BannerList({ route, navigation }) {
   const subTextColor = isDark ? "#9CA3AF" : "#64748B";
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: "#F67922" }]}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: "#F67922" }]}
+      edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor="#F67922" />
 
       {/* Figma Home Header with 1 Click Logo & Centered Notification Bell */}
@@ -456,7 +461,14 @@ export default function BannerList({ route, navigation }) {
             <View style={styles.orangeBackdrop} />
 
             {/* 1. Top Carousel Section (Figma Banner + Dynamic API Sliders) */}
-            <View style={styles.carouselContainer}>
+            <View
+              style={styles.carouselContainer}
+              onLayout={e => {
+                const w = e.nativeEvent.layout.width;
+                if (w > 0 && Math.abs(w - containerWidth) > 1) {
+                  setContainerWidth(w);
+                }
+              }}>
               <ScrollView
                 ref={carouselRef}
                 horizontal
@@ -465,7 +477,7 @@ export default function BannerList({ route, navigation }) {
                 onMomentumScrollEnd={handleCarouselScroll}
                 scrollEventThrottle={16}>
                 {carouselSlides.map(slide => (
-                  <View key={slide.id} style={{ width: width, paddingHorizontal: 16 }}>
+                  <View key={slide.id} style={{ width: activeWidth, paddingHorizontal: 16 }}>
                     <TouchableOpacity
                       activeOpacity={0.92}
                       onPress={() => handleSlidePress(slide)}
