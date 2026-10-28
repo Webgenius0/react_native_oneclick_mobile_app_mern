@@ -108,13 +108,13 @@ export default function CartItem({
 
   const confirmRemove = () => {
     Alert.alert(
-      tr('Ürünü Sil') || 'Remove Item',
-      tr('Bu ürünü sepetten silmek istediğinize emin misiniz?') ||
+      tr('Remove Item') || 'Remove Item',
+      tr('Are you sure you want to remove this item from your cart?') ||
         'Are you sure you want to remove this item from your cart?',
       [
-        { text: tr('İptal') || 'Cancel', style: 'cancel' },
+        { text: tr('Cancel') || 'Cancel', style: 'cancel' },
         {
-          text: tr('Sil') || 'Remove',
+          text: tr('Remove') || 'Remove',
           style: 'destructive',
           onPress: () => onRemove(targetId),
         },
@@ -215,7 +215,7 @@ export default function CartItem({
               </Text>
             ) : (
               <Text style={styles.pendingPriceText}>
-                {t('Fiyat Hesaplanıyor') || 'Calculating price...'}
+                {t('Calculating Price...') || 'Calculating price...'}
               </Text>
             )}
             {!isUsd && finalPrice > 0 ? (

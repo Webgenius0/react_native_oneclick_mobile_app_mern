@@ -51,7 +51,7 @@ export default function AddToCart({ addChart, loading = false }) {
         )}
         <Text style={styles.text}>
           {loading
-            ? tr('Sepete Ekleniyor...') || 'Adding Product...'
+            ? tr('Adding Product...') || 'Adding Product...'
             : tr('Add Product') || 'Add Product'}
         </Text>
       </TouchableOpacity>

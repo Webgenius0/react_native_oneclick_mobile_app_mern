@@ -2631,10 +2631,10 @@ export default function Webview({ route, navigation }) {
         setIsAddingToCart(false);
         isAddingRef.current = false;
         Alert.alert(
-          t('Uyarı') || 'Uyarı',
+          t('Warning') || 'Warning',
           t('gecersizUrunSayfasi') ||
-          'Sadece ürün detay sayfaları sepete eklenebilir. Lütfen bir ürün sayfasına gidip tekrar deneyiniz.',
-          [{ text: t('Tamam') || 'Tamam' }],
+          'Only product detail pages can be added to the cart. Please navigate to a specific product page and try again.',
+          [{ text: t('OK') || 'OK' }],
         );
         return;
       }
@@ -2670,10 +2670,10 @@ export default function Webview({ route, navigation }) {
         setIsAddingToCart(false);
         isAddingRef.current = false;
         Alert.alert(
-          t('Uyarı') || 'Uyarı',
+          t('Warning') || 'Warning',
           t('gecersizUrunSayfasi') ||
-          'Sadece ürün detay sayfaları sepete eklenebilir. Lütfen bir ürün sayfasına gidip tekrar deneyiniz.',
-          [{ text: t('Tamam') || 'Tamam' }],
+          'Only product detail pages can be added to the cart. Please navigate to a specific product page and try again.',
+          [{ text: t('OK') || 'OK' }],
         );
         return;
       }
@@ -2733,21 +2733,21 @@ export default function Webview({ route, navigation }) {
       if (missingOptions.length > 0) {
         const translatedNames = missingOptions.map(name => {
           const lower = (name || '').toLowerCase();
-          if (lower.includes('size') || lower.includes('beden')) return t('Beden') || 'Size';
-          if (lower.includes('color') || lower.includes('renk')) return t('Renk') || 'Color';
-          if (lower.includes('weight') || lower.includes('ağırlık')) return t('Ağırlık') || 'Weight';
-          if (lower.includes('volume') || lower.includes('hacim')) return t('Hacim / Kapasite') || 'Volume';
-          if (lower.includes('variant') || lower.includes('varyant') || lower.includes('option')) return t('Varyant') || 'Variant';
+          if (lower.includes('size') || lower.includes('beden')) return t('Size') || 'Size';
+          if (lower.includes('color') || lower.includes('renk')) return t('Color') || 'Color';
+          if (lower.includes('weight') || lower.includes('ağırlık')) return t('Weight') || 'Weight';
+          if (lower.includes('volume') || lower.includes('hacim')) return t('Volume') || 'Volume';
+          if (lower.includes('variant') || lower.includes('varyant') || lower.includes('option')) return t('Variant') || 'Variant';
           return name;
         }).join(', ');
 
         const alertMsg = t('lutfenSecimYapin', { options: translatedNames }) ||
-          `Lütfen sepete eklemeden önce ürün seçeneklerini (${translatedNames}) seçiniz.`;
+          `Please select product options (${translatedNames}) before adding to cart.`;
 
         setIsAddingToCart(false);
         isAddingRef.current = false;
-        Alert.alert(t('Uyarı') || 'Uyarı', alertMsg, [
-          { text: t('Tamam') || 'Tamam' }
+        Alert.alert(t('Warning') || 'Warning', alertMsg, [
+          { text: t('OK') || 'OK' }
         ]);
         return;
       }
@@ -3247,7 +3247,7 @@ export default function Webview({ route, navigation }) {
           <View style={styles.addingOverlay} pointerEvents="auto">
             <View style={styles.addingCard}>
               <ActivityIndicator size="large" color={Colors.primary || 'orange'} />
-              <Text style={styles.addingText}>{t('Yükleniyor') || 'Loading'}...</Text>
+              <Text style={styles.addingText}>{t('Adding to cart...') || 'Adding to cart...'}</Text>
             </View>
           </View>
         )}

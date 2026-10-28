@@ -171,13 +171,13 @@ export default function CartPage({ navigation }) {
 
   const handleClearCart = () => {
     Alert.alert(
-      tr('Sepeti Temizle') || 'Clear Cart',
-      tr('Tüm ürünleri sepetten çıkarmak istediğinize emin misiniz?') ||
+      tr('Clear Cart') || 'Clear Cart',
+      tr('Are you sure you want to remove all items from your cart?') ||
         'Are you sure you want to remove all items from your cart?',
       [
-        { text: tr('İptal') || 'Cancel', style: 'cancel' },
+        { text: tr('Cancel') || 'Cancel', style: 'cancel' },
         {
-          text: tr('Temizle') || 'Clear All',
+          text: tr('Clear All') || 'Clear All',
           style: 'destructive',
           onPress: () => clearCart(),
         },
@@ -189,13 +189,13 @@ export default function CartPage({ navigation }) {
     const user = await getUser();
     if (user && user.kod === 'GUEST') {
       Alert.alert(
-        tr('Giriş Gerekli') || 'Sign In Required',
-        tr('Sipariş verebilmeniz için üye girişi yapın veya kayıt olun') ||
+        tr('Sign In Required') || 'Sign In Required',
+        tr('Please sign in or create an account to proceed with checkout.') ||
           'Please sign in or create an account to proceed with checkout.',
         [
-          { text: tr('İptal') || 'Cancel', style: 'cancel' },
+          { text: tr('Cancel') || 'Cancel', style: 'cancel' },
           {
-            text: tr('Giriş Yap') || 'Sign In',
+            text: tr('Sign In') || 'Sign In',
             onPress: () => navigation.navigate('Login'),
           },
         ],
@@ -205,16 +205,16 @@ export default function CartPage({ navigation }) {
 
     if (items.length === 0) {
       Alert.alert(
-        tr('Sepet Boş') || 'Empty Cart',
-        tr('Sepetinizde hiç ürün yok') || 'Your cart is currently empty.',
+        tr('Empty Cart') || 'Empty Cart',
+        tr('Your cart is currently empty.') || 'Your cart is currently empty.',
       );
       return;
     }
 
     if (checkedItems.length === 0) {
       Alert.alert(
-        tr('Seçim Yapın') || 'Select Items',
-        tr('Lütfen en az bir ürünü seçin') ||
+        tr('Select Items') || 'Select Items',
+        tr('Please select at least one item to proceed.') ||
           'Please select at least one item to proceed.',
       );
       return;
@@ -231,12 +231,12 @@ export default function CartPage({ navigation }) {
         .join('\n• ');
 
       Alert.alert(
-        tr('Uyarı') || 'Incomplete Options',
+        tr('Incomplete Options') || 'Incomplete Options',
         `${
           tr('eksikUrunDetayi') ||
           'Please select size / color options for the selected products before checking out.'
         }\n\n• ${incompleteNames}`,
-        [{ text: tr('Tamam') || 'OK' }],
+        [{ text: tr('OK') || 'OK' }],
       );
       return;
     }

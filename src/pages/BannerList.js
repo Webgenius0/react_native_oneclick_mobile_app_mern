@@ -67,7 +67,7 @@ const DEFAULT_FALLBACK_STORES = [
   {
     id: "amazon",
     name: "Amazon",
-    url: "https://www.amazon.com",
+    url: "https://www.amazon.ae",
     bgColor: "#FEF3E1",
     knownAsset: require("../assets/img/home/store_amazon.png"),
     subtitle: "Millions of products across every category.",
@@ -91,7 +91,7 @@ const DEFAULT_FALLBACK_STORES = [
   {
     id: "shein",
     name: "SHEIN",
-    url: "https://www.shein.com",
+    url: "https://m.shein.com",
     bgColor: "#FCEFF5",
     knownAsset: require("../assets/img/home/store_shein.png"),
     subtitle: "Fashion, beauty and lifestyle products",
