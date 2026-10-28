@@ -16,6 +16,7 @@ const devCart = [
 
 import { generateItemKey, isAgeOrMeasurement } from '../helpers/variantUtils';
 import { cleanProductTitle } from '../helpers/storeHelper';
+import { parsePrice, calculateConvertedPrice } from '../helpers/currencyHelper';
 
 export const normalizeCartItem = item => {
   if (!item) {
@@ -189,13 +190,40 @@ export const normalizeCartItem = item => {
     (item?.marketplace && String(item.marketplace).toLowerCase().includes('shein')),
   );
 
+  const isSheinArabic = isShein && (
+    itemUrl.includes('/ar-en/') ||
+    itemUrl.includes('/ar/') ||
+    itemUrl.includes('/sa/') ||
+    itemUrl.includes('shein.sa')
+  );
+
   if (!currency || currency === 'TL') {
     if (itemUrl.includes('amazon.ae') || itemUrl.includes('noon.com') || itemUrl.includes('shein.ae')) {
       currency = 'AED';
-    } else if (itemUrl.includes('amazon.sa') || itemUrl.includes('shein.sa')) {
+    } else if (itemUrl.includes('amazon.sa') || itemUrl.includes('shein.sa') || isSheinArabic) {
       currency = 'SAR';
     } else if (itemUrl.includes('amazon.com') || isShein) {
       currency = 'USD';
+    }
+  }
+
+  // Fail-safe: If Shein item is in SAR or has SAR symbol (⃁, \u20C1, ر.س, ﷼), convert its price to USD before saving
+  const hasSarPriceSymbol =
+    String(newPrice).includes('⃁') ||
+    String(newPrice).includes('\u20C1') ||
+    String(newPrice).includes('ر.س') ||
+    String(newPrice).includes('﷼') ||
+    String(newPrice).includes('\uFDFC') ||
+    /\b(?:SAR|SR|RIYAL)\b/i.test(String(newPrice));
+
+  if (isShein && (currency === 'SAR' || item?.currency === 'SAR' || hasSarPriceSymbol || isSheinArabic)) {
+    const rawNum = parsePrice(newPrice);
+    if (rawNum && rawNum > 0) {
+      const conv = calculateConvertedPrice(rawNum, 'SAR') || parseFloat((rawNum * 0.266667).toFixed(2));
+      if (conv && conv > 0) {
+        newPrice = conv.toFixed(2);
+        currency = '$';
+      }
     }
   }
 

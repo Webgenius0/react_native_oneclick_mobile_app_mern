@@ -89,9 +89,13 @@ export default function OrderDetail({ route, navigation }) {
     order?.sehir || firstItem.sehir || firstItem.teslimat_sehir || 'Borama';
 
   const totalAmount = parseFloat(order?.tutar || firstItem.tutar || 0);
-  const shippingCost = 25.0;
-  const subtotal = Math.max(0, totalAmount - shippingCost) || totalAmount;
-  const finalTotal = totalAmount > 0 ? totalAmount : subtotal + shippingCost;
+  // Standard shipping cost ($25.00) - Temporarily commented out
+  // const shippingCost = 25.0;
+  // const subtotal = Math.max(0, totalAmount - shippingCost) || totalAmount;
+  // const finalTotal = totalAmount > 0 ? totalAmount : subtotal + shippingCost;
+  const shippingCost = 0.0;
+  const subtotal = totalAmount;
+  const finalTotal = totalAmount;
 
   const paymentMethodName =
     order?.odeme_yontemi || firstItem.odeme_yontemi || 'Visa**** 4582';
@@ -338,6 +342,7 @@ export default function OrderDetail({ route, navigation }) {
               </Text>
             </View>
 
+            {/* Shipping Cost row - temporarily commented out
             <View style={styles.priceRow}>
               <Text style={[styles.priceLabel, { color: subTextColor }]}>
                 {tr('Shipping Cost') || 'Shipping Cost'}
@@ -346,6 +351,7 @@ export default function OrderDetail({ route, navigation }) {
                 ${shippingCost.toFixed(2)}
               </Text>
             </View>
+            */}
 
             <View
               style={[

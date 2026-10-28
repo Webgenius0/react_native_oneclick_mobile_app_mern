@@ -36,9 +36,11 @@ export default function PaymentStart({ navigation, route }) {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const numTutar = parseFloat(tutar) || 0;
-  const shipping = parseFloat(shippingParam) || 25.0;
+  // Standard shipping cost ($25.00) - Temporarily commented out
+  // const shipping = parseFloat(shippingParam) || 25.0;
+  const shipping = parseFloat(shippingParam) || 0.0;
   const subtotal =
-    parseFloat(subtotalParam) || Math.max(0, numTutar - shipping) || numTutar;
+    parseFloat(subtotalParam) || (numTutar > 0 ? numTutar : 0);
   const total = numTutar > 0 ? numTutar : subtotal + shipping;
 
   const handlePayPress = () => {
@@ -178,6 +180,7 @@ export default function PaymentStart({ navigation, route }) {
             </Text>
           </View>
 
+          {/* Shipping cost row - temporarily commented out
           <View style={styles.priceSummaryRow}>
             <Text style={[styles.priceSummaryLabel, { color: subTextColor }]}>
               {tr('Shipping Cost') || 'Shipping Cost'}
@@ -186,6 +189,7 @@ export default function PaymentStart({ navigation, route }) {
               ${shipping.toFixed(2)}
             </Text>
           </View>
+          */}
 
           <View
             style={[

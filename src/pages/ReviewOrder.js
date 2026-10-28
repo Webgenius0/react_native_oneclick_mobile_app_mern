@@ -68,31 +68,35 @@ export default function ReviewOrder({ navigation, route }) {
     0,
   );
 
-  const subtotalUsd = items.reduce((sum, item) => {
-    const basePrice = parsePrice(item?.price) || 0;
-    const isShein = Boolean(
-      (item?.store && String(item.store).toLowerCase().includes('shein')) ||
-        (item?.url && String(item.url).toLowerCase().includes('shein.com')) ||
-        (item?.marketplace &&
-          String(item.marketplace).toLowerCase().includes('shein')) ||
-        String(getStoreName(item?.url, item?.store || '')).toLowerCase() ===
-          'shein',
-    );
-    const percentAmount =
-      isShein && safePercent > 0 ? basePrice * (safePercent / 100) : 0;
-    const finalPrice = basePrice + percentAmount;
-    const count = Number(item?.count) > 0 ? Number(item.count) : 1;
+  const subtotalUsd =
+    items.length > 0
+      ? items.reduce((sum, item) => {
+          const basePrice = parsePrice(item?.price) || 0;
+          const isShein = Boolean(
+            (item?.store && String(item.store).toLowerCase().includes('shein')) ||
+              (item?.url && String(item.url).toLowerCase().includes('shein.com')) ||
+              (item?.marketplace &&
+                String(item.marketplace).toLowerCase().includes('shein')) ||
+              String(getStoreName(item?.url, item?.store || '')).toLowerCase() ===
+                'shein',
+          );
+          const percentAmount =
+            isShein && safePercent > 0 ? basePrice * (safePercent / 100) : 0;
+          const finalPrice = basePrice + percentAmount;
+          const count = Number(item?.count) > 0 ? Number(item.count) : 1;
 
-    const { code: itemCurrency, isUsd } = getReceivedCurrencyInfo(item);
-    const usd = isUsd
-      ? finalPrice
-      : calculateConvertedPrice(finalPrice, itemCurrency, rates, inverseRates);
-    const effectiveUsd = usd !== null ? usd : finalPrice;
-    return sum + effectiveUsd * count;
-  }, initialTotalUsd || 0);
+          const { code: itemCurrency, isUsd } = getReceivedCurrencyInfo(item);
+          const usd = isUsd
+            ? finalPrice
+            : calculateConvertedPrice(finalPrice, itemCurrency, rates, inverseRates);
+          const effectiveUsd = usd !== null ? usd : finalPrice;
+          return sum + effectiveUsd * count;
+        }, 0)
+      : initialTotalUsd || 0;
 
-  // Standard shipping cost from Figma ($25.00)
-  const shippingCost = 25.0;
+  // Standard shipping cost from Figma ($25.00) - Temporarily commented out
+  // const shippingCost = 25.0;
+  const shippingCost = 0.0;
   const totalAmount = subtotalUsd + shippingCost;
 
   const handleContinueToPayment = async () => {
@@ -435,6 +439,7 @@ export default function ReviewOrder({ navigation, route }) {
             </Text>
           </View>
 
+          {/* Shipping cost row - temporarily commented out
           <View style={styles.priceSummaryRow}>
             <Text style={[styles.priceSummaryLabel, { color: subTextColor }]}>
               {tr('Shipping Cost') || 'Shipping Cost'}
@@ -443,6 +448,7 @@ export default function ReviewOrder({ navigation, route }) {
               ${shippingCost.toFixed(2)}
             </Text>
           </View>
+          */}
 
           <View
             style={[

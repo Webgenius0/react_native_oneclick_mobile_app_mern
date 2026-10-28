@@ -15,7 +15,8 @@ import { userAgent } from '../helpers/webview';
 import { injectedJavascript, normalizeProductImageUrl } from '../helpers/webview1';
 import { cleanProductTitle, getFallbackTitleFromUrl, getStoreName, isProductUrl } from '../helpers/storeHelper';
 import { isPlaceholderValue } from '../helpers/variantUtils';
-import { getReceivedCurrencyInfo } from '../helpers/currencyHelper';
+import { getReceivedCurrencyInfo, calculateConvertedPrice, parsePrice } from '../helpers/currencyHelper';
+import { useExchangeRateStore } from '../store/useExchangeRateStore';
 import { t } from '../translate/i18n';
 
 const styles = StyleSheet.create({
@@ -520,6 +521,26 @@ const TRENDYOL_COOKIE_SETUP_BRIDGE = `
   })();
 `;
 
+const SHEIN_COOKIE_INIT_BRIDGE = `
+  (function() {
+    try {
+      var host = String(window.location.hostname || '').toLowerCase();
+      if (host.indexOf('shein.com') > -1 || host.indexOf('shein.') > -1) {
+        if (!/(?:currency|shein_currency|local_currency|user_currency)=[A-Za-z]{3}/i.test(document.cookie)) {
+          var d = '.' + host.split('.').slice(-2).join('.');
+          var exp = '; path=/; domain=' + d + '; max-age=31536000';
+          document.cookie = 'currency=USD' + exp;
+          document.cookie = 'shein_currency=USD' + exp;
+          document.cookie = 'local_currency=USD' + exp;
+          document.cookie = 'user_currency=USD' + exp;
+          document.cookie = 'sitecurrency=USD' + exp;
+        }
+      }
+    } catch (e) {}
+    true;
+  })();
+`;
+
 const TRENDYOL_MOBILE_STYLE_BRIDGE = `
   (function() {
     try {
@@ -732,6 +753,15 @@ export default function Webview({ route, navigation }) {
 
     const cookies = getTrendyolCookieEntries(sourceUrl);
 
+    if (isSheinUrl(sourceUrl)) {
+      return {
+        uri: sourceUrl,
+        headers: {
+          Cookie: 'currency=USD; shein_currency=USD; local_currency=USD; user_currency=USD; sitecurrency=USD;',
+        },
+      };
+    }
+
     if (!cookies.length) {
       return { uri: sourceUrl };
     }
@@ -757,8 +787,8 @@ export default function Webview({ route, navigation }) {
   const injectedJavaScriptBeforeContentLoaded = useMemo(
     () =>
       useSheinCompatibilityMode
-        ? `${TRENDYOL_COOKIE_SETUP_BRIDGE}\n${TRENDYOL_MOBILE_STYLE_BRIDGE}`
-        : `${TRENDYOL_COOKIE_SETUP_BRIDGE}\n${TRENDYOL_MOBILE_STYLE_BRIDGE}\n${ROUTE_CHANGE_BRIDGE}`,
+        ? `${SHEIN_COOKIE_INIT_BRIDGE}\n${TRENDYOL_COOKIE_SETUP_BRIDGE}\n${TRENDYOL_MOBILE_STYLE_BRIDGE}`
+        : `${SHEIN_COOKIE_INIT_BRIDGE}\n${TRENDYOL_COOKIE_SETUP_BRIDGE}\n${TRENDYOL_MOBILE_STYLE_BRIDGE}\n${ROUTE_CHANGE_BRIDGE}`,
     [useSheinCompatibilityMode],
   );
   const localInitialScript = useMemo(() => {
@@ -1556,7 +1586,7 @@ export default function Webview({ route, navigation }) {
               t = t.replace(/[٠-٩]/g, function(d) { return String.fromCharCode(d.charCodeAt(0) - 1632 + 48); });
               var detectedCurr = '';
               if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:AED|د\.?إ|درهم)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'AED';
-              else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:SAR|SR|ر\.?س|ريال)(?:$|[^a-zA-Z\u0600-\u06FF])|[﷼\uFDFC]/i.test(t)) detectedCurr = 'SAR';
+              else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:SAR|SR|ر\.?س|ريال)(?:$|[^a-zA-Z\u0600-\u06FF])|[﷼\uFDFC\u20C1⃁]/i.test(t)) detectedCurr = 'SAR';
               else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:KWD|د\.?ك)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'KWD';
               else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:QAR|ر\.?ق)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'QAR';
               else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:BHD|د\.?ب)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'BHD';
@@ -1754,6 +1784,15 @@ export default function Webview({ route, navigation }) {
                   }
                 }
               } catch(_eCk) {}
+            }
+
+            if (!currency && window.location && window.location.href) {
+              var h = window.location.href.toLowerCase();
+              if (h.indexOf('shein.') > -1) {
+                if (h.indexOf('/ar-en/') > -1 || h.indexOf('/ar/') > -1 || h.indexOf('/sa/') > -1 || h.indexOf('.sa') > -1) {
+                  currency = 'SAR';
+                }
+              }
             }
 
             // Normalize currency symbol into price if USD
@@ -2721,14 +2760,24 @@ export default function Webview({ route, navigation }) {
       const isIherb = currentUrlRef.current.includes('iherb.com');
       const isYesStyle = currentUrlRef.current.includes('yesstyle.com');
       const isUaeUrl = currentUrlRef.current.includes('amazon.ae') || currentUrlRef.current.includes('noon.com');
-      const isSaUrl = currentUrlRef.current.includes('amazon.sa');
-      const fallbackCurrency = (isAmazonUsUrl || isAliExpress || isIherb || isYesStyle || isShein)
+      const isSheinArabic = isShein && (
+        currentUrlRef.current.includes('/ar-en/') ||
+        currentUrlRef.current.includes('/ar/') ||
+        currentUrlRef.current.includes('/sa/') ||
+        currentUrlRef.current.includes('shein.sa')
+      );
+      const isSaUrl = currentUrlRef.current.includes('amazon.sa') || isSheinArabic;
+      const fallbackCurrency = (isAmazonUsUrl || isAliExpress || isIherb || isYesStyle || (isShein && !isSheinArabic))
         ? 'USD'
         : (isUaeUrl ? 'AED' : (isSaUrl ? 'SAR' : 'TL'));
 
       const resolvedImage = normalizeProductImageUrl(finalImage || freshSnapshot?.image || imageRef.current || '');
       let resolvedPrice = freshSnapshot?.price || priceRef.current || '';
       let rawCurrency = freshSnapshot?.currency || currencyRef.current || '';
+
+      if (isSheinArabic && !rawCurrency) {
+        rawCurrency = 'SAR';
+      }
 
       const currencyInfo = getReceivedCurrencyInfo({
         url: currentUrlRef.current,
@@ -2742,6 +2791,35 @@ export default function Webview({ route, navigation }) {
         resolvedCurrency = currencyInfo.display; // '$' or 'USD' exactly as received
       } else {
         resolvedCurrency = rawCurrency ? currencyInfo.code : (currencyInfo.code || fallbackCurrency);
+      }
+
+      // Convert to USD before adding to cart if item is from Shein in SAR (or non-USD)
+      const baseParsedPrice = parsePrice(resolvedPrice);
+      const isSarPrice =
+        currencyInfo.code === 'SAR' ||
+        rawCurrency === 'SAR' ||
+        resolvedCurrency === 'SAR' ||
+        String(resolvedPrice).includes('⃁') ||
+        String(resolvedPrice).includes('\u20C1') ||
+        String(resolvedPrice).includes('﷼') ||
+        String(resolvedPrice).includes('\uFDFC') ||
+        String(resolvedPrice).includes('ر.س') ||
+        /\b(?:SAR|SR|RIYAL)\b/i.test(String(resolvedPrice)) ||
+        isSheinArabic;
+
+      if (isShein && (isSarPrice || !currencyInfo.isUsd) && baseParsedPrice > 0) {
+        const ratesStore = useExchangeRateStore.getState();
+        const convCurr = isSarPrice ? 'SAR' : (currencyInfo.code || resolvedCurrency || 'SAR');
+        const convertedUsd = calculateConvertedPrice(
+          baseParsedPrice,
+          convCurr,
+          ratesStore.rates,
+          ratesStore.inverseRates,
+        );
+        if (convertedUsd && convertedUsd > 0) {
+          resolvedPrice = convertedUsd.toFixed(2);
+          resolvedCurrency = '$';
+        }
       }
 
       // Sanitize options so that only the user-selected value is retained

@@ -523,7 +523,7 @@ export const getMetaTagPriceAndCurrency = page_url => {
           t = t.replace(/[٠-٩]/g, function(d) { return String.fromCharCode(d.charCodeAt(0) - 1632 + 48); });
           var detectedCurr = '';
           if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:AED|د\.?إ|درهم)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'AED';
-          else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:SAR|SR|ر\.?س|ريال)(?:$|[^a-zA-Z\u0600-\u06FF])|[﷼\uFDFC]/i.test(t)) detectedCurr = 'SAR';
+          else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:SAR|SR|ر\.?س|ريال)(?:$|[^a-zA-Z\u0600-\u06FF])|[﷼\uFDFC\u20C1⃁]/i.test(t)) detectedCurr = 'SAR';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:KWD|د\.?ك)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'KWD';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:QAR|ر\.?ق)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'QAR';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:TL|TRY)(?:$|[^a-zA-Z\u0600-\u06FF])|₺/i.test(t)) detectedCurr = 'TL';
@@ -2374,7 +2374,7 @@ export const getProductSnapshotBridge = page_url => {
           t = t.replace(/[٠-٩]/g, function(d) { return String.fromCharCode(d.charCodeAt(0) - 1632 + 48); });
           var detectedCurr = '';
           if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:AED|د\.?إ|درهم)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'AED';
-          else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:SAR|SR|ر\.?س|ريال)(?:$|[^a-zA-Z\u0600-\u06FF])|[﷼\uFDFC]/i.test(t)) detectedCurr = 'SAR';
+          else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:SAR|SR|ر\.?س|ريال)(?:$|[^a-zA-Z\u0600-\u06FF])|[﷼\uFDFC\u20C1⃁]/i.test(t)) detectedCurr = 'SAR';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:KWD|د\.?ك)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'KWD';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:QAR|ر\.?ق)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'QAR';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:TL|TRY)(?:$|[^a-zA-Z\u0600-\u06FF])|₺/i.test(t)) detectedCurr = 'TL';

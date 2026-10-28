@@ -54,6 +54,8 @@ export const normalizeCurrency = (rawCurrency, rawPrice = '') => {
     c === 'SR' ||
     c.includes('﷼') ||
     c.includes('\uFDFC') ||
+    c.includes('⃁') ||
+    c.includes('\u20C1') ||
     c.includes('ر.س') ||
     c.includes('ريال') ||
     c.includes('RIYAL') ||
@@ -101,6 +103,8 @@ export const normalizeCurrency = (rawCurrency, rawPrice = '') => {
     /\bSR\b/.test(p) ||
     p.includes('﷼') ||
     p.includes('\uFDFC') ||
+    p.includes('⃁') ||
+    p.includes('\u20C1') ||
     p.includes('ر.س') ||
     p.includes('ريال') ||
     p.includes('RIYAL') ||
@@ -291,6 +295,8 @@ export const detectItemCurrency = (item = {}, fallbackCurrency = 'USD') => {
       /\b(?:SAR|SR|RIYAL|RIAL)\b/i.test(p) ||
       p.includes('﷼') ||
       p.includes('\uFDFC') ||
+      p.includes('⃁') ||
+      p.includes('\u20C1') ||
       p.includes('ر.س') ||
       p.includes('ريال')
     ) return 'SAR';
@@ -314,7 +320,15 @@ export const detectItemCurrency = (item = {}, fallbackCurrency = 'USD') => {
   if (url.includes('shein.ae') || url.includes('amazon.ae') || url.includes('noon.com')) {
     return 'AED';
   }
-  if (url.includes('shein.sa') || url.includes('shein.com.sa') || url.includes('amazon.sa')) {
+  if (
+    url.includes('shein.sa') ||
+    url.includes('shein.com.sa') ||
+    url.includes('amazon.sa') ||
+    url.includes('shein.com/ar') ||
+    url.includes('shein.com/sa') ||
+    url.includes('/ar-en/') ||
+    url.includes('/ar/')
+  ) {
     return 'SAR';
   }
   if (url.includes('shein.com.tr') || url.includes('trendyol.') || url.includes('hepsiburada.')) {
@@ -363,12 +377,29 @@ export const getReceivedCurrencyInfo = (item = {}) => {
     return { code: 'USD', display: '$', isUsd: true };
   }
 
-  // If SAR symbols are present
-  if (rawCurr.includes('﷼') || rawCurr.includes('\uFDFC') || rawPrice.includes('﷼') || rawPrice.includes('\uFDFC')) {
-    return { code: 'SAR', display: '﷼', isUsd: false };
+  // If SAR symbols or text are present
+  if (
+    rawCurr.includes('﷼') ||
+    rawCurr.includes('\uFDFC') ||
+    rawCurr.includes('⃁') ||
+    rawCurr.includes('\u20C1') ||
+    rawPrice.includes('﷼') ||
+    rawPrice.includes('\uFDFC') ||
+    rawPrice.includes('⃁') ||
+    rawPrice.includes('\u20C1')
+  ) {
+    return { code: 'SAR', display: '⃁', isUsd: false };
   }
   if (rawCurr.includes('ر.س') || rawPrice.includes('ر.س')) {
     return { code: 'SAR', display: 'ر.س', isUsd: false };
+  }
+  if (
+    /\b(?:SAR|SR|RIYAL|RIAL)\b/i.test(rawCurr) ||
+    /\b(?:SAR|SR|RIYAL|RIAL)\b/i.test(rawPrice) ||
+    rawCurrUpper === 'SAR' ||
+    rawCurrUpper === 'SR'
+  ) {
+    return { code: 'SAR', display: 'SAR', isUsd: false };
   }
 
   // If AED Arabic symbols are present
