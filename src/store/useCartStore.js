@@ -197,17 +197,7 @@ export const normalizeCartItem = item => {
     itemUrl.includes('shein.sa')
   );
 
-  if (!currency || currency === 'TL') {
-    if (itemUrl.includes('amazon.ae') || itemUrl.includes('noon.com') || itemUrl.includes('shein.ae')) {
-      currency = 'AED';
-    } else if (itemUrl.includes('amazon.sa') || itemUrl.includes('shein.sa') || isSheinArabic) {
-      currency = 'SAR';
-    } else if (itemUrl.includes('amazon.com') || isShein) {
-      currency = 'USD';
-    }
-  }
-
-  // Fail-safe: If Shein item is in SAR or has SAR symbol (⃁, \u20C1, ر.س, ﷼), convert its price to USD before saving
+  // Detect SAR from price symbols, currency code, or Saudi domains
   const hasSarPriceSymbol =
     String(newPrice).includes('⃁') ||
     String(newPrice).includes('\u20C1') ||
@@ -216,14 +206,24 @@ export const normalizeCartItem = item => {
     String(newPrice).includes('\uFDFC') ||
     /\b(?:SAR|SR|RIYAL)\b/i.test(String(newPrice));
 
-  if (isShein && (currency === 'SAR' || item?.currency === 'SAR' || hasSarPriceSymbol || isSheinArabic)) {
+  if (
+    hasSarPriceSymbol ||
+    currency === 'SAR' ||
+    item?.currency === 'SAR' ||
+    isSheinArabic ||
+    itemUrl.includes('amazon.sa') ||
+    itemUrl.includes('shein.sa')
+  ) {
+    currency = 'SAR';
     const rawNum = parsePrice(newPrice);
     if (rawNum && rawNum > 0) {
-      const conv = calculateConvertedPrice(rawNum, 'SAR') || parseFloat((rawNum * 0.266667).toFixed(2));
-      if (conv && conv > 0) {
-        newPrice = conv.toFixed(2);
-        currency = '$';
-      }
+      newPrice = rawNum.toFixed(2);
+    }
+  } else if (!currency || currency === 'TL') {
+    if (itemUrl.includes('amazon.ae') || itemUrl.includes('noon.com') || itemUrl.includes('shein.ae')) {
+      currency = 'AED';
+    } else if (itemUrl.includes('amazon.com') || isShein) {
+      currency = 'USD';
     }
   }
 

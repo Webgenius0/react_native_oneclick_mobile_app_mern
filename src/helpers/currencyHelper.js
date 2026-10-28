@@ -230,15 +230,25 @@ export const calculateConvertedPrice = (
     return parseFloat(price.toFixed(2));
   }
 
+  const isWeaker = ['SAR', 'AED', 'UAE', 'TRY', 'QAR', 'EGP', 'INR', 'PKR'].includes(currency);
+
   // 1. Check dynamic rates (Multiplier: Price_in_USD = Local_Price * rates[CURRENCY])
   const rateVal = Number(rates?.[currency]);
   if (!isNaN(rateVal) && rateVal > 0) {
+    if (isWeaker && rateVal > 1) {
+      // rateVal is an inverse rate (e.g. 3.75 SAR per USD) -> divide instead of multiply
+      return parseFloat((price / rateVal).toFixed(2));
+    }
     return parseFloat((price * rateVal).toFixed(2));
   }
 
   // 2. Check dynamic inverse rates (Divisor: Price_in_USD = Local_Price / inverseRates[CURRENCY])
   const inverseRateVal = Number(inverseRates?.[currency]);
   if (!isNaN(inverseRateVal) && inverseRateVal > 0) {
+    if (isWeaker && inverseRateVal < 1) {
+      // inverseRateVal is a direct multiplier -> multiply instead of divide
+      return parseFloat((price * inverseRateVal).toFixed(2));
+    }
     return parseFloat((price / inverseRateVal).toFixed(2));
   }
 

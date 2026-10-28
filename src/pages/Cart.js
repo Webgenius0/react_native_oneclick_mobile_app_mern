@@ -63,16 +63,7 @@ export default function CartPage({ navigation }) {
     items &&
       items.length > 0 &&
       items.some(it => {
-        const isShein = Boolean(
-          (it?.store && String(it.store).toLowerCase().includes('shein')) ||
-            (it?.url && String(it.url).toLowerCase().includes('shein.com')) ||
-            (it?.marketplace &&
-              String(it.marketplace).toLowerCase().includes('shein')) ||
-            String(getStoreName(it?.url, it?.store || '')).toLowerCase() ===
-              'shein',
-        );
         const info = getReceivedCurrencyInfo(it);
-        if (isShein && info.isUsd) return false;
         return !info.isUsd;
       }),
   );

@@ -17,16 +17,34 @@ export const parseExchangeRateData = data => {
   // Ingest pairs from API response dynamically
   if (Array.isArray(data.pairs)) {
     data.pairs.forEach(pair => {
-      if (pair && pair.from) {
-        const fromUpper = String(pair.from).toUpperCase().trim();
-        const toUpper = String(pair.to || 'USD').toUpperCase().trim();
-        if (toUpper === 'USD') {
-          if (pair.rate !== undefined && pair.rate !== null && !ratesObj[fromUpper]) {
-            ratesObj[fromUpper] = Number(pair.rate);
+      if (!pair) return;
+      const fromUpper = String(pair.from || '').toUpperCase().trim();
+      const toUpper = String(pair.to || 'USD').toUpperCase().trim();
+      const rawRate = Number(pair.rate);
+      const rawInverse = Number(pair.inverseRate);
+
+      if (toUpper === 'USD' && fromUpper) {
+        if (!isNaN(rawRate) && rawRate > 0) {
+          if (['SAR', 'AED', 'TRY', 'UAE', 'QAR', 'EGP', 'INR', 'PKR'].includes(fromUpper) && rawRate > 1) {
+            inverseRatesObj[fromUpper] = rawRate;
+            ratesObj[fromUpper] = Number((1 / rawRate).toFixed(6));
+          } else {
+            ratesObj[fromUpper] = rawRate;
+            if (!inverseRatesObj[fromUpper]) {
+              inverseRatesObj[fromUpper] = Number((1 / rawRate).toFixed(6));
+            }
           }
-          if (pair.inverseRate !== undefined && pair.inverseRate !== null && !inverseRatesObj[fromUpper]) {
-            inverseRatesObj[fromUpper] = Number(pair.inverseRate);
+        }
+        if (!isNaN(rawInverse) && rawInverse > 0) {
+          inverseRatesObj[fromUpper] = rawInverse;
+          if (!ratesObj[fromUpper]) {
+            ratesObj[fromUpper] = Number((1 / rawInverse).toFixed(6));
           }
+        }
+      } else if (fromUpper === 'USD' && toUpper) {
+        if (!isNaN(rawRate) && rawRate > 0) {
+          inverseRatesObj[toUpper] = rawRate;
+          ratesObj[toUpper] = Number((1 / rawRate).toFixed(6));
         }
       }
     });
@@ -54,14 +72,33 @@ export const parseExchangeRateData = data => {
 
   if (data.rateAed) {
     inverseRatesObj.AED = Number(data.rateAed);
-    if (!ratesObj.AED && data.rateAed > 0) {
-      ratesObj.AED = Number((1 / data.rateAed).toFixed(6));
-    }
+    ratesObj.AED = Number((1 / data.rateAed).toFixed(6));
   }
   if (data.rateTry) {
     inverseRatesObj.TRY = Number(data.rateTry);
-    if (!ratesObj.TRY && data.rateTry > 0) {
-      ratesObj.TRY = Number((1 / data.rateTry).toFixed(6));
+    ratesObj.TRY = Number((1 / data.rateTry).toFixed(6));
+  }
+
+  // Handle rateSar / rate_sar from API
+  const rawSarRate =
+    data.rateSar ||
+    data.rate_sar ||
+    data.rateSAR ||
+    data.sar ||
+    data.SAR ||
+    (data.rates && (data.rates.SAR || data.rates.sar)) ||
+    (data.inverseRates && (data.inverseRates.SAR || data.inverseRates.sar));
+
+  if (rawSarRate) {
+    const num = Number(rawSarRate);
+    if (!isNaN(num) && num > 0) {
+      if (num > 1) {
+        inverseRatesObj.SAR = num;
+        ratesObj.SAR = Number((1 / num).toFixed(6));
+      } else {
+        ratesObj.SAR = num;
+        inverseRatesObj.SAR = Number((1 / num).toFixed(6));
+      }
     }
   }
 
@@ -72,6 +109,29 @@ export const parseExchangeRateData = data => {
   if (inverseRatesObj.AED) {
     inverseRatesObj.UAE = inverseRatesObj.AED;
   }
+
+  // Sanity check across all weaker currencies (SAR, AED, TRY, etc.)
+  // to ensure ratesObj is always the multiplier (< 1) and inverseRatesObj is always the divisor (> 1)
+  const weakerCurrencies = ['SAR', 'AED', 'UAE', 'TRY', 'QAR', 'EGP', 'INR', 'PKR'];
+  weakerCurrencies.forEach(curr => {
+    const direct = Number(ratesObj[curr]);
+    const inv = Number(inverseRatesObj[curr]);
+
+    if (!isNaN(direct) && direct > 1) {
+      inverseRatesObj[curr] = direct;
+      ratesObj[curr] = Number((1 / direct).toFixed(6));
+    } else if (!isNaN(inv) && inv > 0 && inv < 1) {
+      ratesObj[curr] = inv;
+      inverseRatesObj[curr] = Number((1 / inv).toFixed(6));
+    }
+
+    if (ratesObj[curr] && (!inverseRatesObj[curr] || isNaN(inverseRatesObj[curr]))) {
+      inverseRatesObj[curr] = Number((1 / ratesObj[curr]).toFixed(6));
+    }
+    if (inverseRatesObj[curr] && (!ratesObj[curr] || isNaN(ratesObj[curr]))) {
+      ratesObj[curr] = Number((1 / inverseRatesObj[curr]).toFixed(6));
+    }
+  });
 
   // USD is always 1.0 (never converted)
   const newRates = {
@@ -97,6 +157,7 @@ export const parseExchangeRateData = data => {
     ),
     rateAed: Number(data.rateAed || newInverseRates.AED || 3.2),
     rateTry: Number(data.rateTry || newInverseRates.TRY || 33.9997),
+    rateSar: Number(rawSarRate || newInverseRates.SAR || 3.75),
     lastFetched: Date.now(),
     loading: false,
     error: null,
@@ -114,6 +175,7 @@ export const useExchangeRateStore = create(
       defaultInverseRate: 3.2,
       rateAed: 3.2,
       rateTry: 33.9997,
+      rateSar: 3.75,
       pairs: [],
       lastFetched: null,
       loading: false,
@@ -204,20 +266,11 @@ export const useExchangeRateStore = create(
        * @returns {number}
        */
       toUSD: (amount, fromCurrency = 'AED') => {
-        const cur = normalizeCurrency(fromCurrency);
-        if (cur === 'USD') {
-          return Number(amount) || 0;
-        }
         const {rates, inverseRates} = get();
-        const rate = Number(rates[cur] || DEFAULT_RATES[cur]);
-        if (!isNaN(rate) && rate > 0) {
-          return parseFloat((Number(amount) * rate).toFixed(2));
-        }
-        const invRate = Number(inverseRates[cur] || DEFAULT_INVERSE_RATES[cur]);
-        if (!isNaN(invRate) && invRate > 0) {
-          return parseFloat((Number(amount) / invRate).toFixed(2));
-        }
-        return Number(amount) || 0;
+        return (
+          calculateConvertedPrice(amount, fromCurrency, rates, inverseRates) ??
+          (Number(amount) || 0)
+        );
       },
 
       /**
@@ -232,13 +285,20 @@ export const useExchangeRateStore = create(
           return Number(usdAmount) || 0;
         }
         const {rates, inverseRates} = get();
-        const rate = Number(rates[cur] || DEFAULT_RATES[cur]);
-        if (!isNaN(rate) && rate > 0) {
-          return parseFloat((Number(usdAmount) / rate).toFixed(2));
-        }
+        const isWeaker = ['SAR', 'AED', 'UAE', 'TRY', 'QAR', 'EGP', 'INR', 'PKR'].includes(cur);
         const invRate = Number(inverseRates[cur] || DEFAULT_INVERSE_RATES[cur]);
         if (!isNaN(invRate) && invRate > 0) {
+          if (isWeaker && invRate < 1) {
+            return parseFloat((Number(usdAmount) / invRate).toFixed(2));
+          }
           return parseFloat((Number(usdAmount) * invRate).toFixed(2));
+        }
+        const rate = Number(rates[cur] || DEFAULT_RATES[cur]);
+        if (!isNaN(rate) && rate > 0) {
+          if (isWeaker && rate > 1) {
+            return parseFloat((Number(usdAmount) * rate).toFixed(2));
+          }
+          return parseFloat((Number(usdAmount) / rate).toFixed(2));
         }
         return Number(usdAmount) || 0;
       },
@@ -266,6 +326,7 @@ export const useExchangeRateStore = create(
         defaultInverseRate: state.defaultInverseRate,
         rateAed: state.rateAed,
         rateTry: state.rateTry,
+        rateSar: state.rateSar,
         pairs: state.pairs,
         lastFetched: state.lastFetched,
       }),

@@ -49,7 +49,9 @@ export default function CartItem({
     isShein && safePercent > 0 ? basePrice * (safePercent / 100) : 0;
   const finalPrice = basePrice + percentAmount;
   const displayPrice =
-    finalPrice > 0 ? finalPrice.toFixed(2) : item?.price || '';
+    finalPrice > 0
+      ? (finalPrice % 1 === 0 ? finalPrice.toFixed(0) : finalPrice.toFixed(2))
+      : item?.price || '';
 
   const { code: itemCurrency, display: receivedDisplay, isUsd } =
     getReceivedCurrencyInfo(item);

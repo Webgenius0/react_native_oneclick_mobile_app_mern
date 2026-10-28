@@ -2793,7 +2793,6 @@ export default function Webview({ route, navigation }) {
         resolvedCurrency = rawCurrency ? currencyInfo.code : (currencyInfo.code || fallbackCurrency);
       }
 
-      // Convert to USD before adding to cart if item is from Shein in SAR (or non-USD)
       const baseParsedPrice = parsePrice(resolvedPrice);
       const isSarPrice =
         currencyInfo.code === 'SAR' ||
@@ -2807,18 +2806,10 @@ export default function Webview({ route, navigation }) {
         /\b(?:SAR|SR|RIYAL)\b/i.test(String(resolvedPrice)) ||
         isSheinArabic;
 
-      if (isShein && (isSarPrice || !currencyInfo.isUsd) && baseParsedPrice > 0) {
-        const ratesStore = useExchangeRateStore.getState();
-        const convCurr = isSarPrice ? 'SAR' : (currencyInfo.code || resolvedCurrency || 'SAR');
-        const convertedUsd = calculateConvertedPrice(
-          baseParsedPrice,
-          convCurr,
-          ratesStore.rates,
-          ratesStore.inverseRates,
-        );
-        if (convertedUsd && convertedUsd > 0) {
-          resolvedPrice = convertedUsd.toFixed(2);
-          resolvedCurrency = '$';
+      if (isSarPrice) {
+        resolvedCurrency = 'SAR';
+        if (baseParsedPrice > 0) {
+          resolvedPrice = baseParsedPrice.toFixed(2);
         }
       }
 
