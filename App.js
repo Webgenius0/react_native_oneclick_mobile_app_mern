@@ -14,6 +14,7 @@ import { DEV_REDIRECT_STORE, FIREBASE_ENABLED, MOBIL_SCRIPT } from './config';
 import { useScriptServiceStore } from './src/store/useScriptServiceStore';
 import { useSheinPriceStore } from './src/store/useSheinPriceStore';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import ErrorBoundary from './src/components/common/ErrorBoundary';
 
 // @ts-ignore
 const App = () => {
@@ -169,11 +170,13 @@ const App = () => {
 
   return (
     <SafeAreaProvider>
-      <EmContext.Provider value={contextData}>
-        {/*__DEV__ ? <WaafiPay /> : <AppNavigator />*/}
-        <AppNavigator />
-        <Toast />
-      </EmContext.Provider>
+      <ErrorBoundary>
+        <EmContext.Provider value={contextData}>
+          {/*__DEV__ ? <WaafiPay /> : <AppNavigator />*/}
+          <AppNavigator />
+          <Toast />
+        </EmContext.Provider>
+      </ErrorBoundary>
     </SafeAreaProvider>
   );
 };
