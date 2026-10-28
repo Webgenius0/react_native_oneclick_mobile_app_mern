@@ -9,6 +9,31 @@ LogBox.ignoreLogs([
   'Package react-native-ionicons contains invalid configuration',
 ]);
 
+// Global error safety net to intercept unhandled JS/network exceptions and avoid app crashes
+if (global.ErrorUtils) {
+  const defaultErrorHandler = global.ErrorUtils.getGlobalHandler();
+  global.ErrorUtils.setGlobalHandler((error, isFatal) => {
+    const errorStr = String(error?.message || error || '');
+    const isNetworkOrApiError =
+      errorStr.includes('Network') ||
+      errorStr.includes('timeout') ||
+      errorStr.includes('Server Error') ||
+      errorStr.includes('Axios') ||
+      errorStr.includes('fetch') ||
+      errorStr.includes('ECONNABORTED') ||
+      errorStr.includes('AbortError');
+
+    if (isNetworkOrApiError) {
+      console.warn('[GlobalHandler] Safely caught network/API error:', errorStr);
+      return;
+    }
+
+    if (defaultErrorHandler) {
+      defaultErrorHandler(error, isFatal);
+    }
+  });
+}
+
 function HeadlessCheck({isHeadless}) {
   if (isHeadless) {
     // App has been launched in the background by iOS, ignore

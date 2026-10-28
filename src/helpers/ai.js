@@ -66,6 +66,21 @@ ai.interceptors.response.use(
     if (aiLog) {
       console.log('response', response);
     }
+    // Protect against HTML or invalid string responses when server returns HTML error page with 200 OK
+    if (
+      typeof response?.data === 'string' &&
+      (response.data.includes('<html') || response.data.includes('<!DOCTYPE'))
+    ) {
+      if (aiErrorLog) {
+        console.warn('API returned HTML page instead of JSON:', response.config?.url);
+      }
+      response.data = {
+        error: true,
+        msg: 'Server error: Invalid response format',
+        ss: [],
+        data: null,
+      };
+    }
     return response;
   },
   async error => {
@@ -231,6 +246,43 @@ ai.interceptors.response.use(
         }
       } catch (navErr) {
         console.log('403 handler error:', navErr);
+      }
+    }
+
+    // Guarantee error.response is always an object with error: true and a readable msg
+    if (!error?.response) {
+      error.response = {
+        status: 0,
+        statusText: error?.message || 'Network Error',
+        data: {
+          error: true,
+          msg:
+            error?.message ||
+            'Unable to connect to the server. Please check your internet connection.',
+          ss: [],
+          data: null,
+        },
+        headers: {},
+      };
+    } else {
+      if (
+        typeof error.response.data === 'string' &&
+        (error.response.data.includes('<html') ||
+          error.response.data.includes('<!DOCTYPE'))
+      ) {
+        error.response.data = {
+          error: true,
+          msg: `Server Error (${error.response.status || 500}). Please try again later.`,
+          ss: [],
+          data: null,
+        };
+      } else if (!error.response.data || typeof error.response.data !== 'object') {
+        error.response.data = {
+          error: true,
+          msg: error?.message || `Request failed with status ${error.response.status}`,
+          ss: [],
+          data: null,
+        };
       }
     }
 
