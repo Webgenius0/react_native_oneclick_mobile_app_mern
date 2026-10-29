@@ -38,7 +38,14 @@ export default function Account({ navigation }) {
   const { ctx, setCtx, ctxDil, setCtxDil } = useContext(EmContext);
 
   const initialUser = ctx?.user || null;
-  const initialIsGuest = !initialUser || !Object.keys(initialUser).length;
+  const initialIsGuest =
+    !initialUser ||
+    !Object.keys(initialUser).length ||
+    (!initialUser?.token && !ctx?.token) ||
+    initialUser?.kod === 'GUEST' ||
+    initialUser?.kod === 'HG1000' ||
+    initialUser?.token === 'GUEST' ||
+    ctx?.token === 'GUEST';
 
   const [state, setState] = useState({
     s: initialUser || {},
@@ -79,22 +86,26 @@ export default function Account({ navigation }) {
           currentUser?.token ||
           ctx?.token;
 
-        // Check if user has an active session (real user or dummy user)
-        const hasUserSession = Boolean(
-          currentUser &&
-          (currentUser.id || currentUser.kod || currentUser.email || currentUser.ad || currentUser.name || currentUser.tel || storedToken),
-        );
+        const isGuestStorage = (await storageGet('is_guest')) === '1';
+        const isGuest =
+          isGuestStorage ||
+          currentUser?.kod === 'GUEST' ||
+          currentUser?.kod === 'HG1000' ||
+          currentUser?.token === 'GUEST' ||
+          ctx?.user?.kod === 'GUEST' ||
+          ctx?.user?.kod === 'HG1000' ||
+          ctx?.token === 'GUEST';
 
-        if (!hasUserSession) {
+        if (isGuest || !currentUser || (!currentUser.token && !ctx?.token && !storedToken)) {
           setState({
-            s: {},
+            s: currentUser || { kod: 'HG1000', ad: 'Guest' },
             loading: false,
             isGuest: true,
           });
           return;
         }
 
-        // Active authenticated session (real user or dummy/mock user)
+        // Active authenticated session (real user)
         const activeUser = {
           ...currentUser,
           token: storedToken || currentUser?.token,
@@ -231,13 +242,16 @@ export default function Account({ navigation }) {
   const userDisplayName =
     state.s?.ad ||
     state.s?.name ||
-    (state.s?.kod ? (state.s.kod === 'HG1000' ? 'Dummy User' : `User ${state.s.kod}`) : '') ||
-    tr('User');
+    (state.isGuest
+      ? tr('Misafir Kullanıcı') || 'Guest User'
+      : tr('Kullanıcı') || 'User');
   const userSubtitle =
     state.s?.email ||
     state.s?.eposta ||
     state.s?.tel ||
-    (state.s?.kod ? `ID: ${state.s.kod}` : '');
+    (state.s?.kod && state.s.kod !== 'GUEST' && state.s.kod !== 'HG1000'
+      ? `ID: ${state.s.kod}`
+      : '');
 
   return (
     <SafeAreaView
