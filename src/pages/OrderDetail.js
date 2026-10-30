@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
   Text,
   View,
@@ -21,48 +21,109 @@ import ai from '../helpers/ai';
 import { cleanProductTitle, getStoreName } from '../helpers/storeHelper';
 import { supportPhone } from '../../config';
 import WhatsAppIcon from '../assets/svg/whatsapp.svg';
+import { useOrderStore } from '../store/useOrderStore';
 
 export default function OrderDetail({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { ctx } = useContext(EmContext);
 
-  const [order, setOrder] = useState(route.params?.s || null);
+  // 1. Initial State: prioritize route params, then check central order store cache
+  const initialOrderData = useMemo(() => {
+    if (route.params?.s) return route.params.s;
+    const targetId = route.params?.id || route.params?.grupID;
+    if (!targetId) return null;
+
+    try {
+      const storeState = useOrderStore.getState();
+      const allOrders = [
+        ...(storeState.tabs?.all?.orders || []),
+        ...(storeState.tabs?.pending?.orders || []),
+        ...(storeState.tabs?.in_progress?.orders || []),
+        ...(storeState.tabs?.delivered?.orders || []),
+        ...(storeState.tabs?.cancelled?.orders || []),
+        ...(storeState.searchCache?.orders || []),
+      ];
+      return (
+        allOrders.find(
+          o =>
+            String(o.id) === String(targetId) ||
+            String(o.order_number) === String(targetId),
+        ) || null
+      );
+    } catch (_) {
+      return null;
+    }
+  }, [route.params?.s, route.params?.id, route.params?.grupID]);
+
+  const [order, setOrder] = useState(initialOrderData);
   const [customerTracking, setCustomerTracking] = useState(null);
-  const [loading, setLoading] = useState(!route.params?.s && Boolean(route.params?.id));
+  // Zero-latency: do not show spinner if we already have initial order data
+  const [loading, setLoading] = useState(!initialOrderData && Boolean(route.params?.id));
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchOrderDetail = useCallback(async (isRefresh = false) => {
-    try {
-      const orderId = route.params?.id || order?.id;
+  // 2. High performance background fetch with strict 4s timeout (never hangs UI)
+  const fetchOrderDetail = useCallback(
+    async (isRefresh = false) => {
+      const orderId =
+        route.params?.id || order?.id || route.params?.grupID || route.params?.s?.id;
+      const grupId = route.params?.grupID || order?.grupID || order?.id || orderId;
       if (!orderId) return;
-      if (!isRefresh) {
+
+      // Only show full loading spinner if we literally have no data in memory
+      if (!isRefresh && !order) {
         setLoading(true);
       }
 
-      let c = null;
       try {
-        // Primary v4 API: GET /api/order-detail?id={orderId}
-        c = await ai.get('order-detail', { params: { id: orderId } });
-      } catch (_getErr) {
-        c = await ai.post('order-detail', { id: orderId });
-      }
+        const timeoutConfig = { timeout: 4000 };
 
-      if (c?.data && c.data.error === false) {
-        const orderData = c.data.data || c.data.order || c.data.s;
-        if (orderData) {
-          setOrder(orderData);
+        // Concurrently query order-detail (POST) and order-tracking (GET)
+        const [detailRes, trackingRes] = await Promise.allSettled([
+          ai.post(
+            'order-detail',
+            { id: orderId, grupID: grupId },
+            timeoutConfig,
+          ),
+          ai.get('order-tracking', {
+            params: { id: orderId, grupID: grupId },
+            ...timeoutConfig,
+          }),
+        ]);
+
+        if (
+          detailRes.status === 'fulfilled' &&
+          detailRes.value?.data &&
+          detailRes.value.data.error === false
+        ) {
+          const orderData =
+            detailRes.value.data.data ||
+            detailRes.value.data.order ||
+            detailRes.value.data.s;
+          if (orderData) {
+            setOrder(prev => ({ ...(prev || {}), ...orderData }));
+          }
+          if (detailRes.value.data.customer_tracking) {
+            setCustomerTracking(detailRes.value.data.customer_tracking);
+          }
         }
-        if (c.data.customer_tracking) {
-          setCustomerTracking(c.data.customer_tracking);
+
+        if (
+          trackingRes.status === 'fulfilled' &&
+          trackingRes.value?.data &&
+          trackingRes.value.data.error === false &&
+          trackingRes.value.data.customer_tracking
+        ) {
+          setCustomerTracking(trackingRes.value.data.customer_tracking);
         }
+      } catch (e) {
+        console.log('fetchOrderDetail note:', e?.message || e);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
-    } catch (e) {
-      console.log('fetchOrderDetail error:', e?.message || e);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [route.params?.id, order?.id]);
+    },
+    [route.params?.id, route.params?.grupID, route.params?.s?.id, order],
+  );
 
   useEffect(() => {
     fetchOrderDetail();
@@ -73,18 +134,34 @@ export default function OrderDetail({ route, navigation }) {
     fetchOrderDetail(true);
   };
 
-  const orders = order?.orders || (order ? [order] : []);
-  const firstItem = orders[0] || {};
-  const orderId = order?.id || firstItem.id || route.params?.id || '1CLK-582941';
+  // 3. Normalize Ordered Items list
+  const ordersList = useMemo(() => {
+    if (!order) return [];
+    if (Array.isArray(order.orders) && order.orders.length > 0) {
+      return order.orders;
+    }
+    if (Array.isArray(order.items) && order.items.length > 0) {
+      return order.items;
+    }
+    if (Array.isArray(order.products) && order.products.length > 0) {
+      return order.products;
+    }
+    // Single order item passed directly
+    return [order];
+  }, [order]);
+
+  const firstItem = ordersList[0] || {};
+  const orderId =
+    order?.id || firstItem.id || route.params?.id || '1CLK-582941';
 
   const rawDate = order?.tarih || firstItem.tarih;
   const formattedDate = rawDate
     ? moment(rawDate).format('MMM DD, YYYY')
-    : 'Sep 29, 2026';
+    : moment().format('MMM DD, YYYY');
 
   const expectedDate = rawDate
     ? moment(rawDate).add(3, 'days').format('MMM DD, YYYY')
-    : 'Oct 02, 2026';
+    : moment().add(3, 'days').format('MMM DD, YYYY');
 
   // Status mapping
   const statusNum = parseInt(
@@ -103,27 +180,95 @@ export default function OrderDetail({ route, navigation }) {
     statusTitle = 'Canceled';
     statusDesc = 'This order has been canceled.';
     statusBadgeColor = '#DC2626';
-  } else if ([1, 14, 15, 16, 18, 19].includes(statusNum)) {
-    statusTitle = 'Order Confirmed';
+  } else if ([1, 14, 15, 16, 18, 19, 21].includes(statusNum)) {
+    statusTitle = 'Pending';
     statusDesc = 'Your order is confirmed and being prepared.';
     statusBadgeColor = '#D97706';
   }
 
   const deliveryCity =
-    order?.sehir || firstItem.sehir || firstItem.teslimat_sehir || 'Borama';
+    order?.teslimatSehir ||
+    order?.sehir ||
+    order?.teslimat_sehir ||
+    order?.delivery_city ||
+    firstItem?.teslimatSehir ||
+    firstItem?.sehir ||
+    firstItem?.teslimat_sehir ||
+    'Borama';
 
-  const totalAmount = parseFloat(order?.tutar || firstItem.tutar || 0);
-  // Standard shipping cost ($25.00) - Temporarily commented out
-  // const shippingCost = 25.0;
-  // const subtotal = Math.max(0, totalAmount - shippingCost) || totalAmount;
-  // const finalTotal = totalAmount > 0 ? totalAmount : subtotal + shippingCost;
-  const shippingCost = 0.0;
-  const subtotal = totalAmount;
-  const finalTotal = totalAmount;
+  // 4. Robust Price Summary Calculations (supports urun_tutar_usd, fiyat_usd, total_usd)
+  const calculatedItemsSubtotal = useMemo(() => {
+    return ordersList.reduce((sum, it) => {
+      const price =
+        parseFloat(
+          it.fiyat_usd ??
+            it.price_usd ??
+            it.converted_price ??
+            it.tutar_usd ??
+            it.tutar ??
+            it.price ??
+            it.fiyat ??
+            0,
+        ) || 0;
+      const qty =
+        Number(it.sayi || it.count || it.qty || it.quantity || 1) || 1;
+      return sum + price * qty;
+    }, 0);
+  }, [ordersList]);
 
+  const subtotal =
+    parseFloat(
+      order?.urun_tutar_usd ??
+        order?.subtotal_usd ??
+        order?.subtotal ??
+        order?.urun_fiyat_usd ??
+        (calculatedItemsSubtotal > 0
+          ? calculatedItemsSubtotal
+          : order?.tutar_usd || order?.tutar || firstItem?.tutar || 0),
+    ) || 0;
+
+  const shippingCost =
+    parseFloat(
+      order?.nakliye_usd ??
+        order?.nakliye ??
+        order?.shipping_usd ??
+        order?.shipping_cost ??
+        firstItem?.nakliye ??
+        0,
+    ) || 0;
+
+  const finalTotal =
+    parseFloat(
+      order?.total_usd ??
+        order?.tutar_usd ??
+        order?.total ??
+        order?.total_amount ??
+        order?.tutar ??
+        firstItem?.tutar_usd ??
+        firstItem?.tutar ??
+        subtotal + shippingCost,
+    ) || subtotal + shippingCost;
+
+  // 5. Accurate Payment Information
   const paymentMethodName =
-    order?.odeme_yontemi || firstItem.odeme_yontemi || 'Visa**** 4582';
-  const isPaid = statusNum !== 1 && statusNum !== 14 && statusNum !== 18;
+    order?.odeme_yontemi ||
+    order?.odeme_turu ||
+    order?.payment_method ||
+    order?.odeme_tipi ||
+    firstItem?.odeme_yontemi ||
+    'WaafiPay / eDahab';
+
+  // Status codes that indicate unpaid / pending payment:
+  // 1 (New), 14 (Review), 15 (Price Offered), 16 (Approved), 18 (Unpaid), 19 (Action req), 21 (Ready to pay)
+  const isPayable =
+    [16, 21, 14, 15].includes(statusNum) || Boolean(order?.odenebilir);
+  const isUnpaid =
+    [1, 14, 15, 16, 18, 19, 21].includes(statusNum) ||
+    order?.odendi === 0 ||
+    order?.is_paid === false;
+  const isPaid = !isUnpaid && statusNum > 0;
+
+  const amountPaid = isPaid ? finalTotal : 0.0;
 
   const handleOpenWhatsApp = () => {
     const phoneClean = (supportPhone || '+252637979636').replace(/[^0-9]/g, '');
@@ -135,6 +280,18 @@ export default function OrderDetail({ route, navigation }) {
     });
   };
 
+  const handlePayNow = () => {
+    navigation.navigate('PaymentStart', {
+      tutar: finalTotal.toFixed(2),
+      subtotal: subtotal.toFixed(2),
+      shipping: shippingCost.toFixed(2),
+      quick: true,
+      siparis_ids: order?.order_ids || ordersList.map(o => o.id),
+      grup: order,
+      grupID: order?.id || orderId,
+    });
+  };
+
   const isDark = ctx?.isDark;
   const pageBg = isDark ? '#111827' : '#F8FAFC';
   const cardBg = isDark ? '#1F2937' : '#FFFFFF';
@@ -142,21 +299,30 @@ export default function OrderDetail({ route, navigation }) {
   const subTextColor = isDark ? '#9CA3AF' : '#64748B';
   const borderColor = isDark ? '#374151' : '#F1F5F9';
 
-  const displayOrderNumber = customerTracking?.order_number || `Order #${orderId}`;
+  const displayOrderNumber =
+    customerTracking?.order_number ||
+    order?.order_number ||
+    (orderId ? `1CLK-${orderId}` : '1CLK-582941');
   const displayDate = customerTracking?.order_date || formattedDate;
   const displayStatusTitle = customerTracking?.status_title || statusTitle;
   const displayStatusDesc = customerTracking?.status_subtitle || statusDesc;
-  const displayBadgeColor = customerTracking?.status_badge_color === 'green'
-    ? '#16A34A'
-    : customerTracking?.status_badge_color === 'red'
-    ? '#DC2626'
-    : customerTracking?.status_badge_color === 'orange'
-    ? '#D97706'
-    : statusBadgeColor;
+  const displayBadgeColor =
+    customerTracking?.status_badge_color === 'green'
+      ? '#16A34A'
+      : customerTracking?.status_badge_color === 'red'
+      ? '#DC2626'
+      : customerTracking?.status_badge_color === 'orange'
+      ? '#D97706'
+      : statusBadgeColor;
 
-  const canTrackOrder = customerTracking?.can_track !== undefined
-    ? Boolean(customerTracking.can_track)
-    : statusNum !== 6 && statusNum !== 7 && statusNum !== 8 && statusNum !== 9 && statusNum !== 10;
+  const canTrackOrder =
+    customerTracking?.can_track !== undefined
+      ? Boolean(customerTracking.can_track)
+      : statusNum !== 6 &&
+        statusNum !== 7 &&
+        statusNum !== 8 &&
+        statusNum !== 9 &&
+        statusNum !== 10;
 
   return (
     <SafeAreaView
@@ -321,23 +487,75 @@ export default function OrderDetail({ route, navigation }) {
               { backgroundColor: cardBg, borderColor: borderColor },
             ]}>
             <Text style={[styles.sectionTitle, { color: textColor }]}>
-              {tr('Ordered Items') || 'Ordered Items'} ({orders.length})
+              {tr('Ordered Items') || 'Ordered Items'} ({ordersList.length})
             </Text>
 
-            {orders.map((item, idx) => {
-              const imgUri = item.resim || item.img || item.image;
-              const store = item.magaza || item.store || 'Store';
-              const price = parseFloat(item.tutar || item.price || 0).toFixed(2);
-              const variant = [item.size || item.beden, item.color || item.renk]
+            {ordersList.map((item, idx) => {
+              const imgUri =
+                item.resim ||
+                item.img ||
+                item.image ||
+                item.pic ||
+                item.photo ||
+                (Array.isArray(item.images) && item.images[0]) ||
+                (Array.isArray(order?.images) && order.images[idx]) ||
+                null;
+
+              const store =
+                item.magaza ||
+                item.store ||
+                getStoreName(item.link || item.url, '') ||
+                '1Click Store';
+
+              const itemPrice = (
+                parseFloat(
+                  item.fiyat_usd ??
+                    item.price_usd ??
+                    item.converted_price ??
+                    item.tutar_usd ??
+                    item.tutar ??
+                    item.price ??
+                    item.fiyat ??
+                    0,
+                ) || 0
+              ).toFixed(2);
+
+              const itemQty =
+                Number(
+                  item.sayi || item.count || item.qty || item.quantity || 1,
+                ) || 1;
+
+              const variantDetails = [
+                item.size || item.beden
+                  ? `${tr('Size') || 'Size'}: ${item.size || item.beden}`
+                  : null,
+                item.color || item.renk
+                  ? `${tr('Color') || 'Color'}: ${item.color || item.renk}`
+                  : null,
+                item.note || item.acik
+                  ? `${tr('Note') || 'Note'}: ${item.note || item.acik}`
+                  : null,
+              ]
                 .filter(Boolean)
                 .join(' • ');
 
+              const itemName = cleanProductTitle(
+                item.ad ||
+                  item.title ||
+                  item.product_name ||
+                  item.urun_adi ||
+                  item.name ||
+                  item.acik ||
+                  'Product Item',
+                item.link || item.url || '',
+              );
+
               return (
                 <View
-                  key={idx}
+                  key={item.id ? `item-${item.id}` : `idx-${idx}`}
                   style={[
                     styles.itemRow,
-                    idx < orders.length - 1 && {
+                    idx < ordersList.length - 1 && {
                       borderBottomWidth: 1,
                       borderBottomColor: borderColor,
                     },
@@ -362,19 +580,19 @@ export default function OrderDetail({ route, navigation }) {
 
                   <View style={styles.itemContentCol}>
                     <Text
-                      numberOfLines={1}
+                      numberOfLines={2}
                       style={[styles.itemName, { color: textColor }]}>
-                      {cleanProductTitle(item.ad || item.title || 'Product', '')}
+                      {itemName}
                     </Text>
-                    {variant ? (
+                    {variantDetails ? (
                       <Text
                         numberOfLines={1}
                         style={[styles.itemSub, { color: subTextColor }]}>
-                        {variant}
+                        {variantDetails}
                       </Text>
                     ) : null}
                     <Text style={[styles.itemSub, { color: subTextColor }]}>
-                      {tr('Qty') || 'Qty'}: {item.sayi || item.count || 1}
+                      {tr('Qty') || 'Qty'}: {itemQty}
                     </Text>
                   </View>
 
@@ -383,7 +601,7 @@ export default function OrderDetail({ route, navigation }) {
                       <Text style={styles.storeBadgeText}>{store}</Text>
                     </View>
                     <Text style={[styles.itemPrice, { color: textColor }]}>
-                      ${price}
+                      ${itemPrice}
                     </Text>
                   </View>
                 </View>
@@ -403,24 +621,13 @@ export default function OrderDetail({ route, navigation }) {
 
             <View style={styles.priceRow}>
               <Text style={[styles.priceLabel, { color: subTextColor }]}>
-                {tr('Subtotal') || 'Subtotal'} ({orders.length}{' '}
-                {orders.length === 1 ? 'item' : 'items'})
+                {tr('Subtotal') || 'Subtotal'} ({ordersList.length}{' '}
+                {ordersList.length === 1 ? 'item' : 'items'})
               </Text>
               <Text style={[styles.priceValue, { color: textColor }]}>
                 ${subtotal.toFixed(2)}
               </Text>
             </View>
-
-            {/* Shipping Cost row - temporarily commented out
-            <View style={styles.priceRow}>
-              <Text style={[styles.priceLabel, { color: subTextColor }]}>
-                {tr('Shipping Cost') || 'Shipping Cost'}
-              </Text>
-              <Text style={[styles.priceValue, { color: textColor }]}>
-                ${shippingCost.toFixed(2)}
-              </Text>
-            </View>
-            */}
 
             <View
               style={[
@@ -444,25 +651,40 @@ export default function OrderDetail({ route, navigation }) {
               {tr('Payment Information') || 'Payment Information'}
             </Text>
 
-            <View style={styles.infoRow}>
-              <Text style={[styles.infoLabel, { color: subTextColor }]}>
-                {tr('Payment method') || 'Payment method'}
-              </Text>
-              <Text style={[styles.infoValue, { color: textColor }]}>
-                {paymentMethodName}
-              </Text>
-            </View>
+            {/* Only show Payment method if order is paid */}
+            {isPaid && (
+              <View style={styles.infoRow}>
+                <Text style={[styles.infoLabel, { color: subTextColor }]}>
+                  {tr('Payment method') || 'Payment method'}
+                </Text>
+                <Text style={[styles.infoValue, { color: textColor }]}>
+                  {paymentMethodName}
+                </Text>
+              </View>
+            )}
 
             <View style={styles.infoRow}>
               <Text style={[styles.infoLabel, { color: subTextColor }]}>
                 {tr('Payment Status') || 'Payment Status'}
               </Text>
               <View style={styles.paidStatusRow}>
-                <View style={styles.paidCheckCircle}>
-                  <Text style={styles.paidCheckmark}>✓</Text>
-                </View>
-                <Text style={styles.paidStatusText}>
-                  {isPaid ? tr('Paid') || 'Paid' : tr('Pending') || 'Pending'}
+                {isPaid ? (
+                  <View style={styles.paidCheckCircle}>
+                    <Text style={styles.paidCheckmark}>✓</Text>
+                  </View>
+                ) : (
+                  <View style={styles.pendingCheckCircle}>
+                    <Text style={styles.pendingCheckmark}>!</Text>
+                  </View>
+                )}
+                <Text
+                  style={[
+                    styles.paidStatusText,
+                    { color: isPaid ? '#16A34A' : '#D97706' },
+                  ]}>
+                  {isPaid
+                    ? tr('Paid') || 'Paid'
+                    : tr('Pending Payment') || 'Pending Payment'}
                 </Text>
               </View>
             </View>
@@ -472,9 +694,21 @@ export default function OrderDetail({ route, navigation }) {
                 {tr('Amount Paid') || 'Amount Paid'}
               </Text>
               <Text style={[styles.infoValue, { color: textColor }]}>
-                ${finalTotal.toFixed(2)}
+                ${amountPaid.toFixed(2)}
               </Text>
             </View>
+
+            {/* Direct Pay Now button if order is unpaid and payable */}
+            {isPayable && (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={handlePayNow}
+                style={styles.payNowBtn}>
+                <Text style={styles.payNowBtnText}>
+                  {tr('Pay Now') || 'Pay Now'} • ${finalTotal.toFixed(2)}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Need Help with Your Order Card (Figma) */}
@@ -636,10 +870,36 @@ const styles = StyleSheet.create({
     color: '#16A34A',
     fontWeight: '800',
   },
+  pendingCheckCircle: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+  pendingCheckmark: {
+    fontSize: 11,
+    color: '#D97706',
+    fontWeight: '800',
+  },
   paidStatusText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#16A34A',
+  },
+  payNowBtn: {
+    backgroundColor: '#F67922',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 14,
+  },
+  payNowBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
   itemRow: {
     flexDirection: 'row',
