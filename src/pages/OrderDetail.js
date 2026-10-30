@@ -95,15 +95,30 @@ export default function OrderDetail({ route, navigation }) {
           detailRes.value?.data &&
           detailRes.value.data.error === false
         ) {
+          const raw = detailRes.value.data;
           const orderData =
-            detailRes.value.data.data ||
-            detailRes.value.data.order ||
-            detailRes.value.data.s;
+            raw.data ||
+            raw.order ||
+            raw.s ||
+            raw;
           if (orderData) {
-            setOrder(prev => ({ ...(prev || {}), ...orderData }));
+            setOrder(prev => ({
+              ...(prev || {}),
+              ...orderData,
+              payment_information:
+                orderData.payment_information ||
+                raw.payment_information ||
+                raw.payment_info ||
+                prev?.payment_information,
+              payment_info:
+                orderData.payment_info ||
+                raw.payment_info ||
+                raw.payment_information ||
+                prev?.payment_info,
+            }));
           }
-          if (detailRes.value.data.customer_tracking) {
-            setCustomerTracking(detailRes.value.data.customer_tracking);
+          if (raw.customer_tracking) {
+            setCustomerTracking(raw.customer_tracking);
           }
         }
 
@@ -250,7 +265,15 @@ export default function OrderDetail({ route, navigation }) {
     ) || subtotal + shippingCost;
 
   // 5. Accurate Payment Information
+  const paymentInfo =
+    order?.payment_information ||
+    order?.payment_info ||
+    firstItem?.payment_information ||
+    firstItem?.payment_info;
+
   const paymentMethodName =
+    paymentInfo?.payment_method ||
+    paymentInfo?.method ||
     order?.odeme_yontemi ||
     order?.odeme_turu ||
     order?.payment_method ||
@@ -263,12 +286,31 @@ export default function OrderDetail({ route, navigation }) {
   const isPayable =
     [16, 21, 14, 15].includes(statusNum) || Boolean(order?.odenebilir);
   const isUnpaid =
+    paymentInfo?.is_paid === false ||
     [1, 14, 15, 16, 18, 19, 21].includes(statusNum) ||
     order?.odendi === 0 ||
     order?.is_paid === false;
-  const isPaid = !isUnpaid && statusNum > 0;
+  const isPaid =
+    paymentInfo?.is_paid === true ||
+    paymentInfo?.payment_status?.toLowerCase() === 'paid' ||
+    paymentInfo?.status?.toLowerCase() === 'paid' ||
+    (!isUnpaid && statusNum > 0);
 
-  const amountPaid = isPaid ? finalTotal : 0.0;
+  const amountPaid =
+    paymentInfo?.amount_paid != null
+      ? parseFloat(paymentInfo.amount_paid)
+      : isPaid
+      ? finalTotal
+      : 0.0;
+  const formattedAmountPaid =
+    paymentInfo?.amount_paid_formatted || `$${amountPaid.toFixed(2)}`;
+
+  const paymentStatusText =
+    paymentInfo?.payment_status ||
+    paymentInfo?.status ||
+    (isPaid
+      ? tr('Paid') || 'Paid'
+      : tr('Pending Payment') || 'Pending Payment');
 
   const handleOpenWhatsApp = () => {
     const phoneClean = (supportPhone || '+252637979636').replace(/[^0-9]/g, '');
@@ -682,9 +724,7 @@ export default function OrderDetail({ route, navigation }) {
                     styles.paidStatusText,
                     { color: isPaid ? '#16A34A' : '#D97706' },
                   ]}>
-                  {isPaid
-                    ? tr('Paid') || 'Paid'
-                    : tr('Pending Payment') || 'Pending Payment'}
+                  {paymentStatusText}
                 </Text>
               </View>
             </View>
@@ -694,7 +734,7 @@ export default function OrderDetail({ route, navigation }) {
                 {tr('Amount Paid') || 'Amount Paid'}
               </Text>
               <Text style={[styles.infoValue, { color: textColor }]}>
-                ${amountPaid.toFixed(2)}
+                {formattedAmountPaid}
               </Text>
             </View>
 
