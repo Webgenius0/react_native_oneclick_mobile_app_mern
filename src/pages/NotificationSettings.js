@@ -180,13 +180,13 @@ export default function NotificationSettings({ navigation }) {
     if (rawNotifications.length === 0) return;
 
     Alert.alert(
-      tr('Bildirimleri Temizle') || 'Clear All Notifications',
-      tr('Tüm bildirimleri silmek istediğinize emin misiniz?') ||
+      tr('Clear All Notifications') || 'Clear All Notifications',
+      tr('Are you sure you want to clear all notifications?') ||
         'Are you sure you want to clear all notifications?',
       [
-        { text: tr('İptal') || 'Cancel', style: 'cancel' },
+        { text: tr('Cancel') || 'Cancel', style: 'cancel' },
         {
-          text: tr('Temizle') || 'Clear All',
+          text: tr('Clear All') || 'Clear All',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -548,12 +548,12 @@ export default function NotificationSettings({ navigation }) {
                 <Text style={[styles.emptyTitle, { color: textColor }]}>
                   {activeTab === 'unread'
                     ? tr('No unread notifications') || 'No unread notifications'
-                    : tr('Hiç bildirim yok') || 'No notifications yet'}
+                    : tr('No notifications yet') || 'No notifications yet'}
                 </Text>
                 <Text style={[styles.emptySubtitle, { color: subTextColor }]}>
                   {activeTab === 'unread'
                     ? tr("You're all caught up with your updates.") || "You're all caught up!"
-                    : tr('Yeni bildirimleriniz burada görüntülenecektir.') ||
+                    : tr('Your latest order updates and alerts will appear here.') ||
                       'Your latest order updates and alerts will appear here.'}
                 </Text>
               </View>

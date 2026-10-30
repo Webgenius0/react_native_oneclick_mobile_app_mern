@@ -265,12 +265,27 @@ export default function BannerList({ route, navigation }) {
 
     if (state.sliders && state.sliders.length > 0) {
       state.sliders.forEach((item, index) => {
-        const img = item["img_" + ctxDil] || item.img_tr;
+        const img =
+          item["img_" + ctxDil] ||
+          item.img_en ||
+          item.img_tr ||
+          item.image ||
+          item.img;
         if (img) {
           slides.push({
             id: item.id ? `api-slider-${item.id}` : `api-slider-${index}`,
-            title: item["ad_" + ctxDil] || item.ad_tr || item.title || "Special Deals",
-            ad: item["ad_" + ctxDil] || item.ad_tr || item.title || "Store",
+            title:
+              item["ad_" + ctxDil] ||
+              item.ad_en ||
+              item.title ||
+              item.ad ||
+              "Special Deals",
+            ad:
+              item["ad_" + ctxDil] ||
+              item.ad_en ||
+              item.title ||
+              item.ad ||
+              "Store",
             url: item.link || "https://www.amazon.com",
             remoteImage: img,
           });
@@ -373,7 +388,7 @@ export default function BannerList({ route, navigation }) {
 
     return state.banners.map((item, index) => {
       const rawName =
-        item["ad_" + ctxDil] || item.ad_tr || item.title || "Store";
+        item["ad_" + ctxDil] || item.ad_en || item.title || item.ad || "Store";
       const nameLower = rawName.toLowerCase();
       const linkLower = (item.link || "").toLowerCase();
 
@@ -403,9 +418,9 @@ export default function BannerList({ route, navigation }) {
         };
       }
 
-      // Dynamic store from API rendered in the Figma card style
       const colorConfig = PASTEL_PALETTE[index % PASTEL_PALETTE.length];
-      const remoteImg = item["img_" + ctxDil] || item.img_tr || "";
+      const remoteImg =
+        item["img_" + ctxDil] || item.img_en || item.image || item.img || "";
 
       return {
         id: item.id ? `store-${item.id}` : `store-${index}`,
@@ -414,7 +429,7 @@ export default function BannerList({ route, navigation }) {
         bgColor: colorConfig.bg,
         accentColor: colorConfig.text,
         remoteImg: remoteImg,
-        subtitle: tr("Öne Çıkan Mağaza") || "Featured Store",
+        subtitle: tr("Featured Store") || "Featured Store",
       };
     });
   }, [state.banners, ctxDil]);
@@ -442,7 +457,7 @@ export default function BannerList({ route, navigation }) {
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#F67922" />
             <Text style={[styles.loadingText, { color: subTextColor }]}>
-              {tr("Yükleniyor") || "Loading"}...
+              {tr("Loading") || "Loading"}...
             </Text>
           </View>
         ) : (

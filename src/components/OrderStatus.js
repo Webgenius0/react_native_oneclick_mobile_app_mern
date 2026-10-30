@@ -50,36 +50,41 @@ export default function({ durum }) {
    */
 
   let durumArr = [
-    { id: 1, p: "Hazırlanıyor", ad: "Beklemede" },
-    { id: 2, p: "Sipariş Verildi", ad: "Sipariş Verildi" },
-    { id: 3, p: "İst Depoda", ad: "Türkiye Depoda" },
-    { id: 4, p: "Kargoya Verildi", ad: "Taşımada" },
-    { id: 5, p: "Teslimat Deposunda", ad: "Teslimat Deposunda" },
-    { id: 11, p: "Dağıtımda", ad: "Dağıtımda" },
-    { id: 6, p: "Teslim Edildi", ad: "Teslim Edildi" },
-    { id: 7, p: "İptal Edildi", ad: "İptal Edildi" },
-    { id: 8, p: "İade Edildi", ad: "İade Edildi" },
-    { id: 9, p: "İade Bekleniyor", ad: "İade Bekleniyor" },
-    { id: 10, p: "Yanlış Ürün", ad: "İptal Edildi" },
-    { id: 12, p: "İptal: Yok", ad: "Ürün Kalmadı" },
-    { id: 13, p: "İptal: Fiyatı Farklı", ad: "Fiyatı Farklı" },
-    { id: 14, p: "Fiyat Bekleniyor", ad: "Fiyat Bekleniyor" },
-    { id: 15, p: "Müşteri Onayda", ad: "Onayınız Bekleniyor" },
-    { id: 16, p: "Müşteri Onayladı", ad: "Onaylandı" },
-    { id: 17, p: "İptal: Müşteri Reddetti", ad: "İptal Ettiniz" },
-    { id: 18, p: "Müşteri Ödedi", ad: "Ödeme Başarılı" },
-    { id: 19, p: "Eksik Bilgi", ad: "Eksik Bilgi" },
-    { id: 21, p: "Sipariş Onaylandı", ad: "Sipariş Onaylandı" },
-    { id: 22, p: "Seçtiğiniz beden bu ürün için mevcut değildir", ad: "Seçtiğiniz beden bu ürün için mevcut değildir" },
-    { id: 23, p: "Lütfen bir beden seçin", ad: "Lütfen bir beden seçin" },
-    { id: 24, p: "Lütfen siparişinizi doğru şekilde verin", ad: "Lütfen siparişinizi doğru şekilde verin" },
-    { id: 24, p: "Lütfen boyut seçin", ad: "Lütfen boyut seçin" },
-
+    { id: 1, p: "Hazırlanıyor", ad: "Beklemede", en: "Pending" },
+    { id: 2, p: "Sipariş Verildi", ad: "Sipariş Verildi", en: "Order Placed" },
+    { id: 3, p: "İst Depoda", ad: "Türkiye Depoda", en: "Warehouse" },
+    { id: 4, p: "Kargoya Verildi", ad: "Taşımada", en: "In Transit" },
+    { id: 5, p: "Teslimat Deposunda", ad: "Teslimat Deposunda", en: "Local Warehouse" },
+    { id: 11, p: "Dağıtımda", ad: "Dağıtımda", en: "Out for Delivery" },
+    { id: 6, p: "Teslim Edildi", ad: "Teslim Edildi", en: "Delivered" },
+    { id: 7, p: "İptal Edildi", ad: "İptal Edildi", en: "Cancelled" },
+    { id: 8, p: "İade Edildi", ad: "İade Edildi", en: "Returned" },
+    { id: 9, p: "İade Bekleniyor", ad: "İade Bekleniyor", en: "Return Pending" },
+    { id: 10, p: "Yanlış Ürün", ad: "İptal Edildi", en: "Cancelled" },
+    { id: 12, p: "İptal: Yok", ad: "Ürün Kalmadı", en: "Out of Stock" },
+    { id: 13, p: "İptal: Fiyatı Farklı", ad: "Fiyatı Farklı", en: "Price Difference" },
+    { id: 14, p: "Fiyat Bekleniyor", ad: "Fiyat Bekleniyor", en: "Awaiting Price" },
+    { id: 15, p: "Müşteri Onayda", ad: "Onayınız Bekleniyor", en: "Pending Approval" },
+    { id: 16, p: "Müşteri Onayladı", ad: "Onaylandı", en: "Approved" },
+    { id: 17, p: "İptal: Müşteri Reddetti", ad: "İptal Ettiniz", en: "Cancelled by You" },
+    { id: 18, p: "Müşteri Ödedi", ad: "Ödeme Başarılı", en: "Payment Successful" },
+    { id: 19, p: "Eksik Bilgi", ad: "Eksik Bilgi", en: "Missing Info" },
+    { id: 21, p: "Sipariş Onaylandı", ad: "Sipariş Onaylandı", en: "Order Confirmed" },
+    { id: 22, p: "Seçtiğiniz beden bu ürün için mevcut değildir", ad: "Seçtiğiniz beden bu ürün için mevcut değildir", en: "Size not available" },
+    { id: 23, p: "Lütfen bir beden seçin", ad: "Lütfen bir beden seçin", en: "Please select a size" },
+    { id: 24, p: "Lütfen siparişinizi doğru şekilde verin", ad: "Lütfen siparişinizi doğru şekilde verin", en: "Invalid order details" },
   ];
 
   let durumObj = durumArr.find((item) => item.id === durum);
 
-  return durumObj ? i18n.exists(durumObj.ad) ? i18n.t(durumObj.ad) : durumObj.ad : "";
+  if (!durumObj) return "";
+  if (durumObj.en && i18n.exists(durumObj.en)) {
+    return i18n.t(durumObj.en);
+  }
+  if (durumObj.ad && i18n.exists(durumObj.ad)) {
+    return i18n.t(durumObj.ad);
+  }
+  return durumObj.en || "";
 
 
 }

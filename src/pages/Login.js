@@ -54,7 +54,7 @@ export default function Login({ navigation }) {
       const cleanSifre = password.trim();
 
       const savedLang = await storageGet('language');
-      const activeDil = savedLang && ['en', 'tr', 'som'].includes(savedLang)
+      const activeDil = savedLang && ['en', 'som'].includes(savedLang)
         ? savedLang
         : (i18n.locale || 'en');
       i18n.defaultLocale = 'en';
@@ -122,9 +122,7 @@ export default function Login({ navigation }) {
           }
         }
         const title =
-          activeDil === 'tr'
-            ? 'Giriş Başarısız'
-            : activeDil === 'som'
+          activeDil === 'som'
             ? 'Galitaanku Wuu Fashilmay'
             : 'Login Failed';
         Alert.alert(title, errorMsg);

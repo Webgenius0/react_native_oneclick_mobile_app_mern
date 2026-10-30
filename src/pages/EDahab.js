@@ -98,8 +98,8 @@ export default function EDahab({ navigation, route }) {
 
           Toast.show({
             type: 'success',
-            text1: tr('Ödeme Başarılı') || 'Payment Successful',
-            text2: resData?.msg || tr('Ödeme Başarılı') || 'Payment Successful',
+            text1: tr('Payment Successful') || 'Payment Successful',
+            text2: resData?.msg || tr('Payment Successful') || 'Payment Successful',
           });
 
           navigation.dispatch(
@@ -119,8 +119,8 @@ export default function EDahab({ navigation, route }) {
         setSubmitting(false);
         Toast.show({
           type: 'error',
-          text1: tr('Ödeme Başarısız') || 'Payment Failed',
-          text2: resData?.msg || tr('Ödeme işlemi tamamlanamadı') || 'Payment could not be completed.',
+          text1: tr('Payment Failed') || 'Payment Failed',
+          text2: resData?.msg || tr('Payment could not be completed.') || 'Payment could not be completed.',
           text2Style: { fontSize: 14, color: '#000', width: '100%' },
         });
         return;
@@ -134,7 +134,7 @@ export default function EDahab({ navigation, route }) {
       setSubmitting(false);
       Toast.show({
         type: 'error',
-        text1: tr('Zaman Aşımı') || 'Timeout',
+        text1: tr('Timeout') || 'Timeout',
         text2: t('edahab_timeout_msg') || 'Verification timed out. Please try again.',
         text2Style: { fontSize: 14, color: '#000', width: '100%' },
       });
@@ -149,8 +149,8 @@ export default function EDahab({ navigation, route }) {
     if (!phoneNumber.trim()) {
       Toast.show({
         type: 'error',
-        text1: tr('Hata Oluştu') || 'Required Field',
-        text2: tr('Lütfen telefon numaranızı girin') || 'Please enter your phone number',
+        text1: tr('Required Field') || 'Required Field',
+        text2: tr('Please enter your phone number') || 'Please enter your phone number',
         text2Style: { fontSize: 14, color: '#000' },
       });
       return false;
@@ -201,8 +201,8 @@ export default function EDahab({ navigation, route }) {
         useCartStore.getState().clearCart();
         Toast.show({
           type: 'success',
-          text1: tr('Ödeme Başarılı') || 'Payment Successful',
-          text2: resData?.msg || tr('Ödeme Başarılı') || 'Payment Successful',
+          text1: tr('Payment Successful') || 'Payment Successful',
+          text2: resData?.msg || tr('Payment Successful') || 'Payment Successful',
         });
         navigation.dispatch(
           CommonActions.reset({
@@ -227,10 +227,10 @@ export default function EDahab({ navigation, route }) {
       } else {
         setSubmitting(false);
         const errorMsg =
-          resData?.msg || resData?.detail || tr('Ödeme işlemi başlatılamadı') || 'Could not initiate payment.';
+          resData?.msg || resData?.detail || tr('Could not initiate payment.') || 'Could not initiate payment.';
         Toast.show({
           type: 'error',
-          text1: tr('Ödeme Başarısız') || 'Payment Failed',
+          text1: tr('Payment Failed') || 'Payment Failed',
           text2: errorMsg,
           text2Style: { fontSize: 14, color: '#000', width: '100%' },
         });
@@ -240,8 +240,8 @@ export default function EDahab({ navigation, route }) {
       setSubmitting(false);
       Toast.show({
         type: 'error',
-        text1: tr('Hata Oluştu') || 'Payment Error',
-        text2: err?.response?.data?.msg || err?.message || tr('Ödeme Başarısız') || 'Payment Failed',
+        text1: tr('Payment Error') || 'Payment Error',
+        text2: err?.response?.data?.msg || err?.message || tr('Payment Failed') || 'Payment Failed',
       });
     }
   };
@@ -387,7 +387,7 @@ export default function EDahab({ navigation, route }) {
             disabled={submitting || polling}
             style={[styles.cancelBtn, { borderColor: borderColor }]}>
             <Text style={[styles.cancelBtnText, { color: subTextColor }]}>
-              {tr('İptal') || 'Cancel'}
+              {tr('Cancel') || 'Cancel'}
             </Text>
           </TouchableOpacity>
         </View>

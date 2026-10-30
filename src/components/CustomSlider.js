@@ -7,9 +7,22 @@ export default function(props) {
   let { navigation, data, ctxDil } = props;
   if (data.length === 0) return null;
 
-  // , url: item.link
-  // let mapData = data.map(item => ({ img: item['img_'+ctxDil], url: item.link }));
-  let mapData = data.map(item => ({ img: item['img_'+ctxDil] ? item['img_'+ctxDil] : item['img_tr'], ad:item.ad_tr, link: item.link }));
+  let mapData = data.map(item => ({
+    img:
+      item['img_' + ctxDil] ||
+      item.img_en ||
+      item.image ||
+      item.img ||
+      item.img_tr,
+    ad:
+      item['ad_' + ctxDil] ||
+      item.ad_en ||
+      item.title ||
+      item.name ||
+      item.ad ||
+      item.ad_tr,
+    link: item.link,
+  }));
 
   let defaultHeight = props.height || 80;
   let defaultWidth = props.width || 300;

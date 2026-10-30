@@ -1055,7 +1055,7 @@ export default function Webview({ route, navigation }) {
     Clipboard.setString(nextUrl);
     Toast.show({
       type: 'success',
-      text1: 'Link kopyalandi',
+      text1: t('Link copied') || 'Link copied',
       position: 'bottom',
     });
   }, [sourceUrl]);

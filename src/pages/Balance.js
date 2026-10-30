@@ -25,10 +25,10 @@ export default function({ route, navigation }) {
       {id: 4, ad: 'Alacak Dekontu'},
     ];*/
   const turs = [
-    { id: 1, ad: tr("Tahsilat") }, // Payment
-    { id: 2, ad: tr("Borç") }, // Debt
-    { id: 3, ad: tr("Borç") },
-    { id: 4, ad: tr("Tahsilat") },
+    { id: 1, ad: tr("Payment") || "Payment" }, // Payment
+    { id: 2, ad: tr("Debt") || "Debt" }, // Debt
+    { id: 3, ad: tr("Debt") || "Debt" },
+    { id: 4, ad: tr("Payment") || "Payment" },
   ];
 
   const d = new Date();
@@ -64,7 +64,7 @@ export default function({ route, navigation }) {
       ns = { ...state, data: c.data.ss, bakiye: c.data.s.bakiye, borc: c.data.s.borc };
     } else {
       ns = { ...state, data: [], bakiye: 0, borc: 0 };
-      alert(tr("Hata Oluştu"));
+      alert(tr("Error") || "Error");
     }
 
     ns.loading = false;
@@ -197,25 +197,25 @@ export default function({ route, navigation }) {
         {
           state.loading ? (
             <View style={styles.loading}>
-              <Text style={styles.loadingText}>{tr("Yükleniyor")}...</Text>
+              <Text style={styles.loadingText}>{(tr("Loading") || "Loading")}...</Text>
             </View>
           ) : (
             <>
               <View style={styles.ust}>
-                <Text style={styles.text}>{tr("Bakiye")}</Text>
+                <Text style={styles.text}>{tr("Balance") || "Balance"}</Text>
                 <Text style={[styles.balance, GlobalStyle.mb15]}>${state.bakiye}</Text>
-                <Text style={styles.text}>{tr("Toplam Satınalma")}:
+                <Text style={styles.text}>{tr("Total Purchase") || "Total Purchase"}:
                   ${state.borc > 0 ? state.borc : "0.00"}</Text>{/*Total Purchase*/}
               </View>
               <View style={styles.filter}>
-                <Text style={styles.filterText}>{tr("Hareketler")}</Text>{/*Transactions*/}
+                <Text style={styles.filterText}>{tr("Transactions") || "Transactions"}</Text>{/*Transactions*/}
                 <Text style={{ color: "#666" }}>{/*Filter*/}</Text>
               </View>
               <ScrollView style={styles.content}>
                 {
                   state.data.length === 0 && (
                     <View style={styles.empty}>
-                      <Text style={styles.emptyText}>{tr("Hesap Hareketi Bulunamadı")}</Text>{/*No Transaction*/}
+                      <Text style={styles.emptyText}>{tr("No Transactions Found") || "No Transactions Found"}</Text>{/*No Transaction*/}
                     </View>
                   )
                 }
@@ -228,7 +228,7 @@ export default function({ route, navigation }) {
                   <View>
                     <TouchableOpacity style={styles.odemeButton}
                                       onPress={() => navigation.navigate("PaymentStart")}>
-                      <Text style={styles.odemeButtonText}>{tr("Ödeme Yap")}</Text>
+                      <Text style={styles.odemeButtonText}>{tr("Pay") || "Pay"}</Text>
                     </TouchableOpacity>
                   </View>
                 )

@@ -1,6 +1,7 @@
 import Clipboard from "@react-native-clipboard/clipboard";
 import { TouchableOpacity, StyleSheet, Text } from "react-native";
 import Toast from "react-native-toast-message";
+import { tr } from "../translate/i18n";
 
 export default function(props) {
   const { children } = props;
@@ -18,7 +19,7 @@ export default function(props) {
   const showToast = () => {
     Toast.show({
       type: "success",
-      text1: "Panoya Kopyalandı",
+      text1: tr("Copied to Clipboard") || "Copied to Clipboard",
       position: "bottom",
     });
   };

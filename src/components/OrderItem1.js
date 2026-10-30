@@ -31,7 +31,7 @@ export default function ({
     if (c.data.error === false) {
       setRefetch(refetch + 1);
     } else {
-      alert(tr('Hata Oluştu'));
+      alert(tr('Error') || 'Error');
     }
 
     setStatusLoading(false);
@@ -169,7 +169,7 @@ export default function ({
                 <Text style={styles.text}>{item.grupID ? item.grupID+'/' : ''}{item.id}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>{tr('Fiyat')}</Text>
+                <Text style={styles.detailLabel}>{tr('Price') || 'Price'}</Text>
                 <Text style={styles.text}>:</Text>
                 <Text style={styles.text}>
                   {item.fiyat_usd > 0
@@ -180,7 +180,7 @@ export default function ({
                 </Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>{tr('Nakliye ücreti')}</Text>
+                <Text style={styles.detailLabel}>{tr('Shipping fee') || 'Shipping fee'}</Text>
                 <Text style={styles.text}>:</Text>
                 <Text style={styles.text}>
                   {item.nakliye > 0 ? item.nakliye : '-'}
@@ -192,18 +192,18 @@ export default function ({
                 <Text style={styles.text}>{item.komisyon_usd > 0 ? '$'+item.komisyon_usd : '-'}</Text>
               </View>*/}
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>{tr('Miktar')}</Text>
+                <Text style={styles.detailLabel}>{tr('Quantity') || 'Quantity'}</Text>
                 <Text style={styles.text}>:</Text>
                 <Text style={styles.text}>{item.sayi}</Text>
               </View>
               <View style={[styles.detailRow]}>
-                <Text style={styles.detailLabel}>{tr('Beden')}</Text>
+                <Text style={styles.detailLabel}>{tr('Size') || 'Size'}</Text>
                 <Text style={styles.text}>:</Text>
                 <Text style={styles.text}>{item.size}</Text>
               </View>
               {item.note && item.note.length > 0 && (
                 <View style={[styles.detailRow, gs.mb10]}>
-                  <Text style={styles.detailLabel}>{tr('Not')}</Text>
+                  <Text style={styles.detailLabel}>{tr('Note') || 'Note'}</Text>
                   <Text style={styles.text}>:</Text>
                   <Text style={styles.text}>{item.note}</Text>
                 </View>
@@ -218,7 +218,7 @@ export default function ({
               <TouchableOpacity
                 style={styles.detailBtn}
                 onPress={() => navigation.navigate('OrderDetail', {s: item})}>
-                <Text style={styles.detailBtnText}>{tr('DETAY')}</Text>
+                <Text style={styles.detailBtnText}>{tr('Detail') || 'Detail'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -226,7 +226,7 @@ export default function ({
             <View style={[styles.detailRow, gs.mb10]}>
               <View>
                 <Text style={styles.deliveredBtnText}>
-                  {tr('Durum')} : &nbsp;
+                  {(tr('Status') || 'Status')} : &nbsp;
                   <OrderStatus durum={parseInt(item.durum)} />
                 </Text>
               </View>
@@ -242,13 +242,13 @@ export default function ({
                 <TouchableOpacity
                   style={styles.acceptBtn}
                   onPress={() => updateStatus(item.id, 16)}>
-                  <Text style={styles.acceptBtnText}>{tr('KABUL ET')}</Text>
+                  <Text style={styles.acceptBtnText}>{tr('Accept') || 'Accept'}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={styles.rejectBtn}
                   onPress={() => updateStatus(item.id, 17)}>
-                  <Text style={styles.rejectBtnText}>{tr('REDDET')}</Text>
+                  <Text style={styles.rejectBtnText}>{tr('Reject') || 'Reject'}</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -268,7 +268,7 @@ export default function ({
                 <TouchableOpacity
                   style={styles.rejectBtn}
                   onPress={() => updateStatus(item.id, 17)}>
-                  <Text style={styles.rejectBtnText}>{tr('İPTAL ET')}</Text>
+                  <Text style={styles.rejectBtnText}>{tr('Cancel') || 'Cancel'}</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -288,7 +288,7 @@ export default function ({
                     })
                   }>
                   <Text style={styles.acceptBtnText}>
-                    {tr('Ödeme Yap').toUpperCase()}
+                    {(tr('Pay') || 'Pay').toUpperCase()}
                   </Text>
                 </TouchableOpacity>
               )}

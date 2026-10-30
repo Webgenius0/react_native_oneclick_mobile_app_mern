@@ -42,14 +42,14 @@ export default function ({route, navigation}) {
   const [refreshing, setRefreshing] = useState(false);
   const [statusLoading, setStatusLoading] = useState(false);
   const btns = [
-    {durum: 0, ad: tr('Tüm Siparişler')}, // All Orders
-    {durum: [7, 8, 9, 10, 12, 13, 17], ad: tr('İptal Edildi')}, // Canceled
-    {durum: [1, 14, 15, 16, 18, 19], ad: tr('Beklemede')}, // Waiting
-    {durum: [2], ad: tr('Sipariş Verildi')}, // In Transit
-    {durum: [5], ad: tr('Teslimat Deposunda')}, // Delivered
-    {durum: [3, 4], ad: tr('Taşımada')}, // In Transit
-    {durum: [11], ad: tr('Dağıtımda')}, // In Transit
-    {durum: [6], ad: tr('Teslim Edildi')}, // Delivered
+    {durum: 0, ad: tr('All Orders') || 'All Orders'}, // All Orders
+    {durum: [7, 8, 9, 10, 12, 13, 17], ad: tr('Cancelled') || 'Cancelled'}, // Canceled
+    {durum: [1, 14, 15, 16, 18, 19], ad: tr('Pending') || 'Pending'}, // Waiting
+    {durum: [2], ad: tr('Order Placed') || 'Order Placed'}, // In Transit
+    {durum: [5], ad: tr('Local Warehouse') || 'Local Warehouse'}, // Delivered
+    {durum: [3, 4], ad: tr('In Transit') || 'In Transit'}, // In Transit
+    {durum: [11], ad: tr('Out for Delivery') || 'Out for Delivery'}, // In Transit
+    {durum: [6], ad: tr('Delivered') || 'Delivered'}, // Delivered
   ];
 
   const resetId = () => {
@@ -83,7 +83,7 @@ export default function ({route, navigation}) {
     if (c.data.error === false) {
       ns = c.data.ss;
     } else {
-      alert(tr('Hata Oluştu'));
+      alert(tr('Error') || 'Error');
       ns = [];
     }
     setData(ns);
@@ -219,7 +219,7 @@ export default function ({route, navigation}) {
                     style={[gs.btn, gs.p10, gs.mt10]}
                     onPress={() => resetId()}>
                     <Text style={[gs.bold, gs.textWhite]}>
-                      {tr('Tüm Siparişler')}
+                      {tr('All Orders') || 'All Orders'}
                     </Text>
                     {/*Start to order*/}
                   </TouchableOpacity>

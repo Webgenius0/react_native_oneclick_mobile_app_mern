@@ -147,7 +147,7 @@ export default function WebviewLite({ route, navigation }) {
                   borderWidth: 1,
                   borderColor: '#DDD',
                 }}>
-                <Text>{tr('Yükleniyor')}...</Text>
+                <Text>{tr('Loading') || 'Loading'}...</Text>
               </View>
             </View>
           ) : null}

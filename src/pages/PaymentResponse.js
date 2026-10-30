@@ -55,16 +55,16 @@ export default function PaymentResponse({navigation, route}){
           <View>
             <Text style={styles.text}>
                 {
-                  status === "success" ? tr("Ödeme Başarılı") :
-                  status === "error" ? tr("Ödeme Başarısız") :
-                    tr("Ödeme İptal Edildi")
+                  status === "success" ? (tr("Payment Successful") || "Payment Successful") :
+                  status === "error" ? (tr("Payment Failed") || "Payment Failed") :
+                    (tr("Payment Cancelled") || "Payment Cancelled")
                 }
             </Text>
           </View>
 
           <View>
             <TouchableOpacity onPress={() => git('Balance')} style={styles.btn}>
-              <Text style={styles.btnText}>{tr('Bakiye')}</Text>
+              <Text style={styles.btnText}>{tr('Balance') || 'Balance'}</Text>
             </TouchableOpacity>
           </View>
         </View>

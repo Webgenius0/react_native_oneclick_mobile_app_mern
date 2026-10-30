@@ -105,7 +105,7 @@ export default function ContactOneClick({ navigation, route }) {
     try {
       await Linking.openURL(url);
     } catch (e) {
-      Alert.alert(tr('Hata') || 'Error', 'Could not open WhatsApp');
+      Alert.alert(tr('Error') || 'Error', 'Could not open WhatsApp');
     }
   };
 
@@ -113,19 +113,19 @@ export default function ContactOneClick({ navigation, route }) {
     try {
       await Linking.openURL(`mailto:${emailAddress}`);
     } catch (e) {
-      Alert.alert(tr('Hata') || 'Error', 'Could not open mail app');
+      Alert.alert(tr('Error') || 'Error', 'Could not open mail app');
     }
   };
 
   const handleCall = async () => {
     if (!primaryPhone) {
-      Alert.alert(tr('Hata') || 'Error', 'No phone number available');
+      Alert.alert(tr('Error') || 'Error', 'No phone number available');
       return;
     }
     try {
       await Linking.openURL(`tel:${primaryPhone.replace(/\s+/g, '')}`);
     } catch (e) {
-      Alert.alert(tr('Hata') || 'Error', 'Could not initiate call');
+      Alert.alert(tr('Error') || 'Error', 'Could not initiate call');
     }
   };
 

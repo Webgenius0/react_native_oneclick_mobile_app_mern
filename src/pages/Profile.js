@@ -79,7 +79,7 @@ export default function Profile({ navigation }) {
 
       if (isGuest || !currentUser || (!currentUser.token && !ctx?.token)) {
         setState({
-          s: currentUser || { kod: 'HG1000', ad: tr('Misafir') || 'Guest' },
+          s: currentUser || { kod: 'HG1000', ad: tr('Guest') || 'Guest' },
           loading: false,
           isGuest: true,
           updating: false,
@@ -138,7 +138,7 @@ export default function Profile({ navigation }) {
 
   const handleSave = async () => {
     if (state.isGuest) {
-      Alert.alert(tr('Misafir hesabında değişiklik yapılamaz') || 'Cannot edit guest account');
+      Alert.alert(tr('Cannot edit guest account') || 'Cannot edit guest account');
       return;
     }
 
@@ -155,8 +155,8 @@ export default function Profile({ navigation }) {
       const res = await ai.post('profile-update', payload);
       if (res?.data && res.data.error === false) {
         Alert.alert(
-          tr('Başarılı') || 'Success',
-          tr('Bilgileriniz başarıyla güncellendi') || 'Profile updated successfully',
+          tr('Success') || 'Success',
+          tr('Profile updated successfully') || 'Profile updated successfully',
         );
         const updated = {
           ...(state.s || {}),
@@ -171,13 +171,13 @@ export default function Profile({ navigation }) {
         }
       } else {
         Alert.alert(
-          tr('Hata') || 'Error',
-          res?.data?.msg || tr('Hata Oluştu') || 'Update failed',
+          tr('Error') || 'Error',
+          res?.data?.msg || tr('Update failed') || 'Update failed',
         );
       }
     } catch (e) {
       console.log('Profile update error:', e);
-      Alert.alert(tr('Hata') || 'Error', tr('Hata Oluştu') || 'Update failed');
+      Alert.alert(tr('Error') || 'Error', tr('Update failed') || 'Update failed');
     } finally {
       setState(prev => ({ ...prev, updating: false }));
     }
@@ -205,7 +205,7 @@ export default function Profile({ navigation }) {
     await logoutUser(navigation, setCtx);
   };
 
-  const displayName = state.s.ad || state.s.name || tr('Kullanıcı') || 'Kullanıcı';
+  const displayName = state.s.ad || state.s.name || tr('User') || 'User';
   const displayEmail = email || state.s?.email || state.s?.eposta || '';
 
   return (
@@ -219,7 +219,7 @@ export default function Profile({ navigation }) {
       <AppHeader
         navigation={navigation}
         showBack={true}
-        title={tr('Profil') || 'Profile'}
+        title={tr('Profile') || 'Profile'}
         style={{
           borderBottomWidth: 1,
           borderBottomColor: borderColor,
@@ -287,7 +287,7 @@ export default function Profile({ navigation }) {
                   {tr('Orders') || 'Orders'}
                 </Text>
                 <Text style={[styles.quickSub, { color: subTextColor }]}>
-                  {tr('Geçmiş & Takip') || 'Track & History'}
+                  {tr('Track & History') || 'Track & History'}
                 </Text>
               </TouchableOpacity>
 
@@ -306,7 +306,7 @@ export default function Profile({ navigation }) {
                   {tr('Notifications') || 'Notifications'}
                 </Text>
                 <Text style={[styles.quickSub, { color: subTextColor }]}>
-                  {tr('Güncellemeler') || 'Updates'}
+                  {tr('Updates') || 'Updates'}
                 </Text>
               </TouchableOpacity>
 
@@ -325,7 +325,7 @@ export default function Profile({ navigation }) {
                   {tr('Cart') || 'Cart'}
                 </Text>
                 <Text style={[styles.quickSub, { color: subTextColor }]}>
-                  {tr('Ürünler') || 'Items'}
+                  {tr('Items') || 'Items'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -337,13 +337,13 @@ export default function Profile({ navigation }) {
                 { backgroundColor: cardBg, borderColor: borderColor },
               ]}>
               <Text style={[styles.formCardTitle, { color: textColor }]}>
-                {tr('Account Information') || tr('Hesap Bilgileri') || 'Account Information'}
+                {tr('Account Information') || 'Account Information'}
               </Text>
 
               {/* Phone */}
               <View style={styles.formGroup}>
                 <Text style={[styles.formLabel, { color: subTextColor }]}>
-                  {tr('Telefon') || 'Phone'}
+                  {tr('Phone') || 'Phone'}
                 </Text>
                 <TextInput
                   style={[
@@ -352,7 +352,7 @@ export default function Profile({ navigation }) {
                   ]}
                   value={tel}
                   onChangeText={setTel}
-                  placeholder={tr('Telefon numaranız') || 'Your phone number'}
+                  placeholder={tr('Your phone number') || 'Your phone number'}
                   placeholderTextColor={subTextColor}
                   keyboardType="phone-pad"
                 />
@@ -361,7 +361,7 @@ export default function Profile({ navigation }) {
               {/* Email */}
               <View style={styles.formGroup}>
                 <Text style={[styles.formLabel, { color: subTextColor }]}>
-                  {tr('Email address') || tr('E-posta') || 'Email'}
+                  {tr('Email address') || 'Email'}
                 </Text>
                 <TextInput
                   style={[
@@ -370,7 +370,7 @@ export default function Profile({ navigation }) {
                   ]}
                   value={email}
                   onChangeText={setEmail}
-                  placeholder={tr('E-posta adresiniz') || 'Your email address'}
+                  placeholder={tr('Your email address') || 'Your email address'}
                   placeholderTextColor={subTextColor}
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -380,7 +380,7 @@ export default function Profile({ navigation }) {
               {/* Address */}
               <View style={styles.formGroup}>
                 <Text style={[styles.formLabel, { color: subTextColor }]}>
-                  {tr('Adres') || 'Address'}
+                  {tr('Address') || 'Address'}
                 </Text>
                 <TextInput
                   style={[
@@ -389,7 +389,7 @@ export default function Profile({ navigation }) {
                   ]}
                   value={adres}
                   onChangeText={setAdres}
-                  placeholder={tr('Teslimat adresiniz') || 'Your delivery address'}
+                  placeholder={tr('Your delivery address') || 'Your delivery address'}
                   placeholderTextColor={subTextColor}
                 />
               </View>
@@ -404,7 +404,7 @@ export default function Profile({ navigation }) {
                   <ActivityIndicator color="#FFFFFF" size="small" />
                 ) : (
                   <Text style={styles.saveBtnText}>
-                    {tr('Save Changes') || tr('Değişiklikleri Kaydet') || 'Save Changes'}
+                    {tr('Save Changes') || 'Save Changes'}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -417,7 +417,7 @@ export default function Profile({ navigation }) {
                 { backgroundColor: cardBg, borderColor: borderColor },
               ]}>
               <Text style={[styles.settingsCardTitle, { color: textColor }]}>
-                {tr('Uygulama Dili') || 'App Language'}
+                {tr('App Language') || 'App Language'}
               </Text>
               <View style={styles.langPillsRow}>
                 {availableLanguages.map(dil => {
@@ -453,7 +453,7 @@ export default function Profile({ navigation }) {
                 style={[styles.footerBtn, { backgroundColor: cardBg, borderColor: borderColor }]}
                 onPress={handleLogout}>
                 <Text style={[styles.footerBtnText, { color: '#EF4444' }]}>
-                  {tr('Çıkış Yap') || 'Log Out'}
+                  {tr('Log Out') || 'Log Out'}
                 </Text>
               </TouchableOpacity>
             </View>

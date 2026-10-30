@@ -54,8 +54,10 @@ export default function WaafiPay({ navigation, route }) {
     if (!accountNumber.trim()) {
       Toast.show({
         type: 'error',
-        text1: tr('Hata Oluştu') || 'Required Field',
-        text2: tr('Lütfen telefon numaranızı girin') || 'Please enter your account / phone number',
+        text1: tr('Required Field') || 'Required Field',
+        text2:
+          tr('Please enter your account / phone number') ||
+          'Please enter your account / phone number',
         text2Style: { fontSize: 14, color: '#000' },
       });
       return false;
@@ -85,8 +87,8 @@ export default function WaafiPay({ navigation, route }) {
         useCartStore.getState().clearCart();
         Toast.show({
           type: 'success',
-          text1: tr('Ödeme Başarılı') || 'Payment Successful',
-          text2: r?.data?.msg || tr('Ödeme Başarılı') || 'Payment Successful',
+          text1: tr('Payment Successful') || 'Payment Successful',
+          text2: r?.data?.msg || tr('Payment Successful') || 'Payment Successful',
         });
         navigation.dispatch(
           CommonActions.reset({
@@ -96,10 +98,13 @@ export default function WaafiPay({ navigation, route }) {
         );
       } else {
         const errorMsg =
-          r?.data?.msg || r?.data?.detail || tr('Ödeme Başarısız') || 'Payment Failed';
+          r?.data?.msg ||
+          r?.data?.detail ||
+          tr('Payment Failed') ||
+          'Payment Failed';
         Toast.show({
           type: 'error',
-          text1: tr('Ödeme Başarısız') || 'Payment Failed',
+          text1: tr('Payment Failed') || 'Payment Failed',
           text2: errorMsg,
           text2Style: { fontSize: 14, color: '#000', width: '100%' },
         });
@@ -108,8 +113,12 @@ export default function WaafiPay({ navigation, route }) {
       console.error('WaafiPay error:', err);
       Toast.show({
         type: 'error',
-        text1: tr('Hata Oluştu') || 'Payment Error',
-        text2: err?.response?.data?.msg || err?.message || tr('Ödeme Başarısız') || 'Payment Failed',
+        text1: tr('Payment Error') || 'Payment Error',
+        text2:
+          err?.response?.data?.msg ||
+          err?.message ||
+          tr('Payment Failed') ||
+          'Payment Failed',
       });
     } finally {
       setSubmitting(false);
@@ -257,7 +266,7 @@ export default function WaafiPay({ navigation, route }) {
             disabled={submitting}
             style={[styles.cancelBtn, { borderColor: borderColor }]}>
             <Text style={[styles.cancelBtnText, { color: subTextColor }]}>
-              {tr('İptal') || 'Cancel'}
+              {tr('Cancel') || 'Cancel'}
             </Text>
           </TouchableOpacity>
         </View>

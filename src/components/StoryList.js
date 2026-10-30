@@ -60,8 +60,19 @@ const StoryList = ({stories, navigation}) => {
 
     return stories.map(item => ({
       id: item.id,
-      img: item['img_' + ctxDil] ? item['img_' + ctxDil] : item.img_tr,
-      ad: item['ad_' + ctxDil] ? item['ad_' + ctxDil] : item.ad_tr,
+      img:
+        item['img_' + ctxDil] ||
+        item.img_en ||
+        item.image ||
+        item.img ||
+        item.img_tr,
+      ad:
+        item['ad_' + ctxDil] ||
+        item.ad_en ||
+        item.title ||
+        item.name ||
+        item.ad ||
+        item.ad_tr,
       link: item.link,
     }));
   }, [ctxDil, stories]);

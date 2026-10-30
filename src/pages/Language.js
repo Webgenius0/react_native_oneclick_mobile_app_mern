@@ -21,7 +21,6 @@ import GlobeIcon from '../assets/svg/menu_globe.svg';
 
 const LANGUAGES = [
   { id: 'en', title: 'English', subtitle: 'English (US)', flag: '🇺🇸' },
-  { id: 'tr', title: 'Türkçe', subtitle: 'Turkish', flag: '🇹🇷' },
   { id: 'som', title: 'Soomaali', subtitle: 'Somali', flag: '🇸🇴' },
 ];
 
@@ -90,7 +89,7 @@ export default function Language({ navigation }) {
             <GlobeIcon width={28} height={28} />
           </View>
           <Text style={[styles.introTitle, { color: textColor }]}>
-            {tr('Dil Seçimi') || 'Select Language'}
+            {tr('Select Language') || 'Select Language'}
           </Text>
           <Text style={[styles.introSub, { color: subTextColor }]}>
             {tr('Choose your preferred language') ||
@@ -105,8 +104,6 @@ export default function Language({ navigation }) {
             const localizedSubtitle =
               item.id === 'en'
                 ? tr('English') || 'English'
-                : item.id === 'tr'
-                ? tr('Turkish') || 'Turkish'
                 : tr('Somali') || 'Somali';
 
             return (

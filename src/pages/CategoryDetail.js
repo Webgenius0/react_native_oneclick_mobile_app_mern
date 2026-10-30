@@ -29,9 +29,11 @@ export default function({ props, route, navigation }) {
   const { width, height } = Dimensions.get("window");
   const minImageWidth = (width / 2) - 30;
 
-  const headerRight = () =>  (
+  const headerRight = () => (
     <TouchableOpacity onPress={() => navigation.navigate("WebsiteSuggest")}>
-      <Text style={{ color: Colors.primary}}>{tr('Website öner')}</Text>
+      <Text style={{ color: Colors.primary }}>
+        {tr('Suggest Website') || 'Suggest Website'}
+      </Text>
     </TouchableOpacity>
   );
   const fetchData = async () => {

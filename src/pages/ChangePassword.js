@@ -46,24 +46,27 @@ export default function ChangePassword({ navigation }) {
   const handleSave = async () => {
     if (!currentPassword) {
       Alert.alert(
-        tr('Hata') || 'Error',
-        tr('Lütfen mevcut şifrenizi girin') || 'Please enter your current password.',
+        tr('Error') || 'Error',
+        tr('Please enter your current password.') ||
+          'Please enter your current password.',
       );
       return;
     }
 
     if (!newPassword || newPassword.length < 8) {
       Alert.alert(
-        tr('Hata') || 'Error',
-        tr('Şifreniz en az 8 karakter olmalıdır') || 'Password must be at least 8 characters.',
+        tr('Error') || 'Error',
+        tr('Password must be at least 8 characters.') ||
+          'Password must be at least 8 characters.',
       );
       return;
     }
 
     if (newPassword !== confirmPassword) {
       Alert.alert(
-        tr('Hata') || 'Error',
-        tr('Şifreler uyuşmuyor') || 'New password and confirmation password do not match.',
+        tr('Error') || 'Error',
+        tr('New password and confirmation password do not match.') ||
+          'New password and confirmation password do not match.',
       );
       return;
     }
@@ -104,13 +107,13 @@ export default function ChangePassword({ navigation }) {
 
       if (res?.data && res.data.error === false) {
         Alert.alert(
-          tr('Başarılı') || 'Success',
+          tr('Success') || 'Success',
           res.data.msg ||
-            tr('Şifreniz başarıyla değiştirildi') ||
+            tr('Password updated successfully.') ||
             'Password updated successfully.',
           [
             {
-              text: tr('Tamam') || 'OK',
+              text: tr('OK') || 'OK',
               onPress: () => navigation.goBack(),
             },
           ],
@@ -127,19 +130,19 @@ export default function ChangePassword({ navigation }) {
           serverData?.error;
         if (typeof errorMsg !== 'string' || !errorMsg) {
           errorMsg =
-            tr('Şifre değiştirme işlemi başarısız oldu') ||
+            tr('Failed to change password. Please verify your current password.') ||
             'Failed to change password. Please verify your current password.';
         }
-        Alert.alert(tr('Hata') || 'Error', errorMsg);
+        Alert.alert(tr('Error') || 'Error', errorMsg);
       }
     } catch (err) {
       console.log('ChangePassword unexpected error:', err);
       const errorMsg =
         err?.response?.data?.msg ||
         err?.response?.data?.message ||
-        tr('Şifre değiştirme işlemi başarısız oldu') ||
+        tr('Failed to change password. Please verify your current password.') ||
         'Failed to change password. Please verify your current password.';
-      Alert.alert(tr('Hata') || 'Error', errorMsg);
+      Alert.alert(tr('Error') || 'Error', errorMsg);
     } finally {
       setLoading(false);
     }

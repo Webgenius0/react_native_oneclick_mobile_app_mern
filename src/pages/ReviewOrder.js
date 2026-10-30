@@ -106,8 +106,8 @@ export default function ReviewOrder({ navigation, route }) {
       const user = await getUser();
       if (!user || user.kod === 'GUEST') {
         Alert.alert(
-          tr('Giriş Yapın') || 'Sign In',
-          tr('Sipariş verebilmeniz için üye girişi yapın') ||
+          tr('Sign In') || 'Sign In',
+          tr('Please sign in to place your order.') ||
             'Please sign in to place your order.',
         );
         setIsSubmitting(false);

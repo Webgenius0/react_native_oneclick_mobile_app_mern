@@ -243,8 +243,8 @@ export default function Account({ navigation }) {
     state.s?.ad ||
     state.s?.name ||
     (state.isGuest
-      ? tr('Misafir Kullanıcı') || 'Guest User'
-      : tr('Kullanıcı') || 'User');
+      ? tr('Guest User') || 'Guest User'
+      : tr('User') || 'User');
   const userSubtitle =
     state.s?.email ||
     state.s?.eposta ||
@@ -632,7 +632,7 @@ export default function Account({ navigation }) {
               { backgroundColor: cardBg, borderColor: cardBorder },
             ]}>
             <Text style={[styles.modalTitle, { color: textColor }]}>
-              {tr('Dil Seçimi') || 'Select Language'}
+              {tr('Select Language') || 'Select Language'}
             </Text>
             {availableLanguages.map(dil => {
               const isSelected = dil.id === ctxDil;
@@ -674,10 +674,10 @@ export default function Account({ navigation }) {
               { backgroundColor: cardBg, borderColor: cardBorder },
             ]}>
             <Text style={[styles.modalTitle, { color: textColor }]}>
-              {tr('Ödeme Yöntemleri') || 'Payment Methods'}
+              {tr('Payment Methods') || 'Payment Methods'}
             </Text>
             <Text style={[styles.paymentModalSub, { color: subTextColor }]}>
-              {tr('Desteklenen güvenli ödeme seçenekleri') ||
+              {tr('Supported secure payment options for your orders') ||
                 'Supported secure payment options for your orders'}
             </Text>
 
@@ -722,7 +722,7 @@ export default function Account({ navigation }) {
               style={styles.modalCloseBtn}
               onPress={() => setPaymentModalVisible(false)}>
               <Text style={styles.modalCloseBtnText}>
-                {tr('Tamam') || 'Got it'}
+                {tr('Got it') || 'Got it'}
               </Text>
             </TouchableOpacity>
           </View>
