@@ -22,6 +22,7 @@ import { tr } from "../translate/i18n";
 import { delay } from "../helpers/common";
 import { DATA_URL } from "../../config";
 import { EmContext } from "../contexts/EmContext";
+import { useOrderStore } from "../store/useOrderStore";
 
 export default function({ route, navigation }) {
 
@@ -138,6 +139,7 @@ export default function({ route, navigation }) {
 
     if (response.data.error === false) {
       console.log("Error false", response.data);
+      useOrderStore.getState().invalidateOrders();
       alert(tr("Order Received") || "Order Received");
       setTimeout(function() {
         let d = +new Date();

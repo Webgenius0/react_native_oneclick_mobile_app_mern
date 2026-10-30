@@ -23,6 +23,7 @@ import { EmContext } from "../contexts/EmContext";
 import { getStoreName } from "../helpers/storeHelper";
 import { useExchangeRateStore } from "../store/useExchangeRateStore";
 import { useSheinPriceStore } from "../store/useSheinPriceStore";
+import { useOrderStore } from "../store/useOrderStore";
 import {
   calculateConvertedPrice,
   parsePrice,
@@ -239,6 +240,7 @@ export default function({ route, navigation }) {
 
     if (response.data.error === false) {
       console.log("Error false", response.data);
+      useOrderStore.getState().invalidateOrders();
       const orderId = response.data.order_id || (response.data.order_ids && response.data.order_ids[0]);
       const orderIds = response.data.order_ids || (orderId ? [orderId] : []);
       const totalUsd = response.data.total_usd;

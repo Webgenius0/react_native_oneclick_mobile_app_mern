@@ -18,43 +18,37 @@ import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { getMessaging, onMessage } from '@react-native-firebase/messaging';
 import { tr } from '../translate/i18n';
 import { EmContext } from '../contexts/EmContext';
-import { storageGet, storageSet } from '../helpers/storage';
-import ai from '../helpers/ai';
 import GroupItem from '../components/orders/GroupItem';
 import OrdersLoading from '../components/orders/Loading';
 import AppHeader from '../components/common/AppHeader';
 import { FIREBASE_ENABLED } from '../../config';
 import BagIcon from '../assets/svg/bag.svg';
-import {
-  FILTER_TABS,
-  getOrderStatusCategory,
-  matchesOrderSearch,
-  filterOrdersByTabAndSearch,
-} from '../helpers/orderStatus';
-
-const CACHE_ORDERS_KEY = 'cached_orders_list';
+import { FILTER_TABS } from '../helpers/orderStatus';
+import { useOrderStore } from '../store/useOrderStore';
 
 export default function Orders({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { ctx } = useContext(EmContext);
   const isFocused = useIsFocused();
 
-  const [orders, setOrders] = useState([]);
   const [activeTabId, setActiveTabId] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [hasNextPage, setHasNextPage] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [refetch, setRefetch] = useState(route?.params?.refetch || 0);
 
   const debounceTimerRef = useRef(null);
 
-  // 1. Debounce search query input (300ms as per Section 11)
+  // Connect to central store
+  const {
+    tabs,
+    searchCache,
+    fetchOrders,
+    loadInitialCache,
+    invalidateOrders,
+  } = useOrderStore();
+
+  // 1. Debounce search query input (300ms)
   useEffect(() => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
@@ -70,157 +64,119 @@ export default function Orders({ route, navigation }) {
     };
   }, [searchQuery]);
 
-  // 2. Initial cached data load for fast initial render
+  // 2. Load cached orders on mount for instant zero-latency cold start
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const cached = await storageGet(CACHE_ORDERS_KEY);
-        if (mounted && Array.isArray(cached) && cached.length > 0) {
-          setOrders(cached);
-          setLoading(false);
-        }
-      } catch (err) {
-        console.log('Error reading cached orders:', err);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    loadInitialCache();
+  }, [loadInitialCache]);
 
-  // 3. Fetch orders from backend using GET /api/orders (with POST fallback)
-  const fetchOrders = useCallback(
-    async ({
-      pageNum = 1,
-      tabId = activeTabId,
-      search = debouncedSearch,
-      isRefresh = false,
-      isSilent = false,
-    } = {}) => {
-      if (pageNum === 1 && !isRefresh && !isSilent) {
-        setLoading(true);
-      } else if (pageNum > 1) {
-        setLoadingMore(true);
-      }
+  // Determine current active dataset from store cache
+  const isSearching = debouncedSearch.length > 0;
+  const currentTabData = isSearching
+    ? searchCache
+    : tabs[activeTabId] || {
+        orders: [],
+        page: 1,
+        totalPages: 1,
+        hasNextPage: false,
+        loading: false,
+        loadingMore: false,
+      };
 
-      try {
-        const activeTabObj = FILTER_TABS.find(t => t.id === tabId) || FILTER_TABS[0];
-        const queryParams = {
-          page: pageNum,
-          per_page: 20,
-          filter: tabId,
-        };
-        if (search) {
-          queryParams.search = search;
-        }
-        if (route?.params?.grupID) {
-          queryParams.grupID = route.params.grupID;
-        }
+  const displayedOrders = currentTabData.orders || [];
+  const page = currentTabData.page || 1;
+  const totalPages = currentTabData.totalPages || 1;
+  const hasNextPage = currentTabData.hasNextPage || false;
+  const loading = currentTabData.loading || false;
+  const loadingMore = currentTabData.loadingMore || false;
 
-        let res = null;
-        try {
-          // Primary specification: GET /api/orders?page=X&per_page=20&filter=X&search=X
-          res = await ai.get('orders', { params: queryParams });
-        } catch (_getErr) {
-          // Fallback to POST orders if GET fails on legacy server
-          res = await ai.post('orders', {
-            ...queryParams,
-            durum: activeTabObj.durums || 0,
-            grupID: route?.params?.grupID || 0,
-          });
-        }
+  const lastRefetchRef = useRef(route?.params?.refetch || 0);
 
-        if (res?.data && res.data.error === false) {
-          let rawList = res.data.ss || res.data.grups || [];
-
-          // Tab-level status validation:
-          // If server didn't perform status filtering (returns mixed/unfiltered list on legacy server),
-          // ensure rawList strictly matches the requested tab.
-          if (tabId !== 'all' && Array.isArray(rawList)) {
-            const hasMismatched = rawList.some(
-              item => getOrderStatusCategory(item) !== tabId,
-            );
-            if (hasMismatched) {
-              rawList = rawList.filter(
-                item => getOrderStatusCategory(item) === tabId,
-              );
-            }
-          }
-
-          if (search && Array.isArray(rawList)) {
-            rawList = rawList.filter(item => matchesOrderSearch(item, search));
-          }
-
-          const hasMore = Boolean(
-            res.data.has_next_page ?? (pageNum < (res.data.total_pages || 1)),
-          );
-
-          if (pageNum === 1) {
-            setOrders(rawList);
-            if (!search && tabId === 'all') {
-              await storageSet(CACHE_ORDERS_KEY, rawList);
-            }
-          } else {
-            setOrders(prev => {
-              const existingIds = new Set(prev.map(item => item.id));
-              const newUnique = rawList.filter(item => !existingIds.has(item.id));
-              return [...prev, ...newUnique];
-            });
-          }
-
-          setPage(res.data.page || pageNum);
-          setTotalPages(res.data.total_pages || 1);
-          setHasNextPage(hasMore);
-        }
-      } catch (e) {
-        console.log('Orders fetch error:', e?.message || e);
-      } finally {
-        setLoading(false);
-        setLoadingMore(false);
-        setRefreshing(false);
-      }
-    },
-    [activeTabId, debouncedSearch, route?.params?.grupID],
-  );
-
-  // Trigger fetch when tab or debounced search changes
+  // 3. Fetch orders when tab changes or search query changes
   useEffect(() => {
-    setPage(1);
-    fetchOrders({ pageNum: 1, tabId: activeTabId, search: debouncedSearch });
-  }, [fetchOrders, activeTabId, debouncedSearch]);
+    fetchOrders({
+      tabId: activeTabId,
+      pageNum: 1,
+      search: debouncedSearch,
+      grupID: route?.params?.grupID,
+    });
+  }, [fetchOrders, activeTabId, debouncedSearch, route?.params?.grupID]);
 
-  // Focus effect: silently refresh current view
+  // 4. Focus effect: only re-fetch if marked dirty (new order placed) or refetch param changed
   useFocusEffect(
     useCallback(() => {
-      fetchOrders({ pageNum: 1, isSilent: true });
-    }, [fetchOrders]),
+      const dirty = useOrderStore.getState().isDirty;
+      const refetchParam = route?.params?.refetch || 0;
+      const hasNewRefetch = refetchParam && refetchParam !== lastRefetchRef.current;
+
+      if (dirty || hasNewRefetch) {
+        lastRefetchRef.current = refetchParam;
+        fetchOrders({
+          tabId: activeTabId,
+          pageNum: 1,
+          search: debouncedSearch,
+          force: true,
+          grupID: route?.params?.grupID,
+        });
+      }
+    }, [route?.params?.refetch, activeTabId, debouncedSearch, fetchOrders, route?.params?.grupID]),
   );
 
-  // Firebase real-time updates
+  // 5. Firebase real-time updates: mark dirty and refetch
   useEffect(() => {
     if (!isFocused || !FIREBASE_ENABLED) return;
     let unsubscribe;
     try {
       unsubscribe = onMessage(getMessaging(), () => {
+        invalidateOrders();
+        fetchOrders({
+          tabId: activeTabId,
+          pageNum: 1,
+          search: debouncedSearch,
+          force: true,
+        });
         setRefetch(+new Date());
       });
     } catch (e) {
       console.log('Orders onMessage error:', e?.message || e);
     }
     return unsubscribe;
-  }, [isFocused]);
+  }, [isFocused, activeTabId, debouncedSearch, invalidateOrders, fetchOrders]);
 
-  const onRefresh = useCallback(() => {
+  // Pull to refresh: forces page 1 update and refreshes cache
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    fetchOrders({ pageNum: 1, isRefresh: true });
-  }, [fetchOrders]);
+    await fetchOrders({
+      tabId: activeTabId,
+      pageNum: 1,
+      search: debouncedSearch,
+      isRefresh: true,
+      force: true,
+      grupID: route?.params?.grupID,
+    });
+    setRefreshing(false);
+  }, [activeTabId, debouncedSearch, route?.params?.grupID, fetchOrders]);
 
+  // Infinite scroll load more handler for pagination
   const handleLoadMore = useCallback(() => {
     if (hasNextPage && !loadingMore && !loading && !refreshing) {
-      fetchOrders({ pageNum: page + 1 });
+      fetchOrders({
+        tabId: activeTabId,
+        pageNum: page + 1,
+        search: debouncedSearch,
+        grupID: route?.params?.grupID,
+      });
     }
-  }, [hasNextPage, loadingMore, loading, refreshing, page, fetchOrders]);
+  }, [
+    hasNextPage,
+    loadingMore,
+    loading,
+    refreshing,
+    activeTabId,
+    page,
+    debouncedSearch,
+    route?.params?.grupID,
+    fetchOrders,
+  ]);
 
   const isDark = ctx?.isDark;
   const pageBg = isDark ? '#111827' : '#F8FAFC';
@@ -229,14 +185,10 @@ export default function Orders({ route, navigation }) {
   const subTextColor = isDark ? '#9CA3AF' : '#64748B';
   const borderColor = isDark ? '#374151' : '#F1F5F9';
 
-  const displayedOrders = useMemo(() => {
-    return filterOrdersByTabAndSearch(orders, activeTabId, debouncedSearch);
-  }, [orders, activeTabId, debouncedSearch]);
-
   const renderOrderItem = useCallback(
     ({ item, index }) => (
       <GroupItem
-        key={item.id || index}
+        key={item.id || item.order_number || index}
         s={item}
         ctx={ctx}
         navigation={navigation}
@@ -248,12 +200,12 @@ export default function Orders({ route, navigation }) {
   );
 
   const keyExtractor = useCallback(
-    (item, index) => String(item.id || item.orders?.[0]?.id || index),
+    (item, index) => String(item.id || item.order_number || index),
     [],
   );
 
   const renderFooter = useMemo(() => {
-    if (!loadingMore) return <View style={{ height: 24 }} />;
+    if (!loadingMore) return <View style={{ height: 28 }} />;
     return (
       <View style={styles.footerLoader}>
         <ActivityIndicator size="small" color="#F67922" />
@@ -356,9 +308,6 @@ export default function Orders({ route, navigation }) {
                   onPress={() => {
                     if (activeTabId !== tab.id) {
                       setActiveTabId(tab.id);
-                      setOrders([]);
-                      setLoading(true);
-                      setPage(1);
                     }
                   }}
                   style={[
@@ -396,9 +345,9 @@ export default function Orders({ route, navigation }) {
             data={displayedOrders}
             keyExtractor={keyExtractor}
             renderItem={renderOrderItem}
-            initialNumToRender={6}
-            maxToRenderPerBatch={6}
-            windowSize={5}
+            initialNumToRender={5}
+            maxToRenderPerBatch={5}
+            windowSize={4}
             removeClippedSubviews={Platform.OS === 'android'}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.ordersContent}

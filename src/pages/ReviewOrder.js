@@ -27,6 +27,7 @@ import {
 import { useExchangeRateStore } from '../store/useExchangeRateStore';
 import { useSheinPriceStore } from '../store/useSheinPriceStore';
 import { useCartStore } from '../store/useCartStore';
+import { useOrderStore } from '../store/useOrderStore';
 
 const CITIES = ['Borama', 'Hargeisa', 'Mogadishu', 'Berbera', 'Garowe', 'Kismayo', 'Bossaso'];
 
@@ -183,6 +184,7 @@ export default function ReviewOrder({ navigation, route }) {
         const res = await ai.post('cart', postData);
         if (res?.data?.grupID) {
           resGrupID = res.data.grupID;
+          useOrderStore.getState().invalidateOrders();
         }
       } catch (apiErr) {
         console.log('cart post note:', apiErr?.message || apiErr);

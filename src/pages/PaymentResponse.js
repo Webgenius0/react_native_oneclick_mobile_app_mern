@@ -8,6 +8,7 @@ import Warning from "../assets/svg/warning.svg";
 import Colors from "../assets/Colors";
 import { CommonActions } from "@react-navigation/native";
 import { useCartStore } from "../store/useCartStore";
+import { useOrderStore } from "../store/useOrderStore";
 
 export default function PaymentResponse({navigation, route}){
     const {status} = route.params;
@@ -17,6 +18,7 @@ export default function PaymentResponse({navigation, route}){
     React.useEffect(() => {
       if (status === 'success') {
         useCartStore.getState().clearCart();
+        useOrderStore.getState().invalidateOrders();
       }
     }, [status]);
 
