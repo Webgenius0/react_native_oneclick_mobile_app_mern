@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../../config';
 import { getToken } from './auth';
 import * as RootNavigation from './../services/RootNavigation';
+import { i18n } from '../translate/i18n';
 
 const ai = axios.create();
 const aiLog = false;
@@ -17,6 +18,16 @@ ai.defaults.headers.post['Content-Type'] = 'application/json';
 
 ai.interceptors.request.use(
   async config => {
+    try {
+      const activeLang = i18n?.locale || 'en';
+      if (config.headers?.set) {
+        config.headers.set('Accept-Language', activeLang);
+      } else {
+        config.headers = config.headers || {};
+        config.headers['Accept-Language'] = activeLang;
+      }
+    } catch (_) {}
+
     const token = await getToken();
     if (aiLog) {
       console.log('Request.User Token', token);

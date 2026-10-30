@@ -26,23 +26,123 @@ const isTurkishText = (str) => {
   return /[çğışöüÇĞİŞÖÜ]/.test(str);
 };
 
+const interpolate = (str, opts) => {
+  if (typeof str !== 'string' || !opts || typeof opts !== 'object') return str;
+  return str.replace(/%\{(\w+)\}/g, (_, k) => (opts[k] !== undefined ? opts[k] : `%{${k}}`));
+};
+
+const sanitizeResult = (res, fallback) => {
+  if (typeof res === 'string' && res.startsWith('[missing ') && res.endsWith(']')) {
+    return fallback !== undefined ? fallback : '';
+  }
+  return res;
+};
+
+// Wrap native i18n.t to never fail on keys containing dots (e.g. 'Adding to cart...')
+const originalI18nT = i18n.t.bind(i18n);
+i18n.t = (scope, options = {}) => {
+  if (!scope) return '';
+  const loc = getSafeLocale();
+
+  // 1. Exact match in current locale dictionary (prevents i18n-js from treating '.' as key path separator)
+  if (i18n.translations && i18n.translations[loc] && i18n.translations[loc][scope] !== undefined) {
+    return interpolate(i18n.translations[loc][scope], options);
+  }
+
+  // 2. Exact match in English fallback dictionary
+  if (i18n.translations && i18n.translations.en && i18n.translations.en[scope] !== undefined) {
+    return interpolate(i18n.translations.en[scope], options);
+  }
+
+  try {
+    const res = originalI18nT(scope, { defaultValue: scope, ...options });
+    return sanitizeResult(res, options.defaultValue !== undefined ? options.defaultValue : scope);
+  } catch (_) {
+    return options.defaultValue !== undefined ? options.defaultValue : scope;
+  }
+};
+
 const tr = (key, options = {}) => {
   if (!key) return '';
   const loc = getSafeLocale();
+
+  // 1. Direct key match in current locale (no dot split)
   if (i18n.translations && i18n.translations[loc] && i18n.translations[loc][key] !== undefined) {
-    return i18n.t(key, options);
+    return interpolate(i18n.translations[loc][key], options);
   }
+
+  // 2. Direct key match in English fallback
   if (i18n.translations && i18n.translations.en && i18n.translations.en[key] !== undefined) {
-    return i18n.translations.en[key];
+    return interpolate(i18n.translations.en[key], options);
   }
-  // If the key is in Turkish and no translation was matched, do not leak Turkish to the UI
+
+  // 3. Fallback for Turkish source keys: do not leak Turkish to the UI
   if (isTurkishText(key)) {
     return options.defaultValue !== undefined ? options.defaultValue : '';
   }
-  return i18n.t(key, { defaultValue: key, ...options });
+
+  // 4. Default value if provided
+  if (options.defaultValue !== undefined) {
+    return interpolate(options.defaultValue, options);
+  }
+
+  // 5. Native lookup with sanitized result
+  const res = i18n.t(key, options);
+  return sanitizeResult(res, key);
 };
 
 const t = (key, options = {}) => tr(key, options);
+
+const localizeApiMessage = (msg, fallback = 'Payment Failed') => {
+  if (!msg || typeof msg !== 'string') {
+    return fallback ? (tr(fallback) || fallback) : '';
+  }
+  const clean = msg.trim();
+  if (!clean) {
+    return fallback ? (tr(fallback) || fallback) : '';
+  }
+
+  // 1. Direct translation lookup
+  const directTranslated = tr(clean);
+  if (directTranslated && directTranslated !== clean) {
+    return directTranslated;
+  }
+
+  // 2. Pattern matching for common Turkish phrases returned by backend
+  const lower = clean.toLowerCase();
+  if (
+    lower.includes('cüzdan') ||
+    lower.includes('cuzdan') ||
+    (lower.includes('geçerli') && lower.includes('numara')) ||
+    (lower.includes('gecerli') && lower.includes('numara'))
+  ) {
+    return tr('Please enter a valid mobile wallet number') || 'Please enter a valid mobile wallet number';
+  }
+  if (lower.includes('bakiye') || lower.includes('yetersiz')) {
+    return tr('Insufficient balance') || 'Insufficient balance';
+  }
+  if (lower.includes('zaman aşımı') || lower.includes('zaman asimi') || lower.includes('timeout')) {
+    return tr('Transaction timed out') || 'Transaction timed out';
+  }
+  if (lower.includes('iptal')) {
+    return tr('Payment was cancelled') || 'Payment was cancelled';
+  }
+  if (
+    lower.includes('ödeme') ||
+    lower.includes('odeme') ||
+    lower.includes('başarısız') ||
+    lower.includes('basarisiz')
+  ) {
+    return tr('Payment Failed') || 'Payment Failed';
+  }
+
+  // 3. If it contains Turkish characters and was not translated, do NOT leak it:
+  if (isTurkishText(clean)) {
+    return fallback ? (tr(fallback) || fallback) : (tr('Payment Failed') || 'Payment Failed');
+  }
+
+  return clean;
+};
 
 const availableLanguages = [
   { id: "en", ad: "English" },
@@ -52,6 +152,7 @@ const availableLanguages = [
 export {
   t,
   tr,
+  localizeApiMessage,
   i18n,
   availableLanguages
 };

@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { t, tr } from '../translate/i18n';
+import { t, tr, localizeApiMessage, i18n } from '../translate/i18n';
 import Toast from 'react-native-toast-message';
 import ai from '../helpers/ai';
 import { CommonActions } from '@react-navigation/native';
@@ -117,10 +117,14 @@ export default function EDahab({ navigation, route }) {
 
         setPolling(false);
         setSubmitting(false);
+        const errorMsg = localizeApiMessage(
+          resData?.msg || resData?.detail,
+          'Payment could not be completed.',
+        );
         Toast.show({
           type: 'error',
           text1: tr('Payment Failed') || 'Payment Failed',
-          text2: resData?.msg || tr('Payment could not be completed.') || 'Payment could not be completed.',
+          text2: errorMsg,
           text2Style: { fontSize: 14, color: '#000', width: '100%' },
         });
         return;
@@ -182,6 +186,7 @@ export default function EDahab({ navigation, route }) {
       siparis_id: normalizedOrderIds,
       paymentMethodType: paymentType,
       userAgent: userAgent,
+      dil: i18n.locale || 'en',
     };
 
     console.log('Initiating eDahab payment:', basePayload);
@@ -226,8 +231,10 @@ export default function EDahab({ navigation, route }) {
         await runPollingLoop(issuedOdemeID, issuedInvoiceId, basePayload);
       } else {
         setSubmitting(false);
-        const errorMsg =
-          resData?.msg || resData?.detail || tr('Could not initiate payment.') || 'Could not initiate payment.';
+        const errorMsg = localizeApiMessage(
+          resData?.msg || resData?.detail,
+          'Could not initiate payment.',
+        );
         Toast.show({
           type: 'error',
           text1: tr('Payment Failed') || 'Payment Failed',
@@ -238,10 +245,15 @@ export default function EDahab({ navigation, route }) {
     } catch (err) {
       console.error('eDahab initiate error:', err);
       setSubmitting(false);
+      const rawError =
+        err?.response?.data?.msg ||
+        err?.response?.data?.detail ||
+        err?.message;
+      const errorMsg = localizeApiMessage(rawError, 'Payment Failed');
       Toast.show({
         type: 'error',
         text1: tr('Payment Error') || 'Payment Error',
-        text2: err?.response?.data?.msg || err?.message || tr('Payment Failed') || 'Payment Failed',
+        text2: errorMsg,
       });
     }
   };

@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { tr } from '../translate/i18n';
+import { tr, localizeApiMessage, i18n } from '../translate/i18n';
 import Toast from 'react-native-toast-message';
 import ai from '../helpers/ai';
 import { CommonActions } from '@react-navigation/native';
@@ -51,7 +51,8 @@ export default function WaafiPay({ navigation, route }) {
 
     if (submitting) return false;
 
-    if (!accountNumber.trim()) {
+    const trimmedNumber = accountNumber.trim();
+    if (!trimmedNumber) {
       Toast.show({
         type: 'error',
         text1: tr('Required Field') || 'Required Field',
@@ -68,13 +69,14 @@ export default function WaafiPay({ navigation, route }) {
 
     const data = {
       name: user?.ad || 'Customer',
-      cardNumber: accountNumber.trim(),
-      accountNumber: accountNumber.trim(),
+      cardNumber: trimmedNumber,
+      accountNumber: trimmedNumber,
       tutar: tutar,
       amount: tutar,
       siparis_ids: siparis_ids,
       paymentMethodType: paymentType,
       userAgent: userAgent,
+      dil: i18n.locale || 'en',
     };
 
     console.log('Initiating WaafiPay payment:', data);
@@ -85,10 +87,14 @@ export default function WaafiPay({ navigation, route }) {
 
       if (r?.data?.error === false) {
         useCartStore.getState().clearCart();
+        const successMsg =
+          localizeApiMessage(r?.data?.msg, 'Payment Successful') ||
+          tr('Payment Successful') ||
+          'Payment Successful';
         Toast.show({
           type: 'success',
           text1: tr('Payment Successful') || 'Payment Successful',
-          text2: r?.data?.msg || tr('Payment Successful') || 'Payment Successful',
+          text2: successMsg,
         });
         navigation.dispatch(
           CommonActions.reset({
@@ -97,11 +103,8 @@ export default function WaafiPay({ navigation, route }) {
           }),
         );
       } else {
-        const errorMsg =
-          r?.data?.msg ||
-          r?.data?.detail ||
-          tr('Payment Failed') ||
-          'Payment Failed';
+        const rawMsg = r?.data?.msg || r?.data?.detail;
+        const errorMsg = localizeApiMessage(rawMsg, 'Payment Failed');
         Toast.show({
           type: 'error',
           text1: tr('Payment Failed') || 'Payment Failed',
@@ -111,14 +114,15 @@ export default function WaafiPay({ navigation, route }) {
       }
     } catch (err) {
       console.error('WaafiPay error:', err);
+      const rawError =
+        err?.response?.data?.msg ||
+        err?.response?.data?.detail ||
+        err?.message;
+      const errorMsg = localizeApiMessage(rawError, 'Payment Failed');
       Toast.show({
         type: 'error',
         text1: tr('Payment Error') || 'Payment Error',
-        text2:
-          err?.response?.data?.msg ||
-          err?.message ||
-          tr('Payment Failed') ||
-          'Payment Failed',
+        text2: errorMsg,
       });
     } finally {
       setSubmitting(false);
