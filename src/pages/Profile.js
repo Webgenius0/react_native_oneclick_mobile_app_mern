@@ -20,7 +20,7 @@ import ai from '../helpers/ai';
 import Colors from '../assets/Colors';
 import { availableLanguages, i18n, tr } from '../translate/i18n';
 import { storageDelete, storageGet, storageSet } from '../helpers/storage';
-import { getFcmToken } from '../helpers/notification';
+import { getFcmToken, fcmUpdate } from '../helpers/notification';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUserStore } from '../store/useUserStore';
 import AppHeader from '../components/common/AppHeader';
@@ -192,12 +192,11 @@ export default function Profile({ navigation }) {
       setCtxDil(dil);
 
       const fcmToken = await getFcmToken();
-      await ai.post('update-language', {
-        dil: dil,
-        fcmToken: fcmToken,
-      });
+      if (fcmToken) {
+        await fcmUpdate(fcmToken, true);
+      }
     } catch (e) {
-      console.log('Language update error:', e);
+      // safe fallback
     }
   };
 

@@ -18,7 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { availableLanguages, i18n, tr } from '../translate/i18n';
 import { storageDelete, storageGet, storageSet } from '../helpers/storage';
-import { getFcmToken } from '../helpers/notification';
+import { getFcmToken, fcmUpdate } from '../helpers/notification';
 import * as RootNavigation from '../services/RootNavigation';
 import { logoutUser, setUser } from '../helpers/auth';
 
@@ -223,10 +223,9 @@ export default function Account({ navigation }) {
     i18n.locale = dil;
     try {
       const fcmToken = await getFcmToken();
-      await ai.post('update-language', {
-        dil: dil,
-        fcmToken: fcmToken,
-      });
+      if (fcmToken) {
+        await fcmUpdate(fcmToken, true);
+      }
     } catch (e) {}
     setCtxDil(dil);
   };

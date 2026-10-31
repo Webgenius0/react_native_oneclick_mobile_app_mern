@@ -13,8 +13,7 @@ import {
 import { EmContext } from '../contexts/EmContext';
 import { availableLanguages, i18n, tr } from '../translate/i18n';
 import { storageSet } from '../helpers/storage';
-import { getFcmToken } from '../helpers/notification';
-import ai from '../helpers/ai';
+import { getFcmToken, fcmUpdate } from '../helpers/notification';
 import AppHeader from '../components/common/AppHeader';
 
 import GlobeIcon from '../assets/svg/menu_globe.svg';
@@ -46,12 +45,11 @@ export default function Language({ navigation }) {
       setCtxDil(langId);
 
       const fcmToken = await getFcmToken();
-      await ai.post('update-language', {
-        dil: langId,
-        fcmToken: fcmToken,
-      });
+      if (fcmToken) {
+        await fcmUpdate(fcmToken, true);
+      }
     } catch (e) {
-      console.log('Language update background error:', e);
+      // safe fallback
     } finally {
       setSaving(false);
     }
