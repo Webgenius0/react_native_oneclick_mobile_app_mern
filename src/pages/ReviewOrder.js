@@ -18,7 +18,7 @@ import { tr, localizeApiMessage } from '../translate/i18n';
 import { EmContext } from '../contexts/EmContext';
 import { getUser, getToken, isGuestUser } from '../helpers/auth';
 import ai from '../helpers/ai';
-import { cleanProductTitle, getStoreName } from '../helpers/storeHelper';
+import { cleanProductTitle, getStoreName, calculateMarketplacePrice } from '../helpers/storeHelper';
 import {
   parsePrice,
   calculateConvertedPrice,
@@ -47,8 +47,7 @@ export default function ReviewOrder({ navigation, route }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { rates, inverseRates } = useExchangeRateStore();
-  const sheinPercent = useSheinPriceStore(state => state.percent) ?? 0;
-  const safePercent = Number(sheinPercent) > 0 ? Number(sheinPercent) : 0;
+  const marketplaces = useSheinPriceStore(state => state.marketplaces) || [];
 
   useEffect(() => {
     async function loadUserCity() {
@@ -73,17 +72,7 @@ export default function ReviewOrder({ navigation, route }) {
     items.length > 0
       ? items.reduce((sum, item) => {
           const basePrice = parsePrice(item?.price) || 0;
-          const isShein = Boolean(
-            (item?.store && String(item.store).toLowerCase().includes('shein')) ||
-              (item?.url && String(item.url).toLowerCase().includes('shein.com')) ||
-              (item?.marketplace &&
-                String(item.marketplace).toLowerCase().includes('shein')) ||
-              String(getStoreName(item?.url, item?.store || '')).toLowerCase() ===
-                'shein',
-          );
-          const percentAmount =
-            isShein && safePercent > 0 ? basePrice * (safePercent / 100) : 0;
-          const finalPrice = basePrice + percentAmount;
+          const { finalPrice } = calculateMarketplacePrice(basePrice, item, marketplaces);
           const count = Number(item?.count) > 0 ? Number(item.count) : 1;
 
           const { code: itemCurrency, isUsd } = getReceivedCurrencyInfo(item);
@@ -167,22 +156,11 @@ export default function ReviewOrder({ navigation, route }) {
       items.forEach(item => {
         const storeName = item.store || getStoreName(item.url, '') || '';
         const parsedPriceVal = parsePrice(item.price);
-        const isShein = Boolean(
-          (item?.store && String(item.store).toLowerCase().includes('shein')) ||
-            (item?.url && String(item.url).toLowerCase().includes('shein.com')) ||
-            (item?.marketplace &&
-              String(item.marketplace).toLowerCase().includes('shein')) ||
-            String(getStoreName(item?.url, item?.store || '')).toLowerCase() ===
-              'shein',
+        const { finalPrice: finalPriceVal } = calculateMarketplacePrice(
+          parsedPriceVal,
+          item,
+          marketplaces,
         );
-        const percentAmount =
-          isShein && safePercent > 0 && parsedPriceVal !== null
-            ? parsedPriceVal * (safePercent / 100)
-            : 0;
-        const finalPriceVal =
-          parsedPriceVal !== null
-            ? parseFloat((parsedPriceVal + percentAmount).toFixed(2))
-            : null;
 
         const { code: normalizedCurr, isUsd } = getReceivedCurrencyInfo(item);
         const convertedPriceVal =

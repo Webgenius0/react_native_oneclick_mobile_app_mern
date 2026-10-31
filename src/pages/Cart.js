@@ -28,7 +28,7 @@ import {
   detectItemCurrency,
   getReceivedCurrencyInfo,
 } from '../helpers/currencyHelper';
-import { cleanProductTitle, getStoreName } from '../helpers/storeHelper';
+import { cleanProductTitle, getStoreName, calculateMarketplacePrice } from '../helpers/storeHelper';
 import CartIcon from '../assets/svg/cart.svg';
 import TrashIcon from '../assets/svg/trash.svg';
 
@@ -74,8 +74,7 @@ export default function CartPage({ navigation }) {
     fetchSheinPrice();
   }, [fetchRates, fetchSheinPrice, hasNonUsdItems, items]);
 
-  const sheinPercent = useSheinPriceStore(state => state.percent) ?? 0;
-  const safePercent = Number(sheinPercent) > 0 ? Number(sheinPercent) : 0;
+  const marketplaces = useSheinPriceStore(state => state.marketplaces) || [];
   const checkedItems = useMemo(
     () => (items ? items.filter(item => item.checked === true) : []),
     [items],
@@ -84,34 +83,14 @@ export default function CartPage({ navigation }) {
 
   const totalPrice = checkedItems.reduce((sum, item) => {
     const basePrice = parsePrice(item?.price) || 0;
-    const isShein = Boolean(
-      (item?.store && String(item.store).toLowerCase().includes('shein')) ||
-        (item?.url && String(item.url).toLowerCase().includes('shein.com')) ||
-        (item?.marketplace &&
-          String(item.marketplace).toLowerCase().includes('shein')) ||
-        String(getStoreName(item?.url, item?.store || '')).toLowerCase() ===
-          'shein',
-    );
-    const percentAmount =
-      isShein && safePercent > 0 ? basePrice * (safePercent / 100) : 0;
-    const finalPrice = parseFloat((basePrice + percentAmount).toFixed(2));
+    const { finalPrice } = calculateMarketplacePrice(basePrice, item, marketplaces);
     const count = Number(item?.count) > 0 ? Number(item.count) : 1;
     return finalPrice > 0 ? sum + finalPrice * count : sum;
   }, 0);
 
   const totalUsdPrice = checkedItems.reduce((sum, item) => {
     const basePrice = parsePrice(item?.price) || 0;
-    const isShein = Boolean(
-      (item?.store && String(item.store).toLowerCase().includes('shein')) ||
-        (item?.url && String(item.url).toLowerCase().includes('shein.com')) ||
-        (item?.marketplace &&
-          String(item.marketplace).toLowerCase().includes('shein')) ||
-        String(getStoreName(item?.url, item?.store || '')).toLowerCase() ===
-          'shein',
-    );
-    const percentAmount =
-      isShein && safePercent > 0 ? basePrice * (safePercent / 100) : 0;
-    const finalPrice = basePrice + percentAmount;
+    const { finalPrice } = calculateMarketplacePrice(basePrice, item, marketplaces);
     const count = Number(item?.count) > 0 ? Number(item.count) : 1;
 
     const { code: itemCurrency, isUsd } = getReceivedCurrencyInfo(item);
