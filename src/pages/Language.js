@@ -19,8 +19,8 @@ import AppHeader from '../components/common/AppHeader';
 import GlobeIcon from '../assets/svg/menu_globe.svg';
 
 const LANGUAGES = [
-  { id: 'en', title: 'English', subtitle: 'English (US)', flag: '🇺🇸' },
-  { id: 'som', title: 'Soomaali', subtitle: 'Somali', flag: '🇸🇴' },
+  { id: 'en', title: 'English' },
+  { id: 'som', title: 'Soomaali' },
 ];
 
 export default function Language({ navigation }) {
@@ -99,10 +99,6 @@ export default function Language({ navigation }) {
         <View style={styles.langList}>
           {LANGUAGES.map(item => {
             const isSelected = selectedLang === item.id;
-            const localizedSubtitle =
-              item.id === 'en'
-                ? tr('English') || 'English'
-                : tr('Somali') || 'Somali';
 
             return (
               <TouchableOpacity
@@ -118,20 +114,14 @@ export default function Language({ navigation }) {
                 ]}
                 onPress={() => handleSelectLanguage(item.id)}>
                 <View style={styles.langLeft}>
-                  <Text style={styles.flagEmoji}>{item.flag}</Text>
-                  <View style={styles.langInfo}>
-                    <Text
-                      style={[
-                        styles.langTitle,
-                        { color: textColor },
-                        isSelected && { color: '#F67922' },
-                      ]}>
-                      {item.title}
-                    </Text>
-                    <Text style={[styles.langSub, { color: subTextColor }]}>
-                      {localizedSubtitle}
-                    </Text>
-                  </View>
+                  <Text
+                    style={[
+                      styles.langTitle,
+                      { color: textColor },
+                      isSelected && { color: '#F67922' },
+                    ]}>
+                    {item.title}
+                  </Text>
                 </View>
 
                 {/* Radio Indicator */}
@@ -212,7 +202,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
     borderRadius: 16,
     borderWidth: 1.5,
   },
@@ -224,20 +215,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
-  flagEmoji: {
-    fontSize: 28,
-    marginRight: 14,
-  },
-  langInfo: {
-    flex: 1,
-  },
   langTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
-  },
-  langSub: {
-    fontSize: 12.5,
-    marginTop: 2,
   },
 
   radioOuter: {
