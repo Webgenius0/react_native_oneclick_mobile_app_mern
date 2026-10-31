@@ -392,7 +392,7 @@ export default function PaymentStart({ navigation, route }) {
             <ActivityIndicator color="#FFFFFF" size="small" />
           ) : (
             <Text style={styles.payBtnText}>
-              {tr('Pay') || 'Pay'} ${finalPayTotal.toFixed(2)}
+              {tr('Pay') || 'Pay'}
             </Text>
           )}
         </TouchableOpacity>
