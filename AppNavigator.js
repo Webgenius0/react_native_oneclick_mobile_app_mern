@@ -193,7 +193,7 @@ export default function AppNavigator() {
   const loadLanguage = async () => {
     try {
       const lang = await storageGet('language');
-      const activeLang = lang && ['en', 'tr', 'som'].includes(lang) ? lang : 'en';
+      const activeLang = lang && ['en', 'som'].includes(lang) ? lang : 'en';
       i18n.defaultLocale = 'en';
       i18n.locale = activeLang;
       setCtxDil(activeLang);
@@ -386,7 +386,7 @@ export default function AppNavigator() {
           name="CartForm"
           component={CartForm}
           options={{
-            title: tr('Sepet'),
+            title: tr('Cart') || 'Cart',
             headerTitleStyle: headerTitleStyle,
           }}
         />
@@ -483,7 +483,7 @@ export default function AppNavigator() {
           name="Orderss"
           component={Orders}
           options={{
-            title: t('Siparişler'),
+            title: tr('Orders') || 'Orders',
             headerTitleStyle: headerTitleStyle,
           }}
         />
@@ -491,7 +491,7 @@ export default function AppNavigator() {
           name="OrderForm"
           component={OrderForm}
           options={{
-            title: t('Sipariş Formu'),
+            title: tr('Order Form') || 'Order Form',
             headerTitleStyle: headerTitleStyle,
           }}
         />
@@ -499,7 +499,7 @@ export default function AppNavigator() {
           name="Support"
           component={Support}
           options={{
-            title: t('Destek'),
+            title: tr('Support') || 'Support',
             headerTitleStyle: headerTitleStyle,
           }}
         />
@@ -514,7 +514,7 @@ export default function AppNavigator() {
           name="PaymentResponse"
           component={PaymentResponse}
           options={{
-            title: t('Ödeme Sonucu'),
+            title: tr('Payment Result') || 'Payment Result',
             headerTitleStyle: headerTitleStyle,
           }}
         />
@@ -522,7 +522,7 @@ export default function AppNavigator() {
           name="WaafiPay"
           component={WaafiPay}
           options={{
-            title: t('Ödeme Yap'),
+            title: tr('Pay') || 'Pay',
             headerShown: false,
             headerTitleStyle: headerTitleStyle,
           }}
@@ -531,7 +531,7 @@ export default function AppNavigator() {
           name="EDahab"
           component={EDahab}
           options={{
-            title: t('Ödeme Yap'),
+            title: tr('Pay') || 'Pay',
             headerShown: false,
             headerTitleStyle: headerTitleStyle,
           }}

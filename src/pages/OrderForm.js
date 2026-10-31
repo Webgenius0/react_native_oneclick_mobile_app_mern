@@ -22,6 +22,7 @@ import { tr } from "../translate/i18n";
 import { delay } from "../helpers/common";
 import { DATA_URL } from "../../config";
 import { EmContext } from "../contexts/EmContext";
+import { useOrderStore } from "../store/useOrderStore";
 
 export default function({ route, navigation }) {
 
@@ -30,7 +31,7 @@ export default function({ route, navigation }) {
 
   useEffect(() => {
     navigation.setOptions({
-      title: tr("Sipariş Formu") + " - " + route.params.id,
+      title: (tr("Order Form") || "Order Form") + " - " + route.params.id,
     });
   }, []);
 
@@ -66,7 +67,7 @@ export default function({ route, navigation }) {
       setUploadFile(null);
       console.log("catch", err);
       if (DocumentPicker.isCancel(err)) {
-        alert(tr("İptal Edildi"));
+        alert(tr("Cancelled") || "Cancelled");
       } else {
         alert("Unknown Error: " + JSON.stringify(err));
         throw err;
@@ -138,7 +139,8 @@ export default function({ route, navigation }) {
 
     if (response.data.error === false) {
       console.log("Error false", response.data);
-      alert(tr("Sipariş Alındı"));
+      useOrderStore.getState().invalidateOrders();
+      alert(tr("Order Received") || "Order Received");
       setTimeout(function() {
         let d = +new Date();
         //if(!__DEV__){
@@ -146,7 +148,7 @@ export default function({ route, navigation }) {
         //}
       }, 1000);
     } else {
-      alert(tr("Hata Oluştu"));
+      alert(tr("Error") || "Error");
       console.log("Hata Oluştu", response.data);
     }
   };
@@ -350,7 +352,7 @@ export default function({ route, navigation }) {
               />
             </View>
             <View>
-              <Text style={styles.label}>{tr("Miktar")}</Text>
+              <Text style={styles.label}>{tr("Quantity") || "Quantity"}</Text>
               <View style={styles.qtyView}>
                 <TouchableOpacity style={styles.qtyBtn}
                                   onPress={() => handleQty(-1)}>
@@ -372,7 +374,7 @@ export default function({ route, navigation }) {
           </View>
 
           <View style={[gs.col6, gs.flexColumn, gs.p10, { minHeight: 160 }]}>
-            <Text style={styles.label}>{tr("Resim")}</Text>
+            <Text style={styles.label}>{tr("Image") || "Image"}</Text>
             <TouchableOpacity onPress={async () => selectFile()} style={styles.uploadArea}>
               <View>
                 {
@@ -382,7 +384,7 @@ export default function({ route, navigation }) {
                                         height: 100,
                                         resizeMode: "contain",
                                       }} /> :
-                    <Text style={styles.uploadText}>{tr("Yükle")}</Text>
+                    <Text style={styles.uploadText}>{tr("Upload") || "Upload"}</Text>
                 }
               </View>
             </TouchableOpacity>
@@ -399,7 +401,7 @@ export default function({ route, navigation }) {
         }
 
         <View style={[styles.row]}>
-          <Text style={styles.label}>{tr("Açıklama")}</Text>
+          <Text style={styles.label}>{tr("Description") || "Description"}</Text>
         </View>
 
         <View style={[gs.mb10, gs.flexColumn, gs.w100, gs.pr10, gs.pb10, gs.pl10]}>
@@ -435,11 +437,11 @@ export default function({ route, navigation }) {
 
         <View style={[gs.flex1, gs.w100, gs.justifyStart, gs.p10]}>
           <TouchableOpacity style={styles.button} onPress={() => handleSubmit()}>
-            <Text style={styles.buttonText}>{tr("Sipariş Ver")}</Text>
+            <Text style={styles.buttonText}>{tr("Place Order") || "Place Order"}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={gs.mt30} onPress={() => navigation.goBack()}>
-            <Text style={styles.cancel}>{tr("İptal")}</Text>
+            <Text style={styles.cancel}>{tr("Cancel") || "Cancel"}</Text>
           </TouchableOpacity>
         </View>
 

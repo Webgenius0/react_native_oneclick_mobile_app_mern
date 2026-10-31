@@ -15,8 +15,7 @@ import { CommonActions } from '@react-navigation/native';
 import { storageDelete, storageGet, storageSet } from '../helpers/storage';
 import { setUser } from '../helpers/auth';
 import { EmContext } from '../contexts/EmContext';
-import ai from '../helpers/ai';
-import { getFcmToken } from '../helpers/notification';
+import { getFcmToken, fcmUpdate } from '../helpers/notification';
 import { i18n } from '../translate/i18n';
 
 export default function ContinueGuest({ navigation }) {
@@ -61,13 +60,10 @@ export default function ContinueGuest({ navigation }) {
           try {
             const fcmToken = await getFcmToken();
             if (fcmToken) {
-              await ai.post('update-language', {
-                dil: activeDil,
-                fcmToken,
-              });
+              await fcmUpdate(fcmToken, true);
             }
           } catch (fcmErr) {
-            console.log('fcm update error:', fcmErr?.message || fcmErr);
+            // safe fallback
           }
         }, 0);
       } else {

@@ -42,11 +42,17 @@ export default function ({methods, siparis_ids, tutar, navigation, ctx}) {
 
     tutarNew = round(tutarNew);
 
+    const normalizedOrderIds = Array.isArray(siparis_ids)
+      ? siparis_ids.filter(Boolean).join(',')
+      : String(siparis_ids || '');
+
     const navigateParams = {
       tutar: tutarNew,
       komisyon_tutar: komisyon_tutar,
       ana_tutar: ana_tutar,
-      siparis_ids: siparis_ids,
+      siparis_ids: normalizedOrderIds || siparis_ids,
+      order_ids: normalizedOrderIds || siparis_ids,
+      siparis_id: Array.isArray(siparis_ids) ? siparis_ids[0] : siparis_ids,
       komisyonYuzde: t.komisyonYuzde,
       komisyonFixed: t.komisyonFixed,
     };

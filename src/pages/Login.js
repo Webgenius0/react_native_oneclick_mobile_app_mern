@@ -21,7 +21,7 @@ import { storageDelete, storageGet, storageSet } from '../helpers/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { i18n, tr } from '../translate/i18n';
 import { CommonActions } from '@react-navigation/native';
-import { getFcmToken } from '../helpers/notification';
+import { getFcmToken, fcmUpdate } from '../helpers/notification';
 
 export default function Login({ navigation }) {
   const { setCtx, setCtxDil } = useContext(EmContext);
@@ -54,7 +54,7 @@ export default function Login({ navigation }) {
       const cleanSifre = password.trim();
 
       const savedLang = await storageGet('language');
-      const activeDil = savedLang && ['en', 'tr', 'som'].includes(savedLang)
+      const activeDil = savedLang && ['en', 'som'].includes(savedLang)
         ? savedLang
         : (i18n.locale || 'en');
       i18n.defaultLocale = 'en';
@@ -100,14 +100,13 @@ export default function Login({ navigation }) {
         setTimeout(async () => {
           try {
             const latestFcmToken = await getFcmToken();
-            await ai.post('update-language', {
-              dil: activeDil,
-              fcmToken: latestFcmToken,
-            });
+            if (latestFcmToken) {
+              await fcmUpdate(latestFcmToken, true);
+            }
           } catch (fcmErr) {
-            console.log('fcm background sync error:', fcmErr?.message);
+            // Background sync error handled gracefully
           }
-        }, 0);
+        }, 100);
       } else {
         const rawMsg = res?.data?.msg || 'Hatalı Müşteri Kodu, Eposta veya Parola';
         let errorMsg = tr(rawMsg);
@@ -122,9 +121,7 @@ export default function Login({ navigation }) {
           }
         }
         const title =
-          activeDil === 'tr'
-            ? 'Giriş Başarısız'
-            : activeDil === 'som'
+          activeDil === 'som'
             ? 'Galitaanku Wuu Fashilmay'
             : 'Login Failed';
         Alert.alert(title, errorMsg);

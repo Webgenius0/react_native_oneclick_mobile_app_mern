@@ -42,10 +42,10 @@ export default function ({route, navigation}) {
   });
 
   const btns = [
-    {durum: [5, 11, 6], ad: tr('Tüm Siparişler')}, // All Orders
-    {durum: 5, ad: tr('Teslimat Deposunda')}, // Irak Depoda
-    {durum: 11, ad: tr('Dağıtımda')}, // In Transit
-    {durum: 6, ad: tr('Teslim Edildi')}, // Delivered
+    {durum: [5, 11, 6], ad: tr('All Orders') || 'All Orders'}, // All Orders
+    {durum: 5, ad: tr('Local Warehouse') || 'Local Warehouse'}, // Irak Depoda
+    {durum: 11, ad: tr('Out for Delivery') || 'Out for Delivery'}, // In Transit
+    {durum: 6, ad: tr('Delivered') || 'Delivered'}, // Delivered
   ];
 
   useFocusEffect(
@@ -65,7 +65,7 @@ export default function ({route, navigation}) {
     if (c.data.error === false) {
       ns = {...state, data: c.data.ss, loading: false};
     } else {
-      alert(tr('Hata Oluştu'));
+      alert(tr('Error') || 'Error');
       ns = {...state, data: [], loading: false};
     }
 
@@ -232,7 +232,7 @@ export default function ({route, navigation}) {
               gs.alignCenter,
               {backgroundColor: ctx.bgColor, flex: 5},
             ]}>
-            <Text>{tr('Yükleniyor')}...</Text>
+            <Text>{tr('Loading') || 'Loading'}...</Text>
           </View>
         ) : null}
 
@@ -264,7 +264,7 @@ export default function ({route, navigation}) {
             />
             <FadeInBottom duration={500}>
 
-            <Text style={[gs.f14]}>{tr('Hiç Sipariş Yok')}</Text>
+            <Text style={[gs.f14]}>{tr('No Orders Yet') || 'No Orders Yet'}</Text>
             </FadeInBottom>
             {/*You have no orders*/}
             <FadeInBottom duration={2000}>
@@ -272,7 +272,7 @@ export default function ({route, navigation}) {
                 style={[gs.btn, gs.p10, gs.mt10]}
                 onPress={() => navigation.navigate('CategoryList')}>
                 <Text style={[gs.bold, gs.textWhite]}>
-                  {tr('Alışverişe Başla')}
+                  {tr('Start Shopping') || 'Start Shopping'}
                 </Text>
                 {/*Start to order*/}
               </TouchableOpacity>

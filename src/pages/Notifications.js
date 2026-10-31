@@ -78,13 +78,13 @@ export default function Notifications({ route, navigation }) {
 
   const deleteNotifies = () => {
     Alert.alert(
-      tr("Bildirimleri Temizle") || "Clear All Notifications",
-      tr("Tüm bildirimleri silmek istediğinize emin misiniz?") ||
+      tr("Clear All Notifications") || "Clear All Notifications",
+      tr("Are you sure you want to clear all notifications?") ||
         "Are you sure you want to clear all notifications?",
       [
-        { text: tr("İptal") || "Cancel", style: "cancel" },
+        { text: tr("Cancel") || "Cancel", style: "cancel" },
         {
-          text: tr("Temizle") || "Clear All",
+          text: tr("Clear All") || "Clear All",
           style: "destructive",
           onPress: async () => {
             try {
@@ -159,11 +159,11 @@ export default function Notifications({ route, navigation }) {
     const diffHours = now.diff(m, "hours");
     const diffDays = now.diff(m, "days");
 
-    if (diffMinutes < 1) return tr("Az önce") || "Just now";
-    if (diffMinutes < 60) return `${diffMinutes} ${tr("dakika önce") || "min ago"}`;
-    if (diffHours < 24) return `${diffHours} ${tr("saat önce") || "hours ago"}`;
-    if (diffDays === 1) return tr("Dün") || "Yesterday";
-    if (diffDays < 7) return `${diffDays} ${tr("gün önce") || "days ago"}`;
+    if (diffMinutes < 1) return tr("Just now") || "Just now";
+    if (diffMinutes < 60) return `${diffMinutes} ${tr("min ago") || "min ago"}`;
+    if (diffHours < 24) return `${diffHours} ${tr("hours ago") || "hours ago"}`;
+    if (diffDays === 1) return tr("Yesterday") || "Yesterday";
+    if (diffDays < 7) return `${diffDays} ${tr("days ago") || "days ago"}`;
     return m.format("DD.MM.YYYY");
   }, []);
 
@@ -331,10 +331,10 @@ export default function Notifications({ route, navigation }) {
                 />
               </View>
               <Text style={[styles.emptyTitle, { color: textColor }]}>
-                {tr("Hiç bildirim yok") || "No notifications yet"}
+                {tr("No notifications yet") || "No notifications yet"}
               </Text>
               <Text style={[styles.emptySubtitle, { color: subTextColor }]}>
-                {tr("Yeni bildirimleriniz burada görüntülenecektir.") ||
+                {tr("Your latest updates and alerts will appear here.") ||
                   "Your latest updates and alerts will appear here."}
               </Text>
             </View>

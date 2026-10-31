@@ -23,7 +23,7 @@ export default function ({route, navigation}) {
 
   useEffect(() => {
     navigation.setOptions({
-      title: tr('Website öner'),
+      title: tr('Suggest Website') || 'Suggest Website',
     });
   }, []);
 
@@ -74,7 +74,7 @@ export default function ({route, navigation}) {
         value={state.link} />
 
       <TouchableOpacity style={styles.btn} onPress={handleSubmit}>
-        <Text style={styles.btnText}>{tr('Gönder')}</Text>
+        <Text style={styles.btnText}>{tr('Submit') || 'Submit'}</Text>
       </TouchableOpacity>
     </View>
   );

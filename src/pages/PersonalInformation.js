@@ -118,8 +118,8 @@ export default function PersonalInformation({ navigation }) {
       const res = await ai.post('profile-update', payload);
       if (res?.data && res.data.error === false) {
         Alert.alert(
-          tr('Başarılı') || 'Success',
-          tr('Bilgileriniz başarıyla güncellendi') ||
+          tr('Success') || 'Success',
+          tr('Personal information updated successfully') ||
             'Personal information updated successfully',
         );
         const updatedUser = {
@@ -136,17 +136,17 @@ export default function PersonalInformation({ navigation }) {
         setIsEditing(false);
       } else {
         Alert.alert(
-          tr('Hata') || 'Error',
+          tr('Error') || 'Error',
           res?.data?.msg ||
-            tr('Güncelleme sırasında bir hata oluştu') ||
+            tr('Failed to update information') ||
             'Failed to update information',
         );
       }
     } catch (e) {
       console.log('Profile update error:', e);
       Alert.alert(
-        tr('Hata') || 'Error',
-        tr('Güncelleme sırasında bir hata oluştu') ||
+        tr('Error') || 'Error',
+        tr('Failed to update information') ||
           'Failed to update information',
       );
     } finally {

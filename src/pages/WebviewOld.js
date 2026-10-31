@@ -210,7 +210,7 @@ export default function Webview({route, navigation}) {
     Clipboard.setString(currentUrl);
     Toast.show({
       type: 'success',
-      text1: 'Panoya Kopyalandı',
+      text1: 'Copied to Clipboard',
       position: 'bottom',
     });
   }, []);

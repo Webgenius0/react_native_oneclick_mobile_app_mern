@@ -8,6 +8,7 @@ import Warning from "../assets/svg/warning.svg";
 import Colors from "../assets/Colors";
 import { CommonActions } from "@react-navigation/native";
 import { useCartStore } from "../store/useCartStore";
+import { useOrderStore } from "../store/useOrderStore";
 
 export default function PaymentResponse({navigation, route}){
     const {status} = route.params;
@@ -17,6 +18,7 @@ export default function PaymentResponse({navigation, route}){
     React.useEffect(() => {
       if (status === 'success') {
         useCartStore.getState().clearCart();
+        useOrderStore.getState().invalidateOrders();
       }
     }, [status]);
 
@@ -55,16 +57,16 @@ export default function PaymentResponse({navigation, route}){
           <View>
             <Text style={styles.text}>
                 {
-                  status === "success" ? tr("Ödeme Başarılı") :
-                  status === "error" ? tr("Ödeme Başarısız") :
-                    tr("Ödeme İptal Edildi")
+                  status === "success" ? (tr("Payment Successful") || "Payment Successful") :
+                  status === "error" ? (tr("Payment Failed") || "Payment Failed") :
+                    (tr("Payment Cancelled") || "Payment Cancelled")
                 }
             </Text>
           </View>
 
           <View>
             <TouchableOpacity onPress={() => git('Balance')} style={styles.btn}>
-              <Text style={styles.btnText}>{tr('Bakiye')}</Text>
+              <Text style={styles.btnText}>{tr('Balance') || 'Balance'}</Text>
             </TouchableOpacity>
           </View>
         </View>

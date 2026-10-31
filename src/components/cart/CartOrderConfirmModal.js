@@ -66,10 +66,10 @@ const CartOrderConfirmModal = ({
           <View style={styles.header}>
             <View style={styles.headerTextGroup}>
               <Text style={styles.headerTitle}>
-                {tr('Sipariş Özeti')}
+                {tr('Order Summary') || 'Order Summary'}
               </Text>
               <Text style={styles.headerSubtitle}>
-                {tr('Ödeme öncesi ürünleri inceleyin')}
+                {tr('Review items before payment') || 'Review items before payment'}
               </Text>
             </View>
             <TouchableOpacity
@@ -209,17 +209,17 @@ const CartOrderConfirmModal = ({
           <View style={styles.totalsCard}>
             <View style={styles.totalLine}>
               <Text style={styles.totalLabel}>
-                {tr('Toplam Ürün')}
+                {tr('Total Items') || 'Total Items'}
               </Text>
               <Text style={styles.totalValue}>
-                {`${totalItemCount} ${tr('Ürün')}`}
+                {`${totalItemCount} ${tr('Items') || 'Items'}`}
               </Text>
             </View>
 
             {safeTotalPrice > 0 && primaryCurrency !== 'USD' && (
               <View style={styles.totalLine}>
                 <Text style={styles.totalLabel}>
-                  {tr('Orijinal Tutar')}
+                  {tr('Original Amount') || 'Original Amount'}
                 </Text>
                 <Text style={styles.totalValueMuted}>
                   {`${safeTotalPrice.toFixed(2)} ${primaryCurrency}`}
@@ -229,7 +229,7 @@ const CartOrderConfirmModal = ({
 
             <View style={[styles.totalLine, styles.totalLineGrand]}>
               <Text style={styles.grandTotalLabel}>
-                {tr('Ödenecek Tutar')}
+                {tr('Total to Pay') || 'Total to Pay'}
               </Text>
               <Text style={styles.grandTotalValue}>
                 {safeTotalUsd > 0
@@ -246,7 +246,7 @@ const CartOrderConfirmModal = ({
               disabled={isSubmitting}
               onPress={onClose}>
               <Text style={styles.cancelBtnText}>
-                {tr('İptal')}
+                {tr('Cancel') || 'Cancel'}
               </Text>
             </TouchableOpacity>
 
@@ -261,7 +261,7 @@ const CartOrderConfirmModal = ({
                 <ActivityIndicator color="#FFF" size="small" />
               ) : (
                 <Text style={styles.confirmBtnText}>
-                  {tr('Ödemeye Geç')}
+                  {tr('Proceed to Payment') || 'Proceed to Payment'}
                 </Text>
               )}
             </TouchableOpacity>

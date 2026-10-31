@@ -25,26 +25,29 @@ export const getLocalNotifications = async () => {
 
 
 export const getServerNotifications = async (id, options = {}) => {
-  if (id === null || id === "undefined" || isNaN(id)) id = 0;
+  if (id === null || id === 'undefined' || isNaN(id)) id = 0;
 
   let n = [];
 
   try {
-    let response = null;
-    const params = options?.unreadOnly ? { unread: 1 } : {};
-    try {
-      // API Guide v4.0: GET /api/notifications (with optional ?unread=1)
-      response = await ai.get("notifications", { params });
-    } catch (_getErr) {
-      // Fallback to legacy POST /api/notifications
-      response = await ai.post("notifications", { id: id, ...params });
-    }
-
+    const payload = {
+      id: Number(id) || 0,
+      ...(options?.unreadOnly ? { unread: 1 } : {}),
+    };
+    // Backend API expects POST /api/notifications with { id: id }
+    const response = await ai.post('notifications', payload);
     if (response?.data?.error === false) {
       n = response.data.notifications || response.data.ss || [];
     }
   } catch (e) {
-    console.log('getServerNotifications error', e);
+    // Graceful fallback to GET if POST is ever rejected
+    try {
+      const params = options?.unreadOnly ? { unread: 1 } : {};
+      const response = await ai.get('notifications', { params });
+      if (response?.data?.error === false) {
+        n = response.data.notifications || response.data.ss || [];
+      }
+    } catch (_) {}
   }
 
   return n;
@@ -148,11 +151,11 @@ export const setLocalNotifications = async (data) => {
 };
 
 export const fetchAllNotifications = async (ctx, setCtx, markAsRead) => {
-
-  let d = new Date();
-  console.log('fetchAllNotifications', d.getHours()+':'+d.getMinutes()+':'+d.getSeconds());
-
   const logNotif = false;
+  if (logNotif) {
+    let d = new Date();
+    console.log('fetchAllNotifications', d.getHours() + ':' + d.getMinutes() + ':' + d.getSeconds());
+  }
 
   let local = await getLocalNotifications();
   let server = await getServerNotifications(local.lastId);

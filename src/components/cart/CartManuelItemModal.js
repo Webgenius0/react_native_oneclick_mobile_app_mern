@@ -124,7 +124,10 @@ export default function ({modalVisible, setModalVisible, addItem}) {
 
   const handleSubmit = async () => {
     if (!url || !count) {
-      Alert.alert(t('Uyarı'), t('Lütfen tüm alanları doldurunuz'));
+      Alert.alert(
+        t('Warning') || 'Warning',
+        t('Please fill in all fields') || 'Please fill in all fields',
+      );
       return;
     }
 
@@ -180,10 +183,10 @@ export default function ({modalVisible, setModalVisible, addItem}) {
           <Text style={styles.modalTitle}>Add Product</Text>
 
           <View style={styles.row}>
-            <Text style={styles.label}>{t('Ad')}</Text>
+            <Text style={styles.label}>{t('Name') || 'Name'}</Text>
             <TextInput
               style={styles.input}
-              placeholder={t('Ad')}
+              placeholder={t('Name') || 'Name'}
               placeholderTextColor={'#ddd'}
               value={title}
               onChangeText={setTitle}
@@ -192,7 +195,7 @@ export default function ({modalVisible, setModalVisible, addItem}) {
 
           <View style={styles.row}>
             <Text style={styles.label}>
-              {t('Link')}
+              {t('Link') || 'Link'}
               <Text style={styles.require}> *</Text>
             </Text>
             <TextInput
@@ -205,10 +208,10 @@ export default function ({modalVisible, setModalVisible, addItem}) {
           </View>
 
           <View style={styles.row}>
-            <Text style={styles.label}>{t('Beden')}</Text>
+            <Text style={styles.label}>{t('Size') || 'Size'}</Text>
             <TextInput
               style={styles.input}
-              placeholder={t('Beden')}
+              placeholder={t('Size') || 'Size'}
               placeholderTextColor={'#ddd'}
               value={size}
               onChangeText={setSize}
@@ -217,12 +220,12 @@ export default function ({modalVisible, setModalVisible, addItem}) {
 
           <View style={styles.row}>
             <Text style={styles.label}>
-              {t('Miktar')}
+              {t('Quantity') || 'Quantity'}
               <Text style={styles.require}> *</Text>
             </Text>
             <TextInput
               style={styles.input}
-              placeholder={t('Miktar')}
+              placeholder={t('Quantity') || 'Quantity'}
               placeholderTextColor={'#ddd'}
               value={count}
               onChangeText={setCount}
@@ -231,10 +234,10 @@ export default function ({modalVisible, setModalVisible, addItem}) {
           </View>
 
           <View style={styles.row}>
-            <Text style={styles.label}>{t('Açıklama')}</Text>
+            <Text style={styles.label}>{t('Description') || 'Description'}</Text>
             <TextInput
               style={styles.input}
-              placeholder={t('Açıklama')}
+              placeholder={t('Description') || 'Description'}
               placeholderTextColor={'#ddd'}
               value={description}
               onChangeText={setDescription}
@@ -251,12 +254,12 @@ export default function ({modalVisible, setModalVisible, addItem}) {
             <TouchableOpacity
               style={styles.closeButton}
               onPress={() => handleCancel()}>
-              <Text style={styles.closeButtonText}>{t('İptal')}</Text>
+              <Text style={styles.closeButtonText}>{t('Cancel') || 'Cancel'}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.submitButton}
               onPress={handleSubmit}>
-              <Text style={styles.submitButtonText}>{t('Ürün Ekle')}</Text>
+              <Text style={styles.submitButtonText}>{t('Add Product') || 'Add Product'}</Text>
             </TouchableOpacity>
           </View>
         </View>

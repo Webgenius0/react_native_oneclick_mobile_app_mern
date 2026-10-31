@@ -93,7 +93,7 @@ export default function Faq({ navigation }) {
     }
 
     try {
-      const langParam = ['en', 'tr', 'som'].includes(activeLang) ? activeLang : 'en';
+      const langParam = ['en', 'som'].includes(activeLang) ? activeLang : 'en';
       const res = await ai.get('faq', {
         params: {
           lang: langParam,

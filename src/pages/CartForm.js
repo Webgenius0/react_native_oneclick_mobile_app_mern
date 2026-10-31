@@ -23,6 +23,7 @@ import { EmContext } from "../contexts/EmContext";
 import { getStoreName } from "../helpers/storeHelper";
 import { useExchangeRateStore } from "../store/useExchangeRateStore";
 import { useSheinPriceStore } from "../store/useSheinPriceStore";
+import { useOrderStore } from "../store/useOrderStore";
 import {
   calculateConvertedPrice,
   parsePrice,
@@ -38,7 +39,7 @@ export default function({ route, navigation }) {
 
   useEffect(() => {
     navigation.setOptions({
-      title: tr("Yeni Sipariş"),
+      title: tr("New Order") || "New Order",
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -103,7 +104,7 @@ export default function({ route, navigation }) {
       setUploadFile(null);
       console.log("catch", err);
       if (DocumentPicker.isCancel(err)) {
-        alert(tr("İptal Edildi"));
+        alert(tr("Cancelled") || "Cancelled");
       } else {
         alert("Unknown Error: " + JSON.stringify(err));
         throw err;
@@ -239,6 +240,7 @@ export default function({ route, navigation }) {
 
     if (response.data.error === false) {
       console.log("Error false", response.data);
+      useOrderStore.getState().invalidateOrders();
       const orderId = response.data.order_id || (response.data.order_ids && response.data.order_ids[0]);
       const orderIds = response.data.order_ids || (orderId ? [orderId] : []);
       const totalUsd = response.data.total_usd;
@@ -251,14 +253,14 @@ export default function({ route, navigation }) {
           siparis_id: orderId,
         });
       } else {
-        alert(tr("Sipariş Alındı"));
+        alert(tr("Order Received") || "Order Received");
         setTimeout(function() {
           let d = +new Date();
           navigation.navigate("Orders", { refetch: d });
         }, 1000);
       }
     } else {
-      alert(tr("Hata Oluştu"));
+      alert(tr("Error") || "Error");
       console.log("Hata Oluştu", response.data);
     }
   };
@@ -431,7 +433,7 @@ export default function({ route, navigation }) {
               />
             </View>
             <View>
-              <Text style={styles.label}>{tr("Miktar")}</Text>
+              <Text style={styles.label}>{tr("Quantity") || "Quantity"}</Text>
               <View style={styles.qtyView}>
                 <TouchableOpacity style={styles.qtyBtn}
                                   onPress={() => handleQty(-1)}>
@@ -453,7 +455,7 @@ export default function({ route, navigation }) {
           </View>
 
           <View style={[gs.col6, gs.flexColumn, gs.p10, { minHeight: 160 }]}>
-            <Text style={styles.label}>{tr("Resim")}</Text>
+            <Text style={styles.label}>{tr("Image") || "Image"}</Text>
 
             {
               /*
@@ -474,7 +476,7 @@ export default function({ route, navigation }) {
                                         height: 100,
                                         resizeMode: "contain",
                                       }} /> :
-                    <Text style={styles.uploadText}>{tr("Yükle")}</Text>
+                    <Text style={styles.uploadText}>{tr("Upload") || "Upload"}</Text>
                 }
               </View>
             </TouchableOpacity>
@@ -492,7 +494,7 @@ export default function({ route, navigation }) {
         }
 
         <View style={[styles.row]}>
-          <Text style={styles.label}>{tr("Açıklama")}</Text>
+          <Text style={styles.label}>{tr("Description") || "Description"}</Text>
         </View>
         <View style={[gs.mb10, gs.flexColumn, gs.w100, gs.pr10, gs.pb10, gs.pl10]}>
 
@@ -514,7 +516,7 @@ export default function({ route, navigation }) {
           />
           <View style={{ width: "100%", flexDirection: "row", paddingHorizontal: 10, paddingVertical: 10 }}>
             <View style={{flex: 1, flexDirection: "row",}}>
-              <Text style={{marginEnd: 15, color: ctx.color}}>{tr("Kur")}</Text>
+              <Text style={{marginEnd: 15, color: ctx.color}}>{tr("Exchange Rate") || "Rate"}</Text>
               <Text style={{fontWeight: 'bold', color: ctx.color}}>{state.kur+" ₺"}</Text>
             </View>
             <View style={{flex: 1}}>
@@ -526,11 +528,11 @@ export default function({ route, navigation }) {
 
         <View style={[gs.flex1, gs.w100, gs.justifyStart, gs.p10]}>
           <TouchableOpacity style={styles.button} onPress={() => handleSubmit()}>
-            <Text style={styles.buttonText}>{tr("Sipariş Ver")}</Text>
+            <Text style={styles.buttonText}>{tr("Place Order") || "Place Order"}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={gs.mt30} onPress={() => navigation.goBack()}>
-            <Text style={styles.cancel}>{tr("İptal")}</Text>
+            <Text style={styles.cancel}>{tr("Cancel") || "Cancel"}</Text>
           </TouchableOpacity>
         </View>
 

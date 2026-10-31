@@ -15,12 +15,12 @@ import {
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { t, tr } from '../translate/i18n';
+import { t, tr, localizeApiMessage, i18n } from '../translate/i18n';
 import Toast from 'react-native-toast-message';
 import ai from '../helpers/ai';
 import { CommonActions } from '@react-navigation/native';
 import { IS_LOCAL } from '../../config';
-import { delay, getUserAgent } from '../helpers/common';
+import { delay, getUserAgent, round } from '../helpers/common';
 import { useCartStore } from '../store/useCartStore';
 import { useUserStore } from '../store/useUserStore';
 import AppHeader from '../components/common/AppHeader';
@@ -35,12 +35,23 @@ export default function EDahab({ navigation, route }) {
   const fill = (__DEV__ && IS_LOCAL) || false;
   const defaultPhoneNumber = fill ? '657654580' : user?.telefon || '';
 
+  const rawOrderIds =
+    route?.params?.siparis_ids ??
+    route?.params?.siparis_id ??
+    route?.params?.order_ids ??
+    route?.params?.order_id ??
+    '';
+
+  const initialNormalizedOrderIds = Array.isArray(rawOrderIds)
+    ? rawOrderIds.filter(id => id !== null && id !== undefined && id !== '').join(',')
+    : String(rawOrderIds || '');
+
   const [phoneNumber, setPhoneNumber] = useState(defaultPhoneNumber);
   const tutar = route?.params?.tutar || 0;
   const anaTutar = route?.params?.ana_tutar || 0;
   const komisyonTutar = route?.params?.komisyon_tutar || 0;
   const [invoiceId, setInvoiceId] = useState(route?.params?.invoiceId || '');
-  const siparis_ids = route?.params?.siparis_ids || '';
+  const [siparis_ids, setSiparis_ids] = useState(initialNormalizedOrderIds);
   const [submitting, setSubmitting] = useState(false);
   const [polling, setPolling] = useState(false);
   const [countdown, setCountdown] = useState(60);
@@ -98,8 +109,8 @@ export default function EDahab({ navigation, route }) {
 
           Toast.show({
             type: 'success',
-            text1: tr('Ödeme Başarılı') || 'Payment Successful',
-            text2: resData?.msg || tr('Ödeme Başarılı') || 'Payment Successful',
+            text1: tr('Payment Successful') || 'Payment Successful',
+            text2: resData?.msg || tr('Payment Successful') || 'Payment Successful',
           });
 
           navigation.dispatch(
@@ -117,10 +128,14 @@ export default function EDahab({ navigation, route }) {
 
         setPolling(false);
         setSubmitting(false);
+        const errorMsg = localizeApiMessage(
+          resData?.msg || resData?.detail,
+          'Payment could not be completed.',
+        );
         Toast.show({
           type: 'error',
-          text1: tr('Ödeme Başarısız') || 'Payment Failed',
-          text2: resData?.msg || tr('Ödeme işlemi tamamlanamadı') || 'Payment could not be completed.',
+          text1: tr('Payment Failed') || 'Payment Failed',
+          text2: errorMsg,
           text2Style: { fontSize: 14, color: '#000', width: '100%' },
         });
         return;
@@ -134,7 +149,7 @@ export default function EDahab({ navigation, route }) {
       setSubmitting(false);
       Toast.show({
         type: 'error',
-        text1: tr('Zaman Aşımı') || 'Timeout',
+        text1: tr('Timeout') || 'Timeout',
         text2: t('edahab_timeout_msg') || 'Verification timed out. Please try again.',
         text2Style: { fontSize: 14, color: '#000', width: '100%' },
       });
@@ -149,8 +164,8 @@ export default function EDahab({ navigation, route }) {
     if (!phoneNumber.trim()) {
       Toast.show({
         type: 'error',
-        text1: tr('Hata Oluştu') || 'Required Field',
-        text2: tr('Lütfen telefon numaranızı girin') || 'Please enter your phone number',
+        text1: tr('Required Field') || 'Required Field',
+        text2: tr('Please enter your phone number') || 'Please enter your phone number',
         text2Style: { fontSize: 14, color: '#000' },
       });
       return false;
@@ -162,9 +177,23 @@ export default function EDahab({ navigation, route }) {
     await delay(300);
 
     const userAgent = getUserAgent();
-    const normalizedOrderIds = Array.isArray(siparis_ids)
-      ? siparis_ids.join(',')
-      : String(siparis_ids || '');
+    const normalizedOrderIds =
+      (Array.isArray(siparis_ids)
+        ? siparis_ids.filter(id => id !== null && id !== undefined && id !== '').join(',')
+        : String(siparis_ids || '').trim()) || initialNormalizedOrderIds;
+
+    if (!normalizedOrderIds) {
+      setSubmitting(false);
+      Toast.show({
+        type: 'error',
+        text1: tr('Payment Error') || 'Payment Error',
+        text2:
+          tr('Order ID is missing. Please select an order to pay.') ||
+          'Order ID is missing. Please select an order to pay.',
+        text2Style: { fontSize: 14, color: '#000', width: '100%' },
+      });
+      return false;
+    }
 
     const numericTutar = Number(String(tutar).replace(/[^0-9.]/g, '')) || 0;
 
@@ -182,6 +211,7 @@ export default function EDahab({ navigation, route }) {
       siparis_id: normalizedOrderIds,
       paymentMethodType: paymentType,
       userAgent: userAgent,
+      dil: i18n.locale || 'en',
     };
 
     console.log('Initiating eDahab payment:', basePayload);
@@ -194,15 +224,90 @@ export default function EDahab({ navigation, route }) {
       });
 
       console.log('eDahab initial response:', r?.data);
-      const resData = r?.data;
+      let resData = r?.data;
+
+      // Handle "Ödeme tutarı değişti; lütfen siparişleri yenileyiniz" by auto-synchronizing
+      const rawInitialMsg = resData?.msg || resData?.detail || '';
+      const isAmountChanged =
+        rawInitialMsg.includes('tutarı değişti') ||
+        rawInitialMsg.includes('tutari degisti') ||
+        rawInitialMsg.includes('yenileyiniz') ||
+        rawInitialMsg.toLowerCase().includes('amount changed');
+
+      if (resData?.error === true && isAmountChanged) {
+        console.log('eDahab amount change detected. Auto-synchronizing from database...');
+        try {
+          const syncRes = await ai.post('orders-unpaid', {
+            siparis_id: route?.params?.siparis_id || (normalizedOrderIds.includes(',') ? null : normalizedOrderIds),
+            grupID: route?.params?.grupID || null,
+          });
+
+          if (syncRes?.data?.error === false && Array.isArray(syncRes?.data?.ss)) {
+            const activeList = normalizedOrderIds.split(',').map(s => s.trim()).filter(Boolean);
+            let freshBase = 0;
+            syncRes.data.ss.forEach(item => {
+              if (activeList.includes(String(item.id)) || activeList.length === 0) {
+                freshBase += parseFloat(item.tutar ?? item.tutar_usd ?? 0) || 0;
+              }
+            });
+            if (syncRes.data.grup && syncRes.data.grup.nakliye_usd > 0) {
+              freshBase += parseFloat(syncRes.data.grup.nakliye_usd);
+            }
+
+            let effectivePct = route?.params?.komisyonYuzde || 0;
+            let effectiveFixed = 0;
+            try {
+              const mRes = await ai.get('payment-methods');
+              if (mRes?.data?.error === false && Array.isArray(mRes?.data?.ss)) {
+                const edMethod = mRes.data.ss.find(x => (x?.ad || x?.target || '').toLowerCase().includes('dahab'));
+                if (edMethod) {
+                  effectivePct = parseFloat(edMethod.komisyonYuzde) || 0;
+                  effectiveFixed = parseFloat(edMethod.komisyonFixed) || 0;
+                }
+              }
+            } catch (_) {}
+
+            let freshKom = 0;
+            if (effectivePct > 0) {
+              freshKom = round(freshBase * (effectivePct / 100));
+            } else if (effectiveFixed > 0) {
+              freshKom = effectiveFixed;
+            }
+            const freshTotal = round(freshBase + freshKom);
+
+            if (freshTotal > 0 && Math.abs(freshTotal - numericTutar) > 0.001) {
+              console.log(`Auto-retrying eDahab with synchronized amount: $${freshTotal.toFixed(2)}`);
+              const retryPayload = {
+                ...basePayload,
+                tutar: freshTotal,
+                amount: freshTotal,
+                ana_tutar: freshBase,
+                komisyon_tutar: freshKom,
+                komisyon_yuzde: effectivePct,
+                odemeID: 0,
+                invoiceId: invoiceId,
+              };
+              const retryR = await ai.post('payment-edahab', retryPayload);
+              console.log('eDahab retry response:', retryR?.data);
+              resData = retryR?.data;
+            }
+          }
+        } catch (syncErr) {
+          console.log('Error auto-syncing orders for eDahab:', syncErr);
+        }
+      }
 
       if (resData?.error === false) {
         setSubmitting(false);
         useCartStore.getState().clearCart();
+        const successMsg =
+          localizeApiMessage(resData?.msg || resData?.responseMsg, 'Payment Successful') ||
+          tr('Payment Successful') ||
+          'Payment Successful';
         Toast.show({
           type: 'success',
-          text1: tr('Ödeme Başarılı') || 'Payment Successful',
-          text2: resData?.msg || tr('Ödeme Başarılı') || 'Payment Successful',
+          text1: tr('Payment Successful') || 'Payment Successful',
+          text2: successMsg,
         });
         navigation.dispatch(
           CommonActions.reset({
@@ -226,11 +331,22 @@ export default function EDahab({ navigation, route }) {
         await runPollingLoop(issuedOdemeID, issuedInvoiceId, basePayload);
       } else {
         setSubmitting(false);
-        const errorMsg =
-          resData?.msg || resData?.detail || tr('Ödeme işlemi başlatılamadı') || 'Could not initiate payment.';
+        const rawMsg =
+          resData?.responseMsg ||
+          resData?.r?.message ||
+          resData?.r?.msg ||
+          resData?.message ||
+          (resData?.msg && !resData.msg.toLowerCase().includes('başarısız') && !resData.msg.toLowerCase().includes('basarisiz') ? resData.msg : null) ||
+          resData?.detail ||
+          resData?.msg ||
+          'Could not initiate payment.';
+        const errorMsg = localizeApiMessage(
+          rawMsg,
+          'Could not initiate payment.',
+        );
         Toast.show({
           type: 'error',
-          text1: tr('Ödeme Başarısız') || 'Payment Failed',
+          text1: tr('Payment Failed') || 'Payment Failed',
           text2: errorMsg,
           text2Style: { fontSize: 14, color: '#000', width: '100%' },
         });
@@ -238,10 +354,22 @@ export default function EDahab({ navigation, route }) {
     } catch (err) {
       console.error('eDahab initiate error:', err);
       setSubmitting(false);
+      const errData = err?.response?.data;
+      const rawError =
+        errData?.responseMsg ||
+        errData?.r?.message ||
+        errData?.r?.msg ||
+        errData?.message ||
+        (errData?.msg && !errData.msg.toLowerCase().includes('başarısız') && !errData.msg.toLowerCase().includes('basarisiz') ? errData.msg : null) ||
+        errData?.detail ||
+        errData?.msg ||
+        err?.message ||
+        'Payment Failed';
+      const errorMsg = localizeApiMessage(rawError, 'Payment Failed');
       Toast.show({
         type: 'error',
-        text1: tr('Hata Oluştu') || 'Payment Error',
-        text2: err?.response?.data?.msg || err?.message || tr('Ödeme Başarısız') || 'Payment Failed',
+        text1: tr('Payment Error') || 'Payment Error',
+        text2: errorMsg,
       });
     }
   };
@@ -387,7 +515,7 @@ export default function EDahab({ navigation, route }) {
             disabled={submitting || polling}
             style={[styles.cancelBtn, { borderColor: borderColor }]}>
             <Text style={[styles.cancelBtnText, { color: subTextColor }]}>
-              {tr('İptal') || 'Cancel'}
+              {tr('Cancel') || 'Cancel'}
             </Text>
           </TouchableOpacity>
         </View>

@@ -47,11 +47,11 @@ export default function DeleteAccount({ navigation }) {
 
     if (isGuest) {
       Alert.alert(
-        tr('Misafir Hesabı') || 'Guest Account',
-        tr('Misafir hesabı silinemez. Oturumu kapatmak ister misiniz?') ||
+        tr('Guest Account') || 'Guest Account',
+        tr('Guest account does not have stored permanent profile. You can log out instead.') ||
           'Guest account does not have stored permanent profile. You can log out instead.',
         [
-          { text: tr('İptal') || 'Cancel', style: 'cancel' },
+          { text: tr('Cancel') || 'Cancel', style: 'cancel' },
           {
             text: tr('Log Out') || 'Log Out',
             style: 'destructive',
@@ -96,25 +96,25 @@ export default function DeleteAccount({ navigation }) {
         Alert.alert(
           tr('Account Deleted') || 'Account Deleted',
           res?.data?.msg ||
-            tr('Hesabınız 24 saat içinde silinecektir') ||
+            tr('Your account and all associated data have been scheduled for permanent deletion.') ||
             'Your account and all associated data have been scheduled for permanent deletion.',
         );
 
         await logoutUser(navigation, setCtx);
       } else {
         Alert.alert(
-          tr('Hata') || 'Error',
+          tr('Error') || 'Error',
           res?.data?.msg ||
-            tr('Hesap silme işlemi başarısız oldu') ||
+            tr('Failed to delete account. Please verify your password.') ||
             'Failed to delete account. Please verify your password.',
         );
       }
     } catch (err) {
       console.log('Delete account error:', err);
       Alert.alert(
-        tr('Hata') || 'Error',
+        tr('Error') || 'Error',
         err?.response?.data?.msg ||
-          tr('Hesap silme işlemi başarısız oldu') ||
+          tr('Failed to delete account.') ||
           'Failed to delete account.',
       );
     } finally {

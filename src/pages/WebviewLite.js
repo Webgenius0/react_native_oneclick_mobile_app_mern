@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import WebView from 'react-native-webview';
 import {
   BackHandler,
@@ -6,11 +6,15 @@ import {
   Platform,
   SafeAreaView,
   Text,
+  TouchableOpacity,
   View,
-
+  StyleSheet,
 } from 'react-native';
 import { tr } from '../translate/i18n';
 import GlobalStyle from '../assets/GlobalStyle';
+import Colors from '../assets/Colors';
+import CartIcon from '../assets/svg/cart.svg';
+import { useCartStore } from '../store/useCartStore';
 import { HeaderBackButton } from '@react-navigation/elements';
 import { injectedJavascript } from '../helpers/webview';
 
@@ -27,6 +31,11 @@ export default function WebviewLite({ route, navigation }) {
     page_url = 'https://1clicktoshop.com/sestest.php';
   }
 
+  const cartItems = useCartStore(state => state.items) || [];
+  const cartCount = useMemo(() => {
+    return (cartItems || []).reduce((sum, item) => sum + (item.count || 1), 0);
+  }, [cartItems]);
+
   useEffect(() => {
     // alert(page_url);
   }, [page_url]);
@@ -35,7 +44,7 @@ export default function WebviewLite({ route, navigation }) {
   const webView = useRef(null);
   const [image, setImage] = useState('');
   const HandleBackPressed = () => {
-    if (webView.current.canGoBack) {
+    if (webView.current?.canGoBack) {
       webView.current.goBack();
       return true; // PREVENT DEFAULT BEHAVIOUR (EXITING THE APP)
     }
@@ -56,13 +65,31 @@ export default function WebviewLite({ route, navigation }) {
           labelVisible={false}
           backTitleVisible={false}
           onPress={() => {
-            if (webView.current.canGoBack) {
+            if (webView.current?.canGoBack) {
               webView.current.goBack();
             } else {
               navigation.goBack();
             }
           }}
         />
+      ),
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Cart')}
+          style={styles.headerCartTouch}
+          activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <View style={styles.headerCartButton}>
+            <CartIcon width={20} height={20} fill={Colors.primary || '#F67922'} />
+          </View>
+          {cartCount > 0 && (
+            <View style={styles.headerCartBadge}>
+              <Text style={styles.headerCartBadgeText}>
+                {cartCount > 99 ? '99+' : cartCount}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
       ),
     });
 
@@ -147,7 +174,7 @@ export default function WebviewLite({ route, navigation }) {
                   borderWidth: 1,
                   borderColor: '#DDD',
                 }}>
-                <Text>{tr('Yükleniyor')}...</Text>
+                <Text>{tr('Loading') || 'Loading'}...</Text>
               </View>
             </View>
           ) : null}
@@ -156,3 +183,52 @@ export default function WebviewLite({ route, navigation }) {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  headerCartTouch: {
+    paddingTop: 5,
+    paddingRight: 6,
+    paddingBottom: 2,
+    paddingLeft: 2,
+    marginRight: 6,
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerCartButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#FFE4D0',
+    borderWidth: 1.5,
+    borderColor: '#F67922',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#F67922',
+    shadowOffset: { width: 0, height: 1.5 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  headerCartBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    elevation: 5,
+  },
+  headerCartBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '800',
+    lineHeight: 12,
+  },
+});

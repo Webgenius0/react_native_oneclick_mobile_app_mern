@@ -6,6 +6,7 @@ import { WebView } from 'react-native-webview';
 import Toast from 'react-native-toast-message';
 import GlobalStyle from '../assets/GlobalStyle';
 import Colors from '../assets/Colors';
+import CartIcon from '../assets/svg/cart.svg';
 import { useCartStore } from '../store/useCartStore';
 import { delay } from '../helpers/common';
 import AddToCart from '../components/webview/AddToCart';
@@ -22,6 +23,52 @@ import { t } from '../translate/i18n';
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  headerCartTouch: {
+    paddingTop: 5,
+    paddingRight: 6,
+    paddingBottom: 2,
+    paddingLeft: 2,
+    marginRight: 6,
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerCartButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#FFE4D0',
+    borderWidth: 1.5,
+    borderColor: '#F67922',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#F67922',
+    shadowOffset: { width: 0, height: 1.5 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  headerCartBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    elevation: 5,
+  },
+  headerCartBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '800',
+    lineHeight: 12,
   },
   headerButton: {
     paddingHorizontal: 12,
@@ -724,6 +771,10 @@ const ROUTE_CHANGE_BRIDGE = `
 
 export default function Webview({ route, navigation }) {
   const { addItem } = useCartStore();
+  const cartItems = useCartStore(state => state.items) || [];
+  const cartCount = useMemo(() => {
+    return (cartItems || []).reduce((sum, item) => sum + (item.count || 1), 0);
+  }, [cartItems]);
   const injectScript = useScriptServiceStore(state => state.injectScript);
   const setTranslateUrl = useWebviewStore(state => state.setTranslateUrl);
 
@@ -1055,7 +1106,7 @@ export default function Webview({ route, navigation }) {
     Clipboard.setString(nextUrl);
     Toast.show({
       type: 'success',
-      text1: 'Link kopyalandi',
+      text1: t('Link copied') || 'Link copied',
       position: 'bottom',
     });
   }, [sourceUrl]);
@@ -1097,13 +1148,32 @@ export default function Webview({ route, navigation }) {
     [handleHeaderBack],
   );
 
+  const handleOpenCart = useCallback(() => {
+    navigation.navigate('Cart');
+  }, [navigation]);
+
   const renderHeaderRight = useCallback(
     () => (
-      <TouchableOpacity onPress={copyCurrentUrl} style={styles.headerButton}>
-        <Text style={styles.headerButtonText}>Linki Kopyala</Text>
+      <TouchableOpacity
+        onPress={handleOpenCart}
+        style={styles.headerCartTouch}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Shopping Cart"
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <View style={styles.headerCartButton}>
+          <CartIcon width={20} height={20} fill={Colors.primary || '#F67922'} />
+        </View>
+        {cartCount > 0 && (
+          <View style={styles.headerCartBadge}>
+            <Text style={styles.headerCartBadgeText}>
+              {cartCount > 99 ? '99+' : cartCount}
+            </Text>
+          </View>
+        )}
       </TouchableOpacity>
     ),
-    [copyCurrentUrl],
+    [cartCount, handleOpenCart],
   );
 
   const isAddingRef = useRef(false);
@@ -3125,11 +3195,12 @@ export default function Webview({ route, navigation }) {
     navigation.setOptions({
       title: route?.params?.ad || '',
       headerLeft: renderHeaderLeft,
-      headerRight: undefined,
+      headerRight: renderHeaderRight,
     });
   }, [
     navigation,
     renderHeaderLeft,
+    renderHeaderRight,
     route?.params?.ad,
   ]);
 
@@ -3232,7 +3303,12 @@ export default function Webview({ route, navigation }) {
           }}
         />
         {isProductPage && (
-          <AddToCart addChart={addChart} loading={isAddingToCart} />
+          <AddToCart
+            addChart={addChart}
+            loading={isAddingToCart}
+            onOpenCart={handleOpenCart}
+            cartCount={cartCount}
+          />
         )}
         {isAddingToCart && (
           <View style={styles.addingOverlay} pointerEvents="auto">

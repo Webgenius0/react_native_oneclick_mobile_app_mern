@@ -18,7 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { availableLanguages, i18n, tr } from '../translate/i18n';
 import { storageDelete, storageGet, storageSet } from '../helpers/storage';
-import { getFcmToken } from '../helpers/notification';
+import { getFcmToken, fcmUpdate } from '../helpers/notification';
 import * as RootNavigation from '../services/RootNavigation';
 import { logoutUser, setUser } from '../helpers/auth';
 
@@ -38,7 +38,14 @@ export default function Account({ navigation }) {
   const { ctx, setCtx, ctxDil, setCtxDil } = useContext(EmContext);
 
   const initialUser = ctx?.user || null;
-  const initialIsGuest = !initialUser || !Object.keys(initialUser).length;
+  const initialIsGuest =
+    !initialUser ||
+    !Object.keys(initialUser).length ||
+    (!initialUser?.token && !ctx?.token) ||
+    initialUser?.kod === 'GUEST' ||
+    initialUser?.kod === 'HG1000' ||
+    initialUser?.token === 'GUEST' ||
+    ctx?.token === 'GUEST';
 
   const [state, setState] = useState({
     s: initialUser || {},
@@ -79,22 +86,26 @@ export default function Account({ navigation }) {
           currentUser?.token ||
           ctx?.token;
 
-        // Check if user has an active session (real user or dummy user)
-        const hasUserSession = Boolean(
-          currentUser &&
-          (currentUser.id || currentUser.kod || currentUser.email || currentUser.ad || currentUser.name || currentUser.tel || storedToken),
-        );
+        const isGuestStorage = (await storageGet('is_guest')) === '1';
+        const isGuest =
+          isGuestStorage ||
+          currentUser?.kod === 'GUEST' ||
+          currentUser?.kod === 'HG1000' ||
+          currentUser?.token === 'GUEST' ||
+          ctx?.user?.kod === 'GUEST' ||
+          ctx?.user?.kod === 'HG1000' ||
+          ctx?.token === 'GUEST';
 
-        if (!hasUserSession) {
+        if (isGuest || !currentUser || (!currentUser.token && !ctx?.token && !storedToken)) {
           setState({
-            s: {},
+            s: currentUser || { kod: 'HG1000', ad: 'Guest' },
             loading: false,
             isGuest: true,
           });
           return;
         }
 
-        // Active authenticated session (real user or dummy/mock user)
+        // Active authenticated session (real user)
         const activeUser = {
           ...currentUser,
           token: storedToken || currentUser?.token,
@@ -212,10 +223,9 @@ export default function Account({ navigation }) {
     i18n.locale = dil;
     try {
       const fcmToken = await getFcmToken();
-      await ai.post('update-language', {
-        dil: dil,
-        fcmToken: fcmToken,
-      });
+      if (fcmToken) {
+        await fcmUpdate(fcmToken, true);
+      }
     } catch (e) {}
     setCtxDil(dil);
   };
@@ -231,13 +241,16 @@ export default function Account({ navigation }) {
   const userDisplayName =
     state.s?.ad ||
     state.s?.name ||
-    (state.s?.kod ? (state.s.kod === 'HG1000' ? 'Dummy User' : `User ${state.s.kod}`) : '') ||
-    tr('User');
+    (state.isGuest
+      ? tr('Guest User') || 'Guest User'
+      : tr('User') || 'User');
   const userSubtitle =
     state.s?.email ||
     state.s?.eposta ||
     state.s?.tel ||
-    (state.s?.kod ? `ID: ${state.s.kod}` : '');
+    (state.s?.kod && state.s.kod !== 'GUEST' && state.s.kod !== 'HG1000'
+      ? `ID: ${state.s.kod}`
+      : '');
 
   return (
     <SafeAreaView
@@ -618,7 +631,7 @@ export default function Account({ navigation }) {
               { backgroundColor: cardBg, borderColor: cardBorder },
             ]}>
             <Text style={[styles.modalTitle, { color: textColor }]}>
-              {tr('Dil Seçimi') || 'Select Language'}
+              {tr('Select Language') || 'Select Language'}
             </Text>
             {availableLanguages.map(dil => {
               const isSelected = dil.id === ctxDil;
@@ -660,10 +673,10 @@ export default function Account({ navigation }) {
               { backgroundColor: cardBg, borderColor: cardBorder },
             ]}>
             <Text style={[styles.modalTitle, { color: textColor }]}>
-              {tr('Ödeme Yöntemleri') || 'Payment Methods'}
+              {tr('Payment Methods') || 'Payment Methods'}
             </Text>
             <Text style={[styles.paymentModalSub, { color: subTextColor }]}>
-              {tr('Desteklenen güvenli ödeme seçenekleri') ||
+              {tr('Supported secure payment options for your orders') ||
                 'Supported secure payment options for your orders'}
             </Text>
 
@@ -708,7 +721,7 @@ export default function Account({ navigation }) {
               style={styles.modalCloseBtn}
               onPress={() => setPaymentModalVisible(false)}>
               <Text style={styles.modalCloseBtnText}>
-                {tr('Tamam') || 'Got it'}
+                {tr('Got it') || 'Got it'}
               </Text>
             </TouchableOpacity>
           </View>

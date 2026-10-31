@@ -68,11 +68,12 @@ const App = () => {
         var url = Platform.select({ ios: s.ios, android: s.android });
 
         Alert.alert(
-          tr('Güncelleme Gerekli'),
-          tr('Yeni bir versiyon mevcut Lütfen uygulamayı güncelleyiniz'),
+          tr('Update Required') || 'Update Required',
+          tr('A new version is available. Please update the application.') ||
+            'A new version is available. Please update the application.',
           [
             {
-              text: tr('Güncelle'),
+              text: tr('Update') || 'Update',
               onPress: () => {
                 BackHandler.exitApp();
                 Linking.openURL(url);
@@ -120,12 +121,11 @@ const App = () => {
     (async () => {
       try {
         const savedLang = await storageGet('language');
-        if (savedLang) {
-          i18n.locale = savedLang;
-          setCtxDil(savedLang);
-        } else {
-          i18n.locale = 'en';
-          setCtxDil('en');
+        const activeLang = savedLang && ['en', 'som'].includes(savedLang) ? savedLang : 'en';
+        i18n.locale = activeLang;
+        setCtxDil(activeLang);
+        if (savedLang === 'tr') {
+          await storageSet('language', 'en');
         }
       } catch (langErr) {
         console.log('App init language error:', langErr);
