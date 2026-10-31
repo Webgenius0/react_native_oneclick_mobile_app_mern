@@ -1,32 +1,27 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   StyleSheet,
-  Animated,
-  Text,
   StatusBar,
-  Image,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { getUser } from '../helpers/auth';
 import { CommonActions } from '@react-navigation/native';
 import { FIREBASE_ENABLED } from '../../config';
 import { getInitialNotification, getMessaging } from '@react-native-firebase/messaging';
 import { storageGet } from '../helpers/storage';
+import { SPLASH_HTML } from './splashHtml';
 
 export default function Splash({ navigation }) {
   const [authChecked, setAuthChecked] = useState(false);
+  const [animationDone, setAnimationDone] = useState(false);
   const [destination, setDestination] = useState('Onboarding');
-  const progressAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Start progress bar animation
-    Animated.timing(progressAnim, {
-      toValue: 1,
-      duration: 1800,
-      useNativeDriver: false,
-    }).start(() => {
-      setAuthChecked(true);
-    });
+    // Safety timer: animation completes in ~2.75s, fallback guarantee at 3.1s
+    const timer = setTimeout(() => {
+      setAnimationDone(true);
+    }, 3100);
 
     const checkState = async () => {
       try {
@@ -47,14 +42,28 @@ export default function Splash({ navigation }) {
       } catch (err) {
         console.log('Splash check error:', err);
         setDestination('Onboarding');
+      } finally {
+        setAuthChecked(true);
       }
     };
 
     checkState();
-  }, [progressAnim]);
 
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleMessage = useCallback((event) => {
+    try {
+      const data = event.nativeEvent?.data;
+      if (data === 'READY') {
+        setAnimationDone(true);
+      }
+    } catch (e) {}
+  }, []);
+
+  // Navigate when BOTH the splash animation has finished and auth state is determined
   useEffect(() => {
-    if (authChecked) {
+    if (authChecked && animationDone) {
       let targetRoute = 'Onboarding';
       if (destination === 'Home') {
         targetRoute = 'AuthAfter';
@@ -121,41 +130,24 @@ export default function Splash({ navigation }) {
         navigateToTarget(tip, grupID);
       }
     }
-  }, [authChecked, destination, navigation]);
-
-  const progressWidth = progressAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0%', '100%'],
-  });
+  }, [authChecked, animationDone, destination, navigation]);
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#F58423" />
-
-      {/* Center Brand Logo from Figma */}
-      <View style={styles.centerContent}>
-        <Image
-          source={require('../assets/img/onboarding/splash_logo.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-      </View>
-
-      {/* Bottom Bags Background & Progress */}
-      <View style={styles.bottomContent}>
-        <Image
-          source={require('../assets/img/onboarding/splash_bg_bags.png')}
-          style={styles.bgBags}
-          resizeMode="contain"
-        />
-
-        <View style={styles.progressBarTrack}>
-          <Animated.View
-            style={[styles.progressBarFill, { width: progressWidth }]}
-          />
-        </View>
-        <Text style={styles.versionText}>Version 1.0</Text>
-      </View>
+      <StatusBar barStyle="light-content" backgroundColor="#FFA54F" translucent={true} />
+      <WebView
+        originWhitelist={['*']}
+        source={{ html: SPLASH_HTML }}
+        style={styles.webView}
+        containerStyle={styles.webViewContainer}
+        androidLayerType="hardware"
+        showsVerticalScrollIndicator={false}
+        showsHorizontalScrollIndicator={false}
+        scrollEnabled={false}
+        bounces={false}
+        overScrollMode="never"
+        onMessage={handleMessage}
+      />
     </View>
   );
 }
@@ -164,52 +156,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F58423',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
-  centerContent: {
+  webViewContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 80,
+    backgroundColor: '#F58423',
   },
-  logo: {
-    width: 170,
-    height: 70,
-  },
-  bottomContent: {
-    alignItems: 'center',
-    width: '100%',
-    paddingBottom: 40,
-    position: 'relative',
-  },
-  bgBags: {
-    position: 'absolute',
-    bottom: -20,
-    width: '100%',
-    height: 220,
-    opacity: 0.65,
-  },
-  progressBarTrack: {
-    width: 140,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.35)',
-    overflow: 'hidden',
-    marginBottom: 12,
-    zIndex: 2,
-  },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 3,
-    backgroundColor: '#FFFFFF',
-  },
-  versionText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontFamily: 'System',
-    letterSpacing: 0.5,
-    zIndex: 2,
+  webView: {
+    flex: 1,
+    backgroundColor: 'transparent',
   },
 });
