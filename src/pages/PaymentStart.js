@@ -370,68 +370,7 @@ export default function PaymentStart({ navigation, route }) {
           </View>
         </TouchableOpacity>
 
-        {/* Price Summary (Figma) */}
-        <View
-          style={[
-            styles.sectionCard,
-            { backgroundColor: cardBg, borderColor: borderColor, marginTop: 20 },
-          ]}>
-          <Text style={[styles.summaryHeaderTitle, { color: textColor }]}>
-            {tr('Price Summary') || 'Price Summary'}
-          </Text>
 
-          <View style={styles.priceSummaryRow}>
-            <Text style={[styles.priceSummaryLabel, { color: subTextColor }]}>
-              {tr('Subtotal') || 'Subtotal'} (
-              {itemCountParam !== undefined && itemCountParam !== null && Number(itemCountParam) > 0
-                ? Number(itemCountParam)
-                : (route.params?.items?.length || 1)}{' '}
-              {(itemCountParam !== undefined && itemCountParam !== null && Number(itemCountParam) > 0
-                ? Number(itemCountParam)
-                : (route.params?.items?.length || 1)) === 1
-                ? 'item'
-                : 'items'}
-              )
-            </Text>
-            <Text style={[styles.priceSummaryValue, { color: textColor }]}>
-              ${subtotal.toFixed(2)}
-            </Text>
-          </View>
-
-          {komisyonTutar > 0 ? (
-            <View style={styles.priceSummaryRow}>
-              <Text style={[styles.priceSummaryLabel, { color: subTextColor }]}>
-                {tr('Commission fee') || 'Commission fee'}{' '}
-                {komisyonYuzde > 0 ? `(${komisyonYuzde}%)` : ''}
-              </Text>
-              <Text style={[styles.priceSummaryValue, { color: textColor }]}>
-                ${komisyonTutar.toFixed(2)}
-              </Text>
-            </View>
-          ) : null}
-
-          {/* Shipping cost row - temporarily commented out
-          <View style={styles.priceSummaryRow}>
-            <Text style={[styles.priceSummaryLabel, { color: subTextColor }]}>
-              {tr('Shipping Cost') || 'Shipping Cost'}
-            </Text>
-            <Text style={[styles.priceSummaryValue, { color: textColor }]}>
-              ${shipping.toFixed(2)}
-            </Text>
-          </View>
-          */}
-
-          <View
-            style={[
-              styles.totalRow,
-              { borderTopColor: borderColor, borderTopWidth: 1 },
-            ]}>
-            <Text style={[styles.totalLabel, { color: textColor }]}>
-              {tr('Total') || 'Total'}
-            </Text>
-            <Text style={styles.totalValue}>${finalPayTotal.toFixed(2)}</Text>
-          </View>
-        </View>
       </ScrollView>
 
       {/* Sticky Bottom Pay Button (Figma) */}
