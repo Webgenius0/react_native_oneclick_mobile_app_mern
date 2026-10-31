@@ -16,7 +16,7 @@ import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context'
 import AppHeader from '../components/common/AppHeader';
 import { tr, localizeApiMessage } from '../translate/i18n';
 import { EmContext } from '../contexts/EmContext';
-import { getUser, getToken } from '../helpers/auth';
+import { getUser, getToken, isGuestUser } from '../helpers/auth';
 import ai from '../helpers/ai';
 import { cleanProductTitle, getStoreName } from '../helpers/storeHelper';
 import {
@@ -106,11 +106,19 @@ export default function ReviewOrder({ navigation, route }) {
     if (isSubmitting) return;
 
     const user = await getUser();
-    if (!user || user.kod === 'GUEST') {
+    const guest = await isGuestUser(user);
+    if (guest) {
       Alert.alert(
-        tr('Sign In') || 'Sign In',
-        tr('Please sign in to place your order.') ||
-          'Please sign in to place your order.',
+        tr('Sign In Required') || 'Sign In Required',
+        tr('Please sign in or create an account to proceed with checkout.') ||
+          'Please sign in or create an account to proceed with checkout.',
+        [
+          { text: tr('Cancel') || 'Cancel', style: 'cancel' },
+          {
+            text: tr('Sign In') || 'Sign In',
+            onPress: () => navigation.navigate('Login'),
+          },
+        ],
       );
       return;
     }
@@ -124,12 +132,20 @@ export default function ReviewOrder({ navigation, route }) {
 
     try {
       const user = await getUser();
-      if (!user || user.kod === 'GUEST') {
+      const guest = await isGuestUser(user);
+      if (guest) {
         setConfirmModalVisible(false);
         Alert.alert(
-          tr('Sign In') || 'Sign In',
-          tr('Please sign in to place your order.') ||
-            'Please sign in to place your order.',
+          tr('Sign In Required') || 'Sign In Required',
+          tr('Please sign in or create an account to proceed with checkout.') ||
+            'Please sign in or create an account to proceed with checkout.',
+          [
+            { text: tr('Cancel') || 'Cancel', style: 'cancel' },
+            {
+              text: tr('Sign In') || 'Sign In',
+              onPress: () => navigation.navigate('Login'),
+            },
+          ],
         );
         setIsSubmitting(false);
         return;
@@ -323,23 +339,65 @@ export default function ReviewOrder({ navigation, route }) {
       } else {
         setConfirmModalVisible(false);
         const rawMsg = res?.data?.msg || res?.data?.detail;
-        const errorMsg =
-          localizeApiMessage(rawMsg, 'Failed to place order.') ||
-          rawMsg ||
-          tr('Failed to place order. Please try again.') ||
-          'Failed to place order. Please try again.';
-        Alert.alert(tr('Order Failed') || 'Order Failed', errorMsg);
+        const isSessionExpired =
+          rawMsg &&
+          (String(rawMsg).toLowerCase().includes('session') ||
+            String(rawMsg).toLowerCase().includes('expired') ||
+            String(rawMsg).toLowerCase().includes('token'));
+
+        if (isSessionExpired) {
+          Alert.alert(
+            tr('Session Expired') || 'Session Expired',
+            tr('Your session has expired. Please sign in again.') ||
+              'Your session has expired. Please sign in again.',
+            [
+              { text: tr('Cancel') || 'Cancel', style: 'cancel' },
+              {
+                text: tr('Sign In') || 'Sign In',
+                onPress: () => navigation.navigate('Login'),
+              },
+            ],
+          );
+        } else {
+          const errorMsg =
+            localizeApiMessage(rawMsg, 'Failed to place order.') ||
+            rawMsg ||
+            tr('Failed to place order. Please try again.') ||
+            'Failed to place order. Please try again.';
+          Alert.alert(tr('Order Failed') || 'Order Failed', errorMsg);
+        }
       }
     } catch (err) {
       setConfirmModalVisible(false);
       console.log('handleContinueToPayment err:', err?.response?.data || err?.message || err);
       const rawMsg = err?.response?.data?.msg || err?.response?.data?.detail;
-      const errorMsg =
-        localizeApiMessage(rawMsg, 'Failed to place order.') ||
-        rawMsg ||
-        tr('Failed to place order. Please check your connection and try again.') ||
-        'Failed to place order. Please check your connection and try again.';
-      Alert.alert(tr('Order Failed') || 'Order Failed', errorMsg);
+      const isSessionExpired =
+        rawMsg &&
+        (String(rawMsg).toLowerCase().includes('session') ||
+          String(rawMsg).toLowerCase().includes('expired') ||
+          String(rawMsg).toLowerCase().includes('token'));
+
+      if (isSessionExpired) {
+        Alert.alert(
+          tr('Session Expired') || 'Session Expired',
+          tr('Your session has expired. Please sign in again.') ||
+            'Your session has expired. Please sign in again.',
+          [
+            { text: tr('Cancel') || 'Cancel', style: 'cancel' },
+            {
+              text: tr('Sign In') || 'Sign In',
+              onPress: () => navigation.navigate('Login'),
+            },
+          ],
+        );
+      } else {
+        const errorMsg =
+          localizeApiMessage(rawMsg, 'Failed to place order.') ||
+          rawMsg ||
+          tr('Failed to place order. Please check your connection and try again.') ||
+          'Failed to place order. Please check your connection and try again.';
+        Alert.alert(tr('Order Failed') || 'Order Failed', errorMsg);
+      }
     } finally {
       setIsSubmitting(false);
     }

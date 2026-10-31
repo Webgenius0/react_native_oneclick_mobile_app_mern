@@ -18,7 +18,7 @@ import { useCartStore, isCartItemComplete } from '../store/useCartStore';
 import CartItem from '../components/cart/CartItem';
 import AppHeader from '../components/common/AppHeader';
 import AppCheckbox from '../components/common/AppCheckbox';
-import { getUser } from '../helpers/auth';
+import { getUser, isGuestUser } from '../helpers/auth';
 import { EmContext } from '../contexts/EmContext';
 import { useExchangeRateStore } from '../store/useExchangeRateStore';
 import { useSheinPriceStore } from '../store/useSheinPriceStore';
@@ -180,7 +180,8 @@ export default function CartPage({ navigation }) {
 
   const handleCheckoutPress = async () => {
     const user = await getUser();
-    if (user && user.kod === 'GUEST') {
+    const guest = await isGuestUser(user);
+    if (guest) {
       Alert.alert(
         tr('Sign In Required') || 'Sign In Required',
         tr('Please sign in or create an account to proceed with checkout.') ||

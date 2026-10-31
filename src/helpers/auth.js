@@ -6,6 +6,29 @@ import * as RootNavigation from '../services/RootNavigation';
 import ai from './ai';
 import { getFcmToken } from './notification';
 
+export const isGuestUser = async (userParam = null) => {
+  try {
+    const isGuestStorage = (await storageGet('is_guest')) === '1';
+    if (isGuestStorage) {
+      return true;
+    }
+
+    const user = userParam || (await getUser());
+    if (!user || !user.token) {
+      return true;
+    }
+
+    return (
+      user.kod === 'GUEST' ||
+      user.kod === 'HG1000' ||
+      user.token === 'GUEST' ||
+      String(user.token).trim() === ''
+    );
+  } catch (e) {
+    return true;
+  }
+};
+
 export const getToken = async () => {
   let token = null;
   try {
