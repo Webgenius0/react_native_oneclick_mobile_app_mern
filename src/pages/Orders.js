@@ -133,14 +133,14 @@ export default function Orders({ route, navigation }) {
           pageNum: 1,
           search: debouncedSearch,
           force: true,
+          grupID: route?.params?.grupID,
         });
-        setRefetch(+new Date());
       });
     } catch (e) {
       console.log('Orders onMessage error:', e?.message || e);
     }
     return unsubscribe;
-  }, [isFocused, activeTabId, debouncedSearch, invalidateOrders, fetchOrders]);
+  }, [isFocused, activeTabId, debouncedSearch, invalidateOrders, fetchOrders, route?.params?.grupID]);
 
   // Pull to refresh: forces page 1 update and refreshes cache
   const onRefresh = useCallback(async () => {
@@ -215,6 +215,15 @@ export default function Orders({ route, navigation }) {
 
   const renderEmptyComponent = useMemo(() => {
     if (loading) return null;
+    let subtitle = tr('You have no orders in this category yet') || 'You have no orders in this category yet.';
+    if (debouncedSearch) {
+      subtitle = tr('Try adjusting your search query') || 'No orders match your search keyword.';
+    } else if (activeTabId === 'cancelled') {
+      subtitle = tr('You have no cancelled orders') || 'You have no cancelled orders.';
+    } else if (activeTabId === 'confirmed') {
+      subtitle = tr('You have no confirmed orders') || 'You have no confirmed orders yet.';
+    }
+
     return (
       <View style={styles.emptyContainer}>
         <View style={styles.emptyIconCircle}>
@@ -224,15 +233,11 @@ export default function Orders({ route, navigation }) {
           {tr('No orders found') || 'No orders found'}
         </Text>
         <Text style={[styles.emptySubtitle, { color: subTextColor }]}>
-          {debouncedSearch
-            ? tr('Try adjusting your search query') ||
-              'No orders match your search keyword.'
-            : tr('You have no orders in this category yet') ||
-              'You have no orders in this category yet.'}
+          {subtitle}
         </Text>
       </View>
     );
-  }, [loading, debouncedSearch, textColor, subTextColor]);
+  }, [loading, debouncedSearch, activeTabId, textColor, subTextColor]);
 
   return (
     <SafeAreaView

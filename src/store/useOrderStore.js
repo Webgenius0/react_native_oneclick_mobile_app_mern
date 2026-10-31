@@ -1,7 +1,11 @@
 import { create } from 'zustand';
 import { storageGet, storageSet } from '../helpers/storage';
 import ai from '../helpers/ai';
-import { FILTER_TABS, matchesOrderSearch } from '../helpers/orderStatus';
+import {
+  FILTER_TABS,
+  matchesOrderSearch,
+  getOrderStatusCategory,
+} from '../helpers/orderStatus';
 
 const CACHE_ORDERS_KEY = 'cached_orders_master';
 const LEGACY_CACHE_KEY = 'cached_orders_list';
@@ -23,10 +27,11 @@ const createInitialTabState = () => ({
 });
 
 export const useOrderStore = create((set, get) => ({
-  // Per-tab cache mapping for: 'all', 'pending', 'in_progress', 'delivered', 'cancelled'
+  // Per-tab cache mapping for: 'all', 'pending', 'confirmed', 'in_progress', 'delivered', 'cancelled'
   tabs: {
     all: createInitialTabState(),
     pending: createInitialTabState(),
+    confirmed: createInitialTabState(),
     in_progress: createInitialTabState(),
     delivered: createInitialTabState(),
     cancelled: createInitialTabState(),
@@ -53,6 +58,7 @@ export const useOrderStore = create((set, get) => ({
       tabs: {
         all: { ...state.tabs.all, lastFetched: null },
         pending: { ...state.tabs.pending, lastFetched: null },
+        confirmed: { ...state.tabs.confirmed, lastFetched: null },
         in_progress: { ...state.tabs.in_progress, lastFetched: null },
         delivered: { ...state.tabs.delivered, lastFetched: null },
         cancelled: { ...state.tabs.cancelled, lastFetched: null },
@@ -169,9 +175,12 @@ export const useOrderStore = create((set, get) => ({
           page: pageNum,
           per_page: ORDERS_PER_PAGE,
           limit: ORDERS_PER_PAGE,
-          filter: tabId,
-          tab: tabId,
+          filter: activeTabObj.filter || tabId,
+          tab: activeTabObj.filter || tabId,
         };
+        if (activeTabObj.durums && tabId !== 'all') {
+          queryParams.durum = activeTabObj.durums;
+        }
 
         if (isSearching) {
           queryParams.search = cleanSearch;
@@ -209,6 +218,18 @@ export const useOrderStore = create((set, get) => ({
               ? res.data.has_next_page
               : resPage < resTotalPages,
           );
+
+          // Guarantee tab-level status consistency (protect against unfiltered/mixed server returns)
+          if (!isSearching && tabId !== 'all' && Array.isArray(rawList)) {
+            const hasMismatched = rawList.some(
+              item => getOrderStatusCategory(item) !== tabId,
+            );
+            if (hasMismatched) {
+              rawList = rawList.filter(
+                item => getOrderStatusCategory(item) === tabId,
+              );
+            }
+          }
 
           // Fallback client filter if server returned unfiltered response
           if (isSearching && Array.isArray(rawList)) {

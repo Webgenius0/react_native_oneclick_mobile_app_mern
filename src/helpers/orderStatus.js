@@ -3,11 +3,12 @@
  */
 
 export const FILTER_TABS = [
-  { id: 'all', label: 'All', durums: 0 },
-  { id: 'pending', label: 'Pending', durums: [1, 14, 15, 16, 18, 19] },
-  { id: 'in_progress', label: 'In Progress', durums: [2, 3, 4, 5, 11] },
-  { id: 'delivered', label: 'Delivered', durums: [6] },
-  { id: 'cancelled', label: 'Cancelled', durums: [7, 8, 9, 10, 12, 13, 17] },
+  { id: 'all', label: 'All', durums: 0, filter: 'all' },
+  { id: 'pending', label: 'Pending', durums: [1, 14, 15, 16, 19], filter: 'pending' },
+  { id: 'confirmed', label: 'Confirmed', durums: [18], filter: 'confirmed' },
+  { id: 'in_progress', label: 'In Progress', durums: [2, 3, 4, 5, 11], filter: 'in_progress' },
+  { id: 'delivered', label: 'Delivered', durums: [6], filter: 'delivered' },
+  { id: 'cancelled', label: 'Cancelled', durums: [7, 8, 9, 10, 12, 13, 17], filter: 'cancelled' },
 ];
 
 /**
@@ -25,39 +26,53 @@ export const normalizeText = (text) => {
 
 /**
  * Categorize any order item or order group into one of the standard tab IDs:
- * 'pending' | 'in_progress' | 'delivered' | 'cancelled'
+ * 'pending' | 'confirmed' | 'in_progress' | 'delivered' | 'cancelled'
  *
  * Checks in order:
- * 1. Explicit canonical `app_status`
- * 2. Visual badge color `app_badge_color` (green -> delivered, blue -> in_progress, red -> cancelled, orange -> pending)
- * 3. Text keywords in `app_status_text` or `durum_text` (multilingual: TR/EN)
- * 4. Status numeric codes (`durum`)
+ * 1. Explicit canonical `app_status_text` or `durum_text` for Confirmed
+ * 2. Explicit canonical `app_status`
+ * 3. Status numeric codes (`durum`)
+ * 4. Visual badge color `app_badge_color`
+ * 5. Text keywords in `app_status_text` or `durum_text` (multilingual: TR/EN)
  */
 export const getOrderStatusCategory = (item) => {
   if (!item) return 'pending';
   const orders = item.orders || [item];
   const firstOrder = orders[0] || {};
+  const hasDurum = item.durum !== undefined || firstOrder.durum !== undefined;
+  const statusNum = hasDurum ? parseInt(item.durum !== undefined ? item.durum : firstOrder.durum, 10) : null;
+  const statusText = normalizeText(item.app_status_text || item.durum_text);
 
-  // 1. Explicit app_status if supplied
+  // 1. Direct Confirmed identification (durum 18, "Confirmed", "Müşteri Ödedi", "odendi")
+  if (
+    statusNum === 18 ||
+    statusText.includes('confirm') ||
+    statusText.includes('ödedi') ||
+    statusText.includes('odedi')
+  ) {
+    return 'confirmed';
+  }
+
+  // 2. Explicit canonical app_status if supplied
   if (item.app_status) {
     const s = normalizeText(item.app_status);
     if (s === 'delivered') return 'delivered';
     if (s === 'in_progress' || s === 'progress') return 'in_progress';
     if (s === 'cancelled' || s === 'canceled') return 'cancelled';
+    if (s === 'confirmed') return 'confirmed';
+    if (s === 'pending' && statusNum === 18) return 'confirmed';
     if (s === 'pending') return 'pending';
   }
 
-  // 2. Direct app_badge_color matching GroupItem's exact visual colors
-  if (item.app_badge_color) {
-    const c = normalizeText(item.app_badge_color);
-    if (c === 'green') return 'delivered';
-    if (c === 'blue') return 'in_progress';
-    if (c === 'red') return 'cancelled';
-    if (c === 'orange' || c === 'yellow') return 'pending';
+  // 3. Numeric durum standard mapping (when explicit durum exists)
+  if (statusNum !== null) {
+    if ([6].includes(statusNum)) return 'delivered';
+    if ([2, 3, 4, 5, 11].includes(statusNum)) return 'in_progress';
+    if ([7, 8, 9, 10, 12, 13, 17].includes(statusNum)) return 'cancelled';
+    if ([1, 14, 15, 16, 19].includes(statusNum)) return 'pending';
   }
 
-  // 3. Status text inspection (multilingual: English & Turkish)
-  const statusText = normalizeText(item.app_status_text || item.durum_text);
+  // 4. Status text inspection (multilingual: English & Turkish)
   if (statusText) {
     if (statusText.includes('deliver') || statusText.includes('teslim')) {
       return 'delivered';
@@ -89,12 +104,14 @@ export const getOrderStatusCategory = (item) => {
     }
   }
 
-  // 4. Numeric durum fallback
-  const statusNum = parseInt(item.durum !== undefined ? item.durum : firstOrder.durum || 1, 10);
-  if ([6].includes(statusNum)) return 'delivered';
-  if ([2, 3, 4, 5, 11].includes(statusNum)) return 'in_progress';
-  if ([7, 8, 9, 10, 12, 13, 17].includes(statusNum)) return 'cancelled';
-  if ([1, 14, 15, 16, 18, 19].includes(statusNum)) return 'pending';
+  // 5. Visual badge color matching GroupItem's exact visual colors
+  if (item.app_badge_color) {
+    const c = normalizeText(item.app_badge_color);
+    if (c === 'green') return 'delivered';
+    if (c === 'blue') return 'in_progress';
+    if (c === 'red') return 'cancelled';
+    if (c === 'orange' || c === 'yellow') return 'pending';
+  }
 
   return 'pending';
 };

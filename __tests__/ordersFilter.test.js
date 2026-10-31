@@ -24,6 +24,14 @@ describe('Order Status Categorization & Tab Filtering', () => {
       orders: [{ id: '209', ad: 'Slim Fit Denim Jeans', magaza: 'SHEIN', durum: 1 }],
     },
     {
+      id: '348',
+      order_number: 'Order #348',
+      durum: 18,
+      app_badge_color: 'orange',
+      app_status_text: 'Confirmed',
+      orders: [{ id: '348', ad: 'Acrylic Nails Gift', magaza: 'SHEIN', durum: 18 }],
+    },
+    {
       id: '208',
       order_number: 'Order #208',
       durum: 6,
@@ -44,9 +52,10 @@ describe('Order Status Categorization & Tab Filtering', () => {
   describe('getOrderStatusCategory', () => {
     it('categorizes based on app_badge_color correctly', () => {
       expect(getOrderStatusCategory(mockOrders[0])).toBe('in_progress'); // blue
-      expect(getOrderStatusCategory(mockOrders[1])).toBe('pending'); // orange
-      expect(getOrderStatusCategory(mockOrders[2])).toBe('delivered'); // green
-      expect(getOrderStatusCategory(mockOrders[3])).toBe('cancelled'); // red
+      expect(getOrderStatusCategory(mockOrders[1])).toBe('pending'); // orange durum 1
+      expect(getOrderStatusCategory(mockOrders[2])).toBe('confirmed'); // durum 18 Confirmed
+      expect(getOrderStatusCategory(mockOrders[3])).toBe('delivered'); // green
+      expect(getOrderStatusCategory(mockOrders[4])).toBe('cancelled'); // red
     });
 
     it('categorizes based on numeric durum when badges are absent', () => {
@@ -56,6 +65,8 @@ describe('Order Status Categorization & Tab Filtering', () => {
       expect(getOrderStatusCategory({ durum: 11 })).toBe('in_progress');
       expect(getOrderStatusCategory({ durum: 1 })).toBe('pending');
       expect(getOrderStatusCategory({ durum: 14 })).toBe('pending');
+      expect(getOrderStatusCategory({ durum: 16 })).toBe('pending');
+      expect(getOrderStatusCategory({ durum: 18 })).toBe('confirmed');
       expect(getOrderStatusCategory({ durum: 7 })).toBe('cancelled');
       expect(getOrderStatusCategory({ durum: 10 })).toBe('cancelled');
     });
@@ -65,6 +76,8 @@ describe('Order Status Categorization & Tab Filtering', () => {
       expect(getOrderStatusCategory({ durum_text: 'Sipariş Verildi' })).toBe('in_progress');
       expect(getOrderStatusCategory({ durum_text: 'Dağıtımda' })).toBe('in_progress');
       expect(getOrderStatusCategory({ durum_text: 'Beklemede' })).toBe('pending');
+      expect(getOrderStatusCategory({ durum_text: 'Müşteri Onayladı' })).toBe('pending');
+      expect(getOrderStatusCategory({ durum_text: 'Müşteri Ödedi' })).toBe('confirmed');
       expect(getOrderStatusCategory({ durum_text: 'İptal Edildi' })).toBe('cancelled');
     });
   });
@@ -72,14 +85,20 @@ describe('Order Status Categorization & Tab Filtering', () => {
   describe('filterOrdersByTabAndSearch', () => {
     it('shows ALL orders when tab is "all"', () => {
       const result = filterOrdersByTabAndSearch(mockOrders, 'all');
-      expect(result).toHaveLength(4);
-      expect(result.map(o => o.id)).toEqual(['210', '209', '208', '207']);
+      expect(result).toHaveLength(5);
+      expect(result.map(o => o.id)).toEqual(['210', '209', '348', '208', '207']);
     });
 
-    it('shows ONLY Pending orders on "pending" tab', () => {
+    it('shows ONLY Pending orders on "pending" tab (excludes Confirmed)', () => {
       const result = filterOrdersByTabAndSearch(mockOrders, 'pending');
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe('209');
+    });
+
+    it('shows ONLY Confirmed orders on "confirmed" tab', () => {
+      const result = filterOrdersByTabAndSearch(mockOrders, 'confirmed');
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('348');
     });
 
     it('shows ONLY In Progress orders on "in_progress" tab', () => {
