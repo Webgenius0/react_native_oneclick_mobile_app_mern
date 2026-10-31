@@ -437,3 +437,99 @@ export const cleanProductTitle = (rawTitle, url = '') => {
   return title;
 };
 
+/**
+ * Splits hostname into clean domain tokens (handles regional TLDs, subdomains, etc.):
+ * "https://m.shein.sa/product/123" -> ["m", "shein", "sa"]
+ * "https://www.amazon.co.uk/dp/456" -> ["www", "amazon", "co", "uk"]
+ */
+export const getDomainParts = url => {
+  if (!url || typeof url !== 'string') return [];
+  try {
+    const match = url.trim().toLowerCase().match(/^(?:https?:\/\/)?([^/?#:]+)/i);
+    let host = match && match[1] ? match[1].toLowerCase() : '';
+    // Strip common prefixes like www., m., mobile.
+    host = host.replace(/^(?:www\.|m\.|mobile\.)+/i, '');
+    return host ? host.split('.') : [];
+  } catch (_) {
+    return [];
+  }
+};
+
+/**
+ * Universal Marketplace Rule Finder:
+ * Matches an item by URL domain or store name against the marketplaces list from /api/marketplace-price
+ */
+export const findMarketplaceForItem = (item, marketplaces = []) => {
+  if (!item || !Array.isArray(marketplaces) || marketplaces.length === 0) {
+    return null;
+  }
+
+  const url = String(item.url || item.link || '').toLowerCase();
+  const domainParts = getDomainParts(url);
+  const rawStore = String(
+    item.store || item.marketplace || item.store_name || item.magaza || '',
+  ).toLowerCase();
+  const cleanStore = rawStore.replace(/[^a-z0-9]/g, '');
+
+  for (const m of marketplaces) {
+    if (!m) continue;
+    const mpSlug = String(m.marketplace || '').toLowerCase().trim();
+    const cleanMpSlug = mpSlug.replace(/[^a-z0-9]/g, '');
+    const mpName = String(m.name || '').toLowerCase().trim();
+    const cleanMpName = mpName.replace(/[^a-z0-9]/g, '');
+
+    // 1. Direct domain segment match (e.g. domainParts has 'shein' or 'amazon')
+    if (mpSlug && (domainParts.includes(mpSlug) || domainParts.includes(cleanMpSlug))) {
+      return m;
+    }
+
+    // 2. Substring match in URL (e.g. url contains 'shein.' or '.shein' or 'amazon.' or '.amazon')
+    if (
+      mpSlug &&
+      (url.includes(`${mpSlug}.`) || url.includes(`.${mpSlug}`) || url.includes(`/${mpSlug}`))
+    ) {
+      return m;
+    }
+
+    // 3. Store name matching (handles spaces, symbols, and casing)
+    if (cleanStore && cleanMpSlug && (cleanStore === cleanMpSlug || cleanStore.includes(cleanMpSlug))) {
+      return m;
+    }
+    if (cleanStore && cleanMpName && (cleanStore === cleanMpName || cleanStore.includes(cleanMpName))) {
+      return m;
+    }
+    if (mpName && rawStore.includes(mpName)) {
+      return m;
+    }
+  }
+
+  return null;
+};
+
+/**
+ * Calculates marketplace fee and markup for an item
+ */
+export const calculateMarketplacePrice = (basePrice, item, marketplaces = []) => {
+  const numericPrice = typeof basePrice === 'number' ? basePrice : parseFloat(basePrice);
+  if (isNaN(numericPrice) || numericPrice <= 0) {
+    return {
+      percent: 0,
+      percentAmount: 0,
+      finalPrice: numericPrice || 0,
+      matchedMarketplace: null,
+    };
+  }
+
+  const matched = findMarketplaceForItem(item, marketplaces);
+  const percent = matched && Number(matched.percent) > 0 ? Number(matched.percent) : 0;
+  const percentAmount = percent > 0 ? numericPrice * (percent / 100) : 0;
+  const finalPrice = parseFloat((numericPrice + percentAmount).toFixed(2));
+
+  return {
+    percent,
+    percentAmount,
+    finalPrice,
+    matchedMarketplace: matched,
+  };
+};
+
