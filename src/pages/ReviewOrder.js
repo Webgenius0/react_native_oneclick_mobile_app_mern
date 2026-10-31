@@ -89,7 +89,9 @@ export default function ReviewOrder({ navigation, route }) {
           const usd = isUsd
             ? finalPrice
             : calculateConvertedPrice(finalPrice, itemCurrency, rates, inverseRates);
-          const effectiveUsd = usd !== null ? usd : finalPrice;
+          const effectiveUsd = parseFloat(
+            (usd !== null ? usd : finalPrice).toFixed(2),
+          );
           return sum + effectiveUsd * count;
         }, 0)
       : initialTotalUsd || 0;
@@ -161,12 +163,19 @@ export default function ReviewOrder({ navigation, route }) {
                 )
             : null;
 
+        const count = Number(item?.count) > 0 ? Number(item.count) : 1;
+        const lineTotalUsd =
+          convertedPriceVal !== null
+            ? parseFloat((convertedPriceVal * count).toFixed(2))
+            : null;
+
         postData.append(
           'cart[' + i + '][ad]',
           cleanProductTitle(item.title, item.url),
         );
         postData.append('cart[' + i + '][link]', item.url);
-        postData.append('cart[' + i + '][sayi]', item.count || 1);
+        postData.append('cart[' + i + '][sayi]', count);
+        postData.append('cart[' + i + '][adet]', count);
         postData.append('cart[' + i + '][size]', item.size || '');
         postData.append('cart[' + i + '][color]', item.color || '');
         postData.append('cart[' + i + '][store]', storeName);
@@ -179,6 +188,7 @@ export default function ReviewOrder({ navigation, route }) {
           postData.append('cart[' + i + '][fiyat]', finalPriceVal);
         }
         postData.append('cart[' + i + '][currency]', normalizedCurr);
+        postData.append('cart[' + i + '][pb]', normalizedCurr);
 
         if (convertedPriceVal !== null) {
           postData.append(
@@ -186,10 +196,21 @@ export default function ReviewOrder({ navigation, route }) {
             convertedPriceVal,
           );
           postData.append('cart[' + i + '][price_usd]', convertedPriceVal);
+          postData.append('cart[' + i + '][fiyat_usd]', convertedPriceVal);
+          postData.append('cart[' + i + '][tutar_usd]', lineTotalUsd);
+          postData.append('cart[' + i + '][tutar]', lineTotalUsd);
+          postData.append('cart[' + i + '][total_usd]', lineTotalUsd);
         }
 
         i++;
       });
+
+      postData.append('total_usd', totalAmount.toFixed(2));
+      postData.append('tutar_usd', totalAmount.toFixed(2));
+      postData.append('tutar', totalAmount.toFixed(2));
+      postData.append('total', totalAmount.toFixed(2));
+      postData.append('subtotal', subtotalUsd.toFixed(2));
+      postData.append('subtotal_usd', subtotalUsd.toFixed(2));
 
       let res = null;
       let resGrupID = null;
@@ -261,10 +282,16 @@ export default function ReviewOrder({ navigation, route }) {
             ? parseFloat(res.data.tutar).toFixed(2)
             : totalAmount.toFixed(2);
 
+        // Preserve reviewed amount unless server total differs significantly (> 5 cents)
+        const targetAmount =
+          serverTutar && Math.abs(parseFloat(serverTutar) - totalAmount) > 0.05
+            ? serverTutar
+            : totalAmount.toFixed(2);
+
         navigation.navigate('PaymentStart', {
           quick: true,
-          tutar: serverTutar,
-          subtotal: serverTutar,
+          tutar: targetAmount,
+          subtotal: subtotalUsd.toFixed(2),
           shipping: shippingCost.toFixed(2),
           grupID: resGrupID,
           siparis_ids: resOrderIds,

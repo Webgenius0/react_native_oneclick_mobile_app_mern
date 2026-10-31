@@ -94,7 +94,7 @@ export default function CartPage({ navigation }) {
     );
     const percentAmount =
       isShein && safePercent > 0 ? basePrice * (safePercent / 100) : 0;
-    const finalPrice = basePrice + percentAmount;
+    const finalPrice = parseFloat((basePrice + percentAmount).toFixed(2));
     const count = Number(item?.count) > 0 ? Number(item.count) : 1;
     return finalPrice > 0 ? sum + finalPrice * count : sum;
   }, 0);
@@ -118,7 +118,9 @@ export default function CartPage({ navigation }) {
     const usd = isUsd
       ? finalPrice
       : calculateConvertedPrice(finalPrice, itemCurrency, rates, inverseRates);
-    const effectiveUsd = usd !== null ? usd : finalPrice;
+    const effectiveUsd = parseFloat(
+      (usd !== null ? usd : finalPrice).toFixed(2),
+    );
     return sum + effectiveUsd * count;
   }, 0);
 

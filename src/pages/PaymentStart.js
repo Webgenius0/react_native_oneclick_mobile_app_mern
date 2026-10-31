@@ -19,6 +19,25 @@ import { EmContext } from '../contexts/EmContext';
 import ai from '../helpers/ai';
 import { round } from '../helpers/common';
 
+const DEFAULT_PAYMENT_METHODS = [
+  {
+    id: 'waafipay',
+    ad: 'WaafiPay',
+    name: 'WaafiPay / ZAAD Service',
+    target: 'waafipay',
+    komisyonYuzde: 1,
+    komisyonFixed: 0,
+  },
+  {
+    id: 'edahab',
+    ad: 'E-Dahab',
+    name: 'E-Dahab Mobile Money',
+    target: 'edahab',
+    komisyonYuzde: 0,
+    komisyonFixed: 0,
+  },
+];
+
 export default function PaymentStart({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const { ctx } = useContext(EmContext);
@@ -49,7 +68,7 @@ export default function PaymentStart({ navigation, route }) {
 
   const [siparisIds, setSiparisIds] = useState(uniqueIncomingIds);
   const [tutar, setTutar] = useState(initialTutar);
-  const [methods, setMethods] = useState([]);
+  const [methods, setMethods] = useState(DEFAULT_PAYMENT_METHODS);
   const [selectedMethodId, setSelectedMethodId] = useState('waafipay');
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -57,7 +76,7 @@ export default function PaymentStart({ navigation, route }) {
     async function fetchPaymentMethods() {
       try {
         const res = await ai.get('payment-methods');
-        if (res?.data?.error === false && Array.isArray(res?.data?.ss)) {
+        if (res?.data?.error === false && Array.isArray(res?.data?.ss) && res.data.ss.length > 0) {
           setMethods(res.data.ss);
         }
       } catch (err) {
@@ -96,7 +115,13 @@ export default function PaymentStart({ navigation, route }) {
             let calculatedSum = 0;
             unpaidOrders.forEach(item => {
               if (targetOrderIds.includes(String(item.id))) {
-                calculatedSum += parseFloat(item.tutar ?? item.tutar_usd ?? 0) || 0;
+                calculatedSum += parseFloat(
+                  item.tutar_usd ??
+                    item.tutar ??
+                    item.price_usd ??
+                    item.fiyat_usd ??
+                    0,
+                ) || 0;
               }
             });
 
@@ -117,30 +142,45 @@ export default function PaymentStart({ navigation, route }) {
     syncOrdersAndAmount();
   }, [grupID, route.params?.siparis_id, uniqueIncomingIds.join(',')]);
 
-  const selectedMethodObj = methods.find(
-    m => (m?.ad || m?.target || m?.name || '').toLowerCase().includes(selectedMethodId.toLowerCase())
-  );
+  const selectedMethodObj =
+    methods.find(
+      m =>
+        (m?.ad || m?.target || m?.name || '')
+          .toLowerCase()
+          .includes(selectedMethodId.toLowerCase()),
+    ) ||
+    DEFAULT_PAYMENT_METHODS.find(
+      m => m.id === selectedMethodId || m.target === selectedMethodId,
+    );
 
   const numTutar = parseFloat(tutar) || 0;
   // Standard shipping cost ($25.00) - Temporarily commented out
   // const shipping = parseFloat(shippingParam) || 25.0;
   const shipping = parseFloat(shippingParam) || 0.0;
   const subtotal =
-    parseFloat(subtotalParam) || (numTutar > 0 ? numTutar : 0);
+    numTutar > 0
+      ? (shipping > 0 ? numTutar - shipping : numTutar)
+      : parseFloat(subtotalParam) || 0;
   const baseTotal = numTutar > 0 ? numTutar : subtotal + shipping;
 
   let komisyonTutar = 0;
-  let komisyonYuzde = 0;
+  let komisyonYuzde = selectedMethodId === 'waafipay' ? 1 : 0;
   let komisyonFixed = 0;
 
   if (selectedMethodObj) {
-    komisyonYuzde = parseFloat(selectedMethodObj.komisyonYuzde) || 0;
+    komisyonYuzde =
+      selectedMethodObj.komisyonYuzde !== undefined &&
+      selectedMethodObj.komisyonYuzde !== null
+        ? parseFloat(selectedMethodObj.komisyonYuzde) || 0
+        : (selectedMethodId === 'waafipay' ? 1 : 0);
     komisyonFixed = parseFloat(selectedMethodObj.komisyonFixed) || 0;
     if (komisyonYuzde > 0) {
       komisyonTutar = round(baseTotal * (komisyonYuzde / 100));
     } else if (komisyonFixed > 0) {
       komisyonTutar = komisyonFixed;
     }
+  } else if (komisyonYuzde > 0) {
+    komisyonTutar = round(baseTotal * (komisyonYuzde / 100));
   }
 
   const finalPayTotal = round(baseTotal + komisyonTutar);
@@ -342,11 +382,19 @@ export default function PaymentStart({ navigation, route }) {
 
           <View style={styles.priceSummaryRow}>
             <Text style={[styles.priceSummaryLabel, { color: subTextColor }]}>
-              {tr('Subtotal') || 'Subtotal'} ({itemCountParam || 3}{' '}
-              {itemCountParam === 1 ? 'item' : 'items'})
+              {tr('Subtotal') || 'Subtotal'} (
+              {itemCountParam !== undefined && itemCountParam !== null && Number(itemCountParam) > 0
+                ? Number(itemCountParam)
+                : (route.params?.items?.length || 1)}{' '}
+              {(itemCountParam !== undefined && itemCountParam !== null && Number(itemCountParam) > 0
+                ? Number(itemCountParam)
+                : (route.params?.items?.length || 1)) === 1
+                ? 'item'
+                : 'items'}
+              )
             </Text>
             <Text style={[styles.priceSummaryValue, { color: textColor }]}>
-              ${baseTotal.toFixed(2)}
+              ${subtotal.toFixed(2)}
             </Text>
           </View>
 
