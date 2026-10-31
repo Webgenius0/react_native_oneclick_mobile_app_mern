@@ -19,7 +19,7 @@ import {
   calculateConvertedPrice,
   getReceivedCurrencyInfo,
 } from '../../helpers/currencyHelper';
-import { cleanProductTitle, getStoreName } from '../../helpers/storeHelper';
+import { cleanProductTitle, getStoreName, calculateMarketplacePrice } from '../../helpers/storeHelper';
 import { isAgeOrMeasurement } from '../../helpers/variantUtils';
 
 export default function CartItem({
@@ -35,19 +35,10 @@ export default function CartItem({
 }) {
   const targetId = item.id || item.url;
   const { rates, inverseRates } = useExchangeRateStore();
-  const sheinPercent = useSheinPriceStore(state => state.percent) ?? 0;
-  const safePercent = Number(sheinPercent) > 0 ? Number(sheinPercent) : 0;
-  const isShein = Boolean(
-    (item?.store && String(item.store).toLowerCase().includes('shein')) ||
-      (item?.url && String(item.url).toLowerCase().includes('shein.com')) ||
-      (item?.marketplace && String(item.marketplace).toLowerCase().includes('shein')) ||
-      String(getStoreName(item?.url, item?.store || '')).toLowerCase() === 'shein',
-  );
+  const marketplaces = useSheinPriceStore(state => state.marketplaces) || [];
 
   const basePrice = parsePrice(item?.price) || 0;
-  const percentAmount =
-    isShein && safePercent > 0 ? basePrice * (safePercent / 100) : 0;
-  const finalPrice = basePrice + percentAmount;
+  const { finalPrice } = calculateMarketplacePrice(basePrice, item, marketplaces);
   const displayPrice =
     finalPrice > 0
       ? (finalPrice % 1 === 0 ? finalPrice.toFixed(0) : finalPrice.toFixed(2))

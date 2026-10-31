@@ -20,7 +20,7 @@ import { getToken, getUser } from "../helpers/auth";
 import { ext, mimeType } from "../helpers/file";
 import { tr } from "../translate/i18n";
 import { EmContext } from "../contexts/EmContext";
-import { getStoreName } from "../helpers/storeHelper";
+import { getStoreName, calculateMarketplacePrice } from "../helpers/storeHelper";
 import { useExchangeRateStore } from "../store/useExchangeRateStore";
 import { useSheinPriceStore } from "../store/useSheinPriceStore";
 import { useOrderStore } from "../store/useOrderStore";
@@ -158,10 +158,12 @@ export default function({ route, navigation }) {
     console.log("token", token);
 
     const storeName = getStoreName(state.link);
-    const isShein = Boolean(
-      (storeName && String(storeName).toLowerCase().includes('shein')) ||
-      (state.link && String(state.link).toLowerCase().includes('shein.com')),
-    );
+    const marketplaces = useSheinPriceStore.getState().marketplaces || [];
+    const itemInfo = {
+      url: state.link,
+      store: storeName,
+      marketplace: storeName,
+    };
 
     const { code: normalizedCurr, display: receivedDisplay, isUsd } = getReceivedCurrencyInfo({
       url: state.link,
@@ -170,12 +172,7 @@ export default function({ route, navigation }) {
     });
 
     const parsedPrice = parsePrice(state.price || route.params?.price);
-    const sheinPercent = useSheinPriceStore.getState().percent ?? 0;
-    const safePercent = Number(sheinPercent) > 0 ? Number(sheinPercent) : 0;
-    const percentAmount = isShein && safePercent > 0 && parsedPrice !== null
-      ? parsedPrice * (safePercent / 100)
-      : 0;
-    const finalPrice = parsedPrice !== null ? parseFloat((parsedPrice + percentAmount).toFixed(2)) : null;
+    const { finalPrice } = calculateMarketplacePrice(parsedPrice, itemInfo, marketplaces);
 
     const convertedPrice = finalPrice !== null
       ? (isUsd ? finalPrice : calculateConvertedPrice(finalPrice, normalizedCurr, rates, inverseRates))
