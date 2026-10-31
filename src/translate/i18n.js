@@ -108,8 +108,32 @@ const localizeApiMessage = (msg, fallback = 'Payment Failed') => {
     return directTranslated;
   }
 
-  // 2. Pattern matching for common Turkish phrases returned by backend
+  // 2. Pattern matching for common Turkish / Gateway phrases returned by backend
   const lower = clean.toLowerCase();
+
+  // Success phrases first
+  if (
+    lower.includes('başarılı') ||
+    lower.includes('basarili') ||
+    lower.includes('success') ||
+    lower.includes('alındı') ||
+    lower.includes('alindi')
+  ) {
+    return tr('Payment Successful') || 'Payment Successful';
+  }
+
+  // Amount changed
+  if (
+    lower.includes('tutarı değişti') ||
+    lower.includes('tutari degisti') ||
+    lower.includes('yenileyiniz') ||
+    lower.includes('amount changed')
+  ) {
+    return (
+      tr('Payment amount has changed. Please refresh and try again.') ||
+      'Payment amount has changed. Please refresh and try again.'
+    );
+  }
   if (
     lower.includes('cüzdan') ||
     lower.includes('cuzdan') ||
@@ -128,12 +152,16 @@ const localizeApiMessage = (msg, fallback = 'Payment Failed') => {
     return tr('Payment was cancelled') || 'Payment was cancelled';
   }
   if (
-    lower.includes('ödeme') ||
-    lower.includes('odeme') ||
     lower.includes('başarısız') ||
-    lower.includes('basarisiz')
+    lower.includes('basarisiz') ||
+    lower.includes('başlatılamadı') ||
+    lower.includes('baslatilamadi') ||
+    lower.includes('reddedildi') ||
+    lower === 'hata' ||
+    lower.includes('hata oluştu') ||
+    lower.includes('hata olustu')
   ) {
-    return tr('Payment Failed') || 'Payment Failed';
+    return fallback ? (tr(fallback) || fallback) : (tr('Payment Failed') || 'Payment Failed');
   }
 
   // 3. If it contains Turkish characters and was not translated, do NOT leak it:

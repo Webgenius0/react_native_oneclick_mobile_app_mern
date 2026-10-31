@@ -323,12 +323,20 @@ export default function OrderDetail({ route, navigation }) {
   };
 
   const handlePayNow = () => {
+    const rawIds = order?.order_ids || ordersList.map(o => o.id);
+    const resolvedIds =
+      Array.isArray(rawIds) && rawIds.length > 0
+        ? rawIds
+        : (order?.id || orderId ? [order?.id || orderId] : []);
+
     navigation.navigate('PaymentStart', {
       tutar: finalTotal.toFixed(2),
       subtotal: subtotal.toFixed(2),
       shipping: shippingCost.toFixed(2),
       quick: true,
-      siparis_ids: order?.order_ids || ordersList.map(o => o.id),
+      siparis_ids: resolvedIds,
+      siparis_id: resolvedIds[0] || order?.id || orderId,
+      order_ids: resolvedIds,
       grup: order,
       grupID: order?.id || orderId,
     });

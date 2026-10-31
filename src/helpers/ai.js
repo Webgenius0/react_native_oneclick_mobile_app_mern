@@ -57,6 +57,18 @@ ai.interceptors.request.use(
           if (!config.data.token) {
             config.data = { token, ...config.data };
           }
+        } else if (config.data instanceof FormData) {
+          try {
+            if (typeof config.data.append === 'function') {
+              if (typeof config.data.has === 'function') {
+                if (!config.data.has('token')) {
+                  config.data.append('token', token);
+                }
+              } else {
+                config.data.append('token', token);
+              }
+            }
+          } catch (_) {}
         }
       } else {
         config.params = { token, ...config.params };

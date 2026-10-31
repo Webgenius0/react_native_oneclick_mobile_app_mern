@@ -19,7 +19,7 @@ import Toast from 'react-native-toast-message';
 import ai from '../helpers/ai';
 import { CommonActions } from '@react-navigation/native';
 import { IS_LOCAL } from '../../config';
-import { getUserAgent } from '../helpers/common';
+import { getUserAgent, round } from '../helpers/common';
 import { useCartStore } from '../store/useCartStore';
 import { useUserStore } from '../store/useUserStore';
 import AppHeader from '../components/common/AppHeader';
@@ -34,11 +34,20 @@ export default function WaafiPay({ navigation, route }) {
   const fill = (__DEV__ && IS_LOCAL) || false;
   const defaultAccountNumber = fill ? '252615214249' : user?.telefon || '';
 
+  const rawOrderIds =
+    route?.params?.siparis_ids ??
+    route?.params?.siparis_id ??
+    route?.params?.order_ids ??
+    route?.params?.order_id ??
+    '';
+
+  const normalizedOrderIds = Array.isArray(rawOrderIds)
+    ? rawOrderIds.filter(id => id !== null && id !== undefined && id !== '').join(',')
+    : String(rawOrderIds || '');
+
   const [accountNumber, setAccountNumber] = useState(defaultAccountNumber);
   const [tutar, setTutar] = useState(route?.params?.tutar || 0);
-  const [siparis_ids, setSiparis_ids] = useState(
-    route?.params?.siparis_ids || '',
-  );
+  const [siparis_ids, setSiparis_ids] = useState(normalizedOrderIds);
   const [submitting, setSubmitting] = useState(false);
 
   const handleCancel = () => {
@@ -64,16 +73,43 @@ export default function WaafiPay({ navigation, route }) {
       return false;
     }
 
+    const activeOrderIds =
+      (Array.isArray(siparis_ids)
+        ? siparis_ids.filter(id => id !== null && id !== undefined && id !== '').join(',')
+        : String(siparis_ids || '').trim()) || normalizedOrderIds;
+
+    if (!activeOrderIds) {
+      Toast.show({
+        type: 'error',
+        text1: tr('Payment Error') || 'Payment Error',
+        text2:
+          tr('Order ID is missing. Please select an order to pay.') ||
+          'Order ID is missing. Please select an order to pay.',
+        text2Style: { fontSize: 14, color: '#000', width: '100%' },
+      });
+      return false;
+    }
+
     setSubmitting(true);
     const userAgent = getUserAgent();
+
+    const numericTutar = Number(String(tutar).replace(/[^0-9.]/g, '')) || 0;
+    const anaTutar = route?.params?.ana_tutar ? Number(route.params.ana_tutar) : numericTutar;
+    const komisyonTutar = route?.params?.komisyon_tutar ? Number(route.params.komisyon_tutar) : 0;
+    const komisyonYuzde = route?.params?.komisyonYuzde ? Number(route.params.komisyonYuzde) : 0;
 
     const data = {
       name: user?.ad || 'Customer',
       cardNumber: trimmedNumber,
       accountNumber: trimmedNumber,
-      tutar: tutar,
-      amount: tutar,
-      siparis_ids: siparis_ids,
+      tutar: numericTutar || tutar,
+      amount: numericTutar || tutar,
+      ana_tutar: anaTutar,
+      komisyon_tutar: komisyonTutar,
+      komisyon_yuzde: komisyonYuzde,
+      siparis_ids: activeOrderIds,
+      order_ids: activeOrderIds,
+      siparis_id: activeOrderIds,
       paymentMethodType: paymentType,
       userAgent: userAgent,
       dil: i18n.locale || 'en',
@@ -82,13 +118,83 @@ export default function WaafiPay({ navigation, route }) {
     console.log('Initiating WaafiPay payment:', data);
 
     try {
-      const r = await ai.post('payment-waafipay', data);
+      let r = await ai.post('payment-waafipay', data);
       console.log('WaafiPay response:', r?.data);
+
+      // Handle "Ödeme tutarı değişti; lütfen siparişleri yenileyiniz" by auto-synchronizing
+      const initialRawMsg = r?.data?.msg || r?.data?.detail || '';
+      const isAmountChanged =
+        initialRawMsg.includes('tutarı değişti') ||
+        initialRawMsg.includes('tutari degisti') ||
+        initialRawMsg.includes('yenileyiniz') ||
+        initialRawMsg.toLowerCase().includes('amount changed');
+
+      if (r?.data?.error === true && isAmountChanged) {
+        console.log('WaafiPay amount change detected from server. Auto-synchronizing from database...');
+        try {
+          const syncRes = await ai.post('orders-unpaid', {
+            siparis_id: route?.params?.siparis_id || (activeOrderIds.includes(',') ? null : activeOrderIds),
+            grupID: route?.params?.grupID || null,
+          });
+
+          if (syncRes?.data?.error === false && Array.isArray(syncRes?.data?.ss)) {
+            const activeList = activeOrderIds.split(',').map(s => s.trim()).filter(Boolean);
+            let freshBase = 0;
+            syncRes.data.ss.forEach(item => {
+              if (activeList.includes(String(item.id)) || activeList.length === 0) {
+                freshBase += parseFloat(item.tutar ?? item.tutar_usd ?? 0) || 0;
+              }
+            });
+            if (syncRes.data.grup && syncRes.data.grup.nakliye_usd > 0) {
+              freshBase += parseFloat(syncRes.data.grup.nakliye_usd);
+            }
+
+            let effectivePct = komisyonYuzde;
+            let effectiveFixed = 0;
+            try {
+              const mRes = await ai.get('payment-methods');
+              if (mRes?.data?.error === false && Array.isArray(mRes?.data?.ss)) {
+                const wMethod = mRes.data.ss.find(x => (x?.ad || x?.target || '').toLowerCase().includes('waafi'));
+                if (wMethod) {
+                  effectivePct = parseFloat(wMethod.komisyonYuzde) || 0;
+                  effectiveFixed = parseFloat(wMethod.komisyonFixed) || 0;
+                }
+              }
+            } catch (_) {}
+
+            let freshKom = 0;
+            if (effectivePct > 0) {
+              freshKom = round(freshBase * (effectivePct / 100));
+            } else if (effectiveFixed > 0) {
+              freshKom = effectiveFixed;
+            }
+            const freshTotal = round(freshBase + freshKom);
+
+            if (freshTotal > 0 && Math.abs(freshTotal - numericTutar) > 0.001) {
+              console.log(`Auto-retrying WaafiPay with synchronized amount: $${freshTotal.toFixed(2)}`);
+              setTutar(freshTotal.toFixed(2));
+
+              const retryData = {
+                ...data,
+                tutar: freshTotal.toFixed(2),
+                amount: freshTotal.toFixed(2),
+                ana_tutar: freshBase.toFixed(2),
+                komisyon_tutar: freshKom,
+                komisyon_yuzde: effectivePct,
+              };
+              r = await ai.post('payment-waafipay', retryData);
+              console.log('WaafiPay retry response:', r?.data);
+            }
+          }
+        } catch (syncErr) {
+          console.log('Error auto-syncing orders on amount change:', syncErr);
+        }
+      }
 
       if (r?.data?.error === false) {
         useCartStore.getState().clearCart();
         const successMsg =
-          localizeApiMessage(r?.data?.msg, 'Payment Successful') ||
+          localizeApiMessage(r?.data?.msg || r?.data?.responseMsg, 'Payment Successful') ||
           tr('Payment Successful') ||
           'Payment Successful';
         Toast.show({
@@ -103,7 +209,15 @@ export default function WaafiPay({ navigation, route }) {
           }),
         );
       } else {
-        const rawMsg = r?.data?.msg || r?.data?.detail;
+        const rawMsg =
+          r?.data?.responseMsg ||
+          r?.data?.r?.message ||
+          r?.data?.r?.msg ||
+          r?.data?.message ||
+          (r?.data?.msg && !r.data.msg.toLowerCase().includes('başarısız') && !r.data.msg.toLowerCase().includes('basarisiz') ? r.data.msg : null) ||
+          r?.data?.detail ||
+          r?.data?.msg ||
+          'Payment Failed';
         const errorMsg = localizeApiMessage(rawMsg, 'Payment Failed');
         Toast.show({
           type: 'error',
@@ -114,10 +228,17 @@ export default function WaafiPay({ navigation, route }) {
       }
     } catch (err) {
       console.error('WaafiPay error:', err);
+      const resData = err?.response?.data;
       const rawError =
-        err?.response?.data?.msg ||
-        err?.response?.data?.detail ||
-        err?.message;
+        resData?.responseMsg ||
+        resData?.r?.message ||
+        resData?.r?.msg ||
+        resData?.message ||
+        (resData?.msg && !resData.msg.toLowerCase().includes('başarısız') && !resData.msg.toLowerCase().includes('basarisiz') ? resData.msg : null) ||
+        resData?.detail ||
+        resData?.msg ||
+        err?.message ||
+        'Payment Failed';
       const errorMsg = localizeApiMessage(rawError, 'Payment Failed');
       Toast.show({
         type: 'error',

@@ -274,6 +274,8 @@ export default function ({
                       tutar: item.tutar_usd,
                       quick: true,
                       siparis_id: item.id,
+                      siparis_ids: [item.id],
+                      order_ids: [item.id],
                       grupID: item.grupID,
                     })
                   }>

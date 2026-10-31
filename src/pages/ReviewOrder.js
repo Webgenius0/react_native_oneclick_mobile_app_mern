@@ -14,9 +14,9 @@ import FastImage from 'react-native-fast-image';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '../components/common/AppHeader';
-import { tr } from '../translate/i18n';
+import { tr, localizeApiMessage } from '../translate/i18n';
 import { EmContext } from '../contexts/EmContext';
-import { getUser } from '../helpers/auth';
+import { getUser, getToken } from '../helpers/auth';
 import ai from '../helpers/ai';
 import { cleanProductTitle, getStoreName } from '../helpers/storeHelper';
 import {
@@ -116,7 +116,16 @@ export default function ReviewOrder({ navigation, route }) {
       }
 
       let postData = new FormData();
+      const token = (await getToken()) || user?.token;
+      if (token) {
+        postData.append('token', token);
+      }
       postData.append('sehir', selectedCity);
+      postData.append('city', selectedCity);
+      postData.append('teslimatSehir', selectedCity);
+      if (user?.teslimatSehirID) {
+        postData.append('teslimatSehirID', user.teslimatSehirID);
+      }
 
       var i = 0;
       items.forEach(item => {
@@ -161,6 +170,9 @@ export default function ReviewOrder({ navigation, route }) {
         postData.append('cart[' + i + '][size]', item.size || '');
         postData.append('cart[' + i + '][color]', item.color || '');
         postData.append('cart[' + i + '][store]', storeName);
+        postData.append('cart[' + i + '][img]', item.image || item.img || '');
+        postData.append('cart[' + i + '][image]', item.image || item.img || '');
+        postData.append('cart[' + i + '][acik]', item.desc || item.description || '');
 
         if (finalPriceVal !== null) {
           postData.append('cart[' + i + '][price]', finalPriceVal);
@@ -179,39 +191,107 @@ export default function ReviewOrder({ navigation, route }) {
         i++;
       });
 
+      let res = null;
       let resGrupID = null;
+      let resOrderIds = [];
+
       try {
-        const res = await ai.post('cart', postData);
-        if (res?.data?.grupID) {
-          resGrupID = res.data.grupID;
-          useOrderStore.getState().invalidateOrders();
+        res = await ai.post('new-order-multiple', postData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+      } catch (firstErr) {
+        console.log('new-order-multiple attempt note:', firstErr?.message || firstErr);
+        if (firstErr?.response?.status === 404 || firstErr?.response?.status === 405) {
+          res = await ai.post('cart', postData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          });
+        } else {
+          throw firstErr;
         }
-      } catch (apiErr) {
-        console.log('cart post note:', apiErr?.message || apiErr);
       }
 
-      // Navigate to Payment Method
-      navigation.navigate('PaymentStart', {
-        quick: true,
-        tutar: totalAmount.toFixed(2),
-        subtotal: subtotalUsd.toFixed(2),
-        shipping: shippingCost.toFixed(2),
-        grupID: resGrupID,
-        itemCount: totalItemCount,
-        deliveryCity: selectedCity,
-        items: items,
-      });
+      console.log('Order creation response:', res?.data);
+
+      const isSuccess =
+        res?.data?.error === false ||
+        res?.data?.success === true ||
+        Boolean(res?.data?.grupID) ||
+        Boolean(res?.data?.order_id) ||
+        Boolean(res?.data?.order_ids);
+
+      if (isSuccess) {
+        resGrupID =
+          res?.data?.grupID ||
+          res?.data?.grup_id ||
+          res?.data?.grup?.id ||
+          null;
+
+        if (res?.data?.order_ids) {
+          resOrderIds = Array.isArray(res.data.order_ids)
+            ? res.data.order_ids
+            : String(res.data.order_ids).split(',').map(s => s.trim()).filter(Boolean);
+        } else if (res?.data?.siparis_ids) {
+          resOrderIds = Array.isArray(res.data.siparis_ids)
+            ? res.data.siparis_ids
+            : String(res.data.siparis_ids).split(',').map(s => s.trim()).filter(Boolean);
+        } else if (Array.isArray(res?.data?.ss)) {
+          resOrderIds = res.data.ss.map(s => s.id);
+        } else if (Array.isArray(res?.data?.orders)) {
+          resOrderIds = res.data.orders.map(s => s.id);
+        } else if (res?.data?.order_id) {
+          resOrderIds = [res.data.order_id];
+        } else if (res?.data?.siparis_id) {
+          resOrderIds = [res.data.siparis_id];
+        } else if (res?.data?.id) {
+          resOrderIds = [res.data.id];
+        }
+
+        useOrderStore.getState().invalidateOrders();
+
+        const serverTutar =
+          res?.data?.total_usd !== undefined
+            ? parseFloat(res.data.total_usd).toFixed(2)
+            : res?.data?.total !== undefined
+            ? parseFloat(res.data.total).toFixed(2)
+            : res?.data?.tutar !== undefined
+            ? parseFloat(res.data.tutar).toFixed(2)
+            : totalAmount.toFixed(2);
+
+        navigation.navigate('PaymentStart', {
+          quick: true,
+          tutar: serverTutar,
+          subtotal: serverTutar,
+          shipping: shippingCost.toFixed(2),
+          grupID: resGrupID,
+          siparis_ids: resOrderIds,
+          order_ids: resOrderIds,
+          siparis_id: resOrderIds[0] || null,
+          itemCount: totalItemCount,
+          deliveryCity: selectedCity,
+          items: items,
+        });
+      } else {
+        const rawMsg = res?.data?.msg || res?.data?.detail;
+        const errorMsg =
+          localizeApiMessage(rawMsg, 'Failed to place order.') ||
+          rawMsg ||
+          tr('Failed to place order. Please try again.') ||
+          'Failed to place order. Please try again.';
+        Alert.alert(tr('Order Failed') || 'Order Failed', errorMsg);
+      }
     } catch (err) {
-      console.log('handleContinueToPayment err:', err);
-      navigation.navigate('PaymentStart', {
-        quick: true,
-        tutar: totalAmount.toFixed(2),
-        subtotal: subtotalUsd.toFixed(2),
-        shipping: shippingCost.toFixed(2),
-        itemCount: totalItemCount,
-        deliveryCity: selectedCity,
-        items: items,
-      });
+      console.log('handleContinueToPayment err:', err?.response?.data || err?.message || err);
+      const rawMsg = err?.response?.data?.msg || err?.response?.data?.detail;
+      const errorMsg =
+        localizeApiMessage(rawMsg, 'Failed to place order.') ||
+        rawMsg ||
+        tr('Failed to place order. Please check your connection and try again.') ||
+        'Failed to place order. Please check your connection and try again.';
+      Alert.alert(tr('Order Failed') || 'Order Failed', errorMsg);
     } finally {
       setIsSubmitting(false);
     }

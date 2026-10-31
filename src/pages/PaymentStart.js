@@ -17,6 +17,7 @@ import AppHeader from '../components/common/AppHeader';
 import AppCheckbox from '../components/common/AppCheckbox';
 import { EmContext } from '../contexts/EmContext';
 import ai from '../helpers/ai';
+import { round } from '../helpers/common';
 
 export default function PaymentStart({ navigation, route }) {
   const insets = useSafeAreaInsets();
@@ -24,15 +25,101 @@ export default function PaymentStart({ navigation, route }) {
 
   const quick = route.params?.quick;
   const initialTutar = route.params?.tutar || '0.00';
-  const paramSiparisIds = route.params?.siparis_ids || [];
   const grupID = route.params?.grupID;
   const subtotalParam = route.params?.subtotal;
   const shippingParam = route.params?.shipping;
   const itemCountParam = route.params?.itemCount;
 
+  const extractIds = raw => {
+    if (!raw && raw !== 0) return [];
+    if (Array.isArray(raw)) return raw.filter(id => id !== null && id !== undefined && id !== '');
+    if (typeof raw === 'string') {
+      return raw.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    return [raw];
+  };
+
+  const incomingIds = [
+    ...extractIds(route.params?.siparis_ids),
+    ...extractIds(route.params?.siparis_id),
+    ...extractIds(route.params?.order_ids),
+    ...extractIds(route.params?.order_id),
+  ];
+  const uniqueIncomingIds = Array.from(new Set(incomingIds.map(String)));
+
+  const [siparisIds, setSiparisIds] = useState(uniqueIncomingIds);
   const [tutar, setTutar] = useState(initialTutar);
+  const [methods, setMethods] = useState([]);
   const [selectedMethodId, setSelectedMethodId] = useState('waafipay');
   const [isProcessing, setIsProcessing] = useState(false);
+
+  useEffect(() => {
+    async function fetchPaymentMethods() {
+      try {
+        const res = await ai.get('payment-methods');
+        if (res?.data?.error === false && Array.isArray(res?.data?.ss)) {
+          setMethods(res.data.ss);
+        }
+      } catch (err) {
+        console.log('PaymentStart fetch payment-methods err:', err);
+      }
+    }
+    fetchPaymentMethods();
+  }, []);
+
+  useEffect(() => {
+    async function syncOrdersAndAmount() {
+      if (grupID || route.params?.siparis_id || uniqueIncomingIds.length > 0) {
+        try {
+          const res = await ai.post('orders-unpaid', {
+            siparis_id: route.params?.siparis_id || (uniqueIncomingIds.length === 1 ? uniqueIncomingIds[0] : null),
+            grupID: grupID || null,
+          });
+          if (res?.data?.error === false && Array.isArray(res?.data?.ss)) {
+            const unpaidOrders = res.data.ss;
+            let targetOrderIds = [];
+
+            if (uniqueIncomingIds.length > 0) {
+              targetOrderIds = uniqueIncomingIds;
+            } else if (grupID) {
+              targetOrderIds = unpaidOrders
+                .filter(item => String(item.grupID) === String(grupID))
+                .map(item => String(item.id));
+            } else {
+              targetOrderIds = unpaidOrders.map(item => String(item.id));
+            }
+
+            if (targetOrderIds.length > 0) {
+              setSiparisIds(targetOrderIds);
+            }
+
+            let calculatedSum = 0;
+            unpaidOrders.forEach(item => {
+              if (targetOrderIds.includes(String(item.id))) {
+                calculatedSum += parseFloat(item.tutar ?? item.tutar_usd ?? 0) || 0;
+              }
+            });
+
+            if (res.data.grup && res.data.grup.nakliye_usd > 0) {
+              calculatedSum += parseFloat(res.data.grup.nakliye_usd);
+            }
+
+            if (calculatedSum > 0) {
+              console.log('PaymentStart synchronized base tutar with server orders-unpaid:', calculatedSum.toFixed(2));
+              setTutar(calculatedSum.toFixed(2));
+            }
+          }
+        } catch (e) {
+          console.log('PaymentStart fetch unpaid orders err:', e);
+        }
+      }
+    }
+    syncOrdersAndAmount();
+  }, [grupID, route.params?.siparis_id, uniqueIncomingIds.join(',')]);
+
+  const selectedMethodObj = methods.find(
+    m => (m?.ad || m?.target || m?.name || '').toLowerCase().includes(selectedMethodId.toLowerCase())
+  );
 
   const numTutar = parseFloat(tutar) || 0;
   // Standard shipping cost ($25.00) - Temporarily commented out
@@ -40,14 +127,96 @@ export default function PaymentStart({ navigation, route }) {
   const shipping = parseFloat(shippingParam) || 0.0;
   const subtotal =
     parseFloat(subtotalParam) || (numTutar > 0 ? numTutar : 0);
-  const total = numTutar > 0 ? numTutar : subtotal + shipping;
+  const baseTotal = numTutar > 0 ? numTutar : subtotal + shipping;
 
-  const handlePayPress = () => {
+  let komisyonTutar = 0;
+  let komisyonYuzde = 0;
+  let komisyonFixed = 0;
+
+  if (selectedMethodObj) {
+    komisyonYuzde = parseFloat(selectedMethodObj.komisyonYuzde) || 0;
+    komisyonFixed = parseFloat(selectedMethodObj.komisyonFixed) || 0;
+    if (komisyonYuzde > 0) {
+      komisyonTutar = round(baseTotal * (komisyonYuzde / 100));
+    } else if (komisyonFixed > 0) {
+      komisyonTutar = komisyonFixed;
+    }
+  }
+
+  const finalPayTotal = round(baseTotal + komisyonTutar);
+
+  const handlePayPress = async () => {
+    let activeIds = siparisIds.length > 0 ? siparisIds : uniqueIncomingIds;
+    let freshBaseAmount = baseTotal;
+
+    // Refresh orders-unpaid right before paying to ensure 100% price synchronization
+    if (grupID || route.params?.siparis_id || activeIds.length > 0) {
+      setIsProcessing(true);
+      try {
+        const res = await ai.post('orders-unpaid', {
+          siparis_id: route.params?.siparis_id || (activeIds.length === 1 ? activeIds[0] : null),
+          grupID: grupID || null,
+        });
+        if (res?.data?.error === false && Array.isArray(res?.data?.ss)) {
+          const unpaidOrders = res.data.ss;
+          let targetOrderIds = [];
+          if (uniqueIncomingIds.length > 0) {
+            targetOrderIds = uniqueIncomingIds;
+          } else if (grupID) {
+            targetOrderIds = unpaidOrders
+              .filter(item => String(item.grupID) === String(grupID))
+              .map(item => String(item.id));
+          } else {
+            targetOrderIds = unpaidOrders.map(item => String(item.id));
+          }
+
+          if (targetOrderIds.length > 0) {
+            activeIds = targetOrderIds;
+            setSiparisIds(targetOrderIds);
+          }
+
+          let calculatedSum = 0;
+          unpaidOrders.forEach(item => {
+            if (activeIds.includes(String(item.id))) {
+              calculatedSum += parseFloat(item.tutar ?? item.tutar_usd ?? 0) || 0;
+            }
+          });
+          if (res.data.grup && res.data.grup.nakliye_usd > 0) {
+            calculatedSum += parseFloat(res.data.grup.nakliye_usd);
+          }
+          if (calculatedSum > 0) {
+            freshBaseAmount = calculatedSum;
+            setTutar(calculatedSum.toFixed(2));
+          }
+        }
+      } catch (err) {
+        console.log('Error resolving unpaid orders on Pay press:', err);
+      } finally {
+        setIsProcessing(false);
+      }
+    }
+
+    // Recompute commission on latest freshBaseAmount
+    let freshKomisyonTutar = 0;
+    if (komisyonYuzde > 0) {
+      freshKomisyonTutar = round(freshBaseAmount * (komisyonYuzde / 100));
+    } else if (komisyonFixed > 0) {
+      freshKomisyonTutar = komisyonFixed;
+    }
+    const freshFinalTotal = round(freshBaseAmount + freshKomisyonTutar);
+
+    const normalizedStr = activeIds.join(',');
+    const primaryId = activeIds[0] || '';
+
     const navigateParams = {
-      tutar: total.toFixed(2),
-      ana_tutar: total.toFixed(2),
-      komisyon_tutar: 0,
-      siparis_ids: paramSiparisIds,
+      tutar: freshFinalTotal.toFixed(2),
+      ana_tutar: freshBaseAmount.toFixed(2),
+      komisyon_tutar: freshKomisyonTutar,
+      komisyonYuzde: komisyonYuzde,
+      komisyonFixed: komisyonFixed,
+      siparis_ids: normalizedStr,
+      order_ids: normalizedStr,
+      siparis_id: primaryId,
       grupID: grupID,
     };
 
@@ -177,9 +346,21 @@ export default function PaymentStart({ navigation, route }) {
               {itemCountParam === 1 ? 'item' : 'items'})
             </Text>
             <Text style={[styles.priceSummaryValue, { color: textColor }]}>
-              ${subtotal.toFixed(2)}
+              ${baseTotal.toFixed(2)}
             </Text>
           </View>
+
+          {komisyonTutar > 0 ? (
+            <View style={styles.priceSummaryRow}>
+              <Text style={[styles.priceSummaryLabel, { color: subTextColor }]}>
+                {tr('Commission fee') || 'Commission fee'}{' '}
+                {komisyonYuzde > 0 ? `(${komisyonYuzde}%)` : ''}
+              </Text>
+              <Text style={[styles.priceSummaryValue, { color: textColor }]}>
+                ${komisyonTutar.toFixed(2)}
+              </Text>
+            </View>
+          ) : null}
 
           {/* Shipping cost row - temporarily commented out
           <View style={styles.priceSummaryRow}>
@@ -200,7 +381,7 @@ export default function PaymentStart({ navigation, route }) {
             <Text style={[styles.totalLabel, { color: textColor }]}>
               {tr('Total') || 'Total'}
             </Text>
-            <Text style={styles.totalValue}>${total.toFixed(2)}</Text>
+            <Text style={styles.totalValue}>${finalPayTotal.toFixed(2)}</Text>
           </View>
         </View>
       </ScrollView>
@@ -224,7 +405,7 @@ export default function PaymentStart({ navigation, route }) {
             <ActivityIndicator color="#FFFFFF" size="small" />
           ) : (
             <Text style={styles.payBtnText}>
-              {tr('Pay') || 'Pay'} ${total.toFixed(2)}
+              {tr('Pay') || 'Pay'} ${finalPayTotal.toFixed(2)}
             </Text>
           )}
         </TouchableOpacity>

@@ -77,6 +77,11 @@
         "Fiyat Bekleniyor": "WAITING FOR PRICE",
         "Onayınız Bekleniyor": "YOUR APPROVAL IS PENDING",
         "Ödeme Başarılı": "PAYMENT SUCCESSFUL",
+        "Ödeme başarılı": "Payment Successful",
+        "ödeme başarılı": "Payment Successful",
+        "Ödeme Başarısız": "Payment Failed",
+        "Ödeme başarısız": "Payment Failed",
+        "ödeme başarısız": "Payment Failed",
         "Eksik Bilgi": "MISSING INFORMATION",
         "Seçtiğiniz beden bu ürün için mevcut değildir": "THE SIZE YOU CHOSE IS NOT AVAILABLE FOR THIS PRODUCT",
         "Lütfen bir beden seçin": "PLEASE CHOOSE A SIZE",
@@ -443,7 +448,9 @@
         "Payment was cancelled": "Payment was cancelled",
         "Required Field": "Required Field",
         "Please enter your account / phone number": "Please enter your account / phone number",
-        "Payment Error": "Payment Error"
+        "Payment Error": "Payment Error",
+        "Payment amount has changed. Please refresh and try again.": "Payment amount has changed. Please refresh and try again.",
+        "Ödeme tutarı değişti; lütfen siparişleri yenileyiniz": "Payment amount has changed; please refresh and try again."
     },
     "som": {
         "Express": "Express",
@@ -523,6 +530,11 @@
         "Fiyat Bekleniyor": "SUGAYA QIIMAHA",
         "Onayınız Bekleniyor": "SUGAYA ANSIXINTAADA",
         "Ödeme Başarılı": "LACAGTII WAAD BIXISAY",
+        "Ödeme başarılı": "LACAGTII WAAD BIXISAY",
+        "ödeme başarılı": "LACAGTII WAAD BIXISAY",
+        "Ödeme Başarısız": "Lacag bixintii ma guuleysan",
+        "Ödeme başarısız": "Lacag bixintii ma guuleysan",
+        "ödeme başarısız": "Lacag bixintii ma guuleysan",
         "Eksik Bilgi": "Macluumaadka dalabka ad bixisay ma dhameys tirna",
         "Seçtiğiniz beden bu ürün için mevcut değildir": "SIZE-KA AAD DOORATAY SHAYGANI MALAHA",
         "Lütfen bir beden seçin": "FADLAN SIZE DOORO",
@@ -889,6 +901,8 @@
         "Payment was cancelled": "Lacag bixintii waa la joojiyay",
         "Required Field": "Goobta loo baahan yahay",
         "Please enter your account / phone number": "Fadlan geli lambarkaaga / taleefankaaga",
-        "Payment Error": "Qalad Lacag Bixinta"
+        "Payment Error": "Qalad Lacag Bixinta",
+        "Payment amount has changed. Please refresh and try again.": "Qadarka lacag-bixinta waa isbedelay. Fadlan cusbooneysii oo mar kale isku day.",
+        "Ödeme tutarı değişti; lütfen siparişleri yenileyiniz": "Qadarka lacag-bixinta waa isbedelay; fadlan cusbooneysii oo mar kale isku day."
     }
 }
