@@ -53,91 +53,36 @@ const resolveImageUrl = img => {
   return `https://1click.thesyndicates.team/data/${trimmed}`;
 };
 
-// Default store definitions matching the exact Figma design
-const BASE_STORE_THEMES = [
+// Default fallback store definitions used when API banners are loading or offline
+const DEFAULT_FALLBACK_STORES = [
   {
     id: "amazon",
-    key: "amazon",
     name: "Amazon",
     url: "https://www.amazon.ae",
-    badgeText: "amazon",
-    badgeTextColor: "#000000",
-    badgeFontWeight: "900",
-    titleLine1: "Summer Sale",
-    titleLine2Prefix: "Up to ",
-    titleLine2Highlight: "50% Off",
-    highlightColor: "#F59E0B",
-    subtitle: "Millions of products",
-    btnText: "Shop Now →",
-    btnBg: "#F67922",
-    btnTextColor: "#FFFFFF",
-    gradColors: ["#232D3F", "#111827"],
     assetImage: STORE_AMAZON_IMG,
+    btnText: "Shop Now →",
   },
   {
     id: "shein",
-    key: "shein",
     name: "SHEIN",
     url: "https://m.shein.com",
-    badgeText: "SHEIN",
-    badgeTextColor: "#000000",
-    badgeFontWeight: "900",
-    titleLine1: "New Season",
-    titleLine2Prefix: "",
-    titleLine2Highlight: "Styles",
-    highlightColor: "#F472B6",
-    subtitle: "Fashion & beauty picks",
-    btnText: "Shop SHEIN →",
-    btnBg: "#FFFFFF",
-    btnTextColor: "#1A0E18",
-    gradColors: ["#381C2B", "#1B0C15"],
     assetImage: STORE_SHEIN_IMG,
+    btnText: "Shop Now →",
   },
   {
     id: "iherb",
-    key: "iherb",
     name: "iHerb",
     url: "https://www.iherb.com",
-    badgeText: "iHerb",
-    badgeTextColor: "#166534",
-    badgeFontWeight: "800",
-    titleLine1: "Vitamins &",
-    titleLine2Prefix: "",
-    titleLine2Highlight: "Wellness",
-    highlightColor: "#FFFFFF",
-    subtitle: "Feel your best every day",
-    btnText: "Shop iHerb →",
-    btnBg: "#FFFFFF",
-    btnTextColor: "#166534",
-    gradColors: ["#1B5E20", "#0A3311"],
     assetImage: STORE_IHERB_IMG,
+    btnText: "Shop Now →",
   },
   {
     id: "yesstyle",
-    key: "yesstyle",
     name: "YESSTYLE",
     url: "https://www.yesstyle.com",
-    badgeText: "YESSTYLE",
-    badgeTextColor: "#0D5C58",
-    badgeFontWeight: "800",
-    titleLine1: "Beauty &",
-    titleLine2Prefix: "",
-    titleLine2Highlight: "Skincare",
-    highlightColor: "#FFFFFF",
-    subtitle: "Asian beauty favorites",
-    btnText: "Shop YesStyle →",
-    btnBg: "#FFFFFF",
-    btnTextColor: "#0D5C58",
-    gradColors: ["#0E5D57", "#05312E"],
     assetImage: STORE_YESSTYLE_IMG,
+    btnText: "Shop Now →",
   },
-];
-
-const DYNAMIC_PALETTES = [
-  { grad: ["#1E1B4B", "#0F0C29"], btn: "#FFFFFF", btnText: "#1E1B4B", highlight: "#A78BFA" },
-  { grad: ["#4C0519", "#200109"], btn: "#FFFFFF", btnText: "#4C0519", highlight: "#FB7185" },
-  { grad: ["#064E3B", "#022C22"], btn: "#FFFFFF", btnText: "#064E3B", highlight: "#34D399" },
-  { grad: ["#1C1917", "#0C0A09"], btn: "#F67922", btnText: "#FFFFFF", highlight: "#FBBF24" },
 ];
 
 const DEFAULT_MARKET_DATA = {
@@ -271,7 +216,6 @@ export default function BannerList({ route, navigation }) {
       title: "App.",
       subtitle: "Everything you need",
       tags: "Amazon • SHEIN • iHerb • YesStyle",
-      url: "https://www.amazon.ae",
       isFigmaHero: true,
       image: HERO_PEDESTALS_IMG,
     });
@@ -309,12 +253,6 @@ export default function BannerList({ route, navigation }) {
     }
   };
 
-  const handleSlidePress = slide => {
-    const url = slide.url || "https://www.amazon.ae";
-    const ad = slide.title || "Store";
-    navigation.navigate("Webview", { ad, url });
-  };
-
   const handleStorePress = store => {
     const targetUrl = store.url || "https://www.amazon.ae";
     navigation.navigate("Webview", {
@@ -323,130 +261,60 @@ export default function BannerList({ route, navigation }) {
     });
   };
 
-  // 2. Intelligent Mapping: Prioritize backend API data, fall back to Figma themes
+  // 2. Dynamic Stores: Driven directly by API banners, with graceful asset fallback
   const displayStores = useMemo(() => {
     const apiBanners = Array.isArray(state.banners) ? state.banners : [];
 
-    // Track which API banners have been assigned to avoid duplicating
-    const usedBannerIndices = new Set();
-
-    // Map the 4 standard stores with API overrides if returned by backend
-    const matchedStores = BASE_STORE_THEMES.map((baseTheme, themeIdx) => {
-      // 1. Try to match by key (e.g. "amazon", "shein", "iherb", "yesstyle") in title, name or URL
-      let matchedIndex = apiBanners.findIndex((b, bIdx) => {
-        if (!b || usedBannerIndices.has(bIdx)) return false;
-        const name = (
-          b["ad_" + ctxDil] ||
-          b.ad_en ||
-          b.ad_tr ||
-          b.ad_ar ||
-          b.title ||
-          b.ad ||
-          b.name ||
-          ""
-        ).toLowerCase();
-        const link = (b.link || b.url || "").toLowerCase();
-        return name.includes(baseTheme.key) || link.includes(baseTheme.key);
-      });
-
-      // 2. If no key match, but an unused banner exists at this index, associate it
-      if (
-        matchedIndex === -1 &&
-        apiBanners[themeIdx] &&
-        !usedBannerIndices.has(themeIdx)
-      ) {
-        matchedIndex = themeIdx;
-      }
-
-      if (matchedIndex !== -1) {
-        usedBannerIndices.add(matchedIndex);
-        const apiItem = apiBanners[matchedIndex];
-
-        const rawImg =
-          apiItem["img_" + ctxDil] ||
-          apiItem.img_en ||
-          apiItem.img_tr ||
-          apiItem.img_ar ||
-          apiItem.image ||
-          apiItem.img ||
-          null;
+    if (apiBanners.length > 0) {
+      return apiBanners.map((item, index) => {
+        const storeName =
+          item["ad_" + ctxDil] ||
+          item.ad_en ||
+          item.ad_tr ||
+          item.ad_ar ||
+          item.title ||
+          item.ad ||
+          item.name ||
+          `Store ${index + 1}`;
 
         const storeUrl =
-          (apiItem.link || apiItem.url || "").trim() || baseTheme.url;
+          (item.link || item.url || "").trim() || "https://www.amazon.ae";
 
-        const storeName =
-          apiItem["ad_" + ctxDil] ||
-          apiItem.ad_en ||
-          apiItem.ad_tr ||
-          apiItem.title ||
-          apiItem.ad ||
-          apiItem.name ||
-          baseTheme.name;
+        const rawImg =
+          item["img_" + ctxDil] ||
+          item.img_en ||
+          item.img_tr ||
+          item.img_ar ||
+          item.image ||
+          item.img ||
+          null;
+
+        const nameLower = storeName.toLowerCase();
+        const linkLower = storeUrl.toLowerCase();
+
+        let assetFallback = null;
+        if (nameLower.includes("amazon") || linkLower.includes("amazon")) {
+          assetFallback = STORE_AMAZON_IMG;
+        } else if (nameLower.includes("shein") || linkLower.includes("shein")) {
+          assetFallback = STORE_SHEIN_IMG;
+        } else if (nameLower.includes("iherb") || linkLower.includes("iherb")) {
+          assetFallback = STORE_IHERB_IMG;
+        } else if (nameLower.includes("yesstyle") || linkLower.includes("yesstyle")) {
+          assetFallback = STORE_YESSTYLE_IMG;
+        }
 
         return {
-          ...baseTheme,
-          id: apiItem.id ? `store-api-${apiItem.id}` : baseTheme.id,
+          id: item.id ? `api-store-${item.id}` : `api-store-${index}`,
           name: storeName,
-          // Priority 1: Backend API URL, Priority 2: baseTheme fallback URL
           url: storeUrl,
-          // Priority 1: Backend API Image, Priority 2: baseTheme local assetImage
           apiRemoteImg: resolveImageUrl(rawImg),
+          assetImage: assetFallback,
+          btnText: "Shop Now →",
         };
-      }
+      });
+    }
 
-      // If API misses this store, cleanly use the hardcoded theme
-      return baseTheme;
-    });
-
-    // Check if there are other dynamic stores returned by API that aren't the 4 big stores
-    const remainingBanners = apiBanners.filter(
-      (_, idx) => !usedBannerIndices.has(idx)
-    );
-
-    const additionalStores = remainingBanners.map((item, idx) => {
-      const storeName =
-        item["ad_" + ctxDil] ||
-        item.ad_en ||
-        item.ad_tr ||
-        item.title ||
-        item.ad ||
-        item.name ||
-        `Store ${idx + 1}`;
-      const palette = DYNAMIC_PALETTES[idx % DYNAMIC_PALETTES.length];
-      const rawImg =
-        item["img_" + ctxDil] ||
-        item.img_en ||
-        item.img_tr ||
-        item.img_ar ||
-        item.image ||
-        item.img ||
-        null;
-
-      return {
-        id: item.id ? `dynamic-${item.id}` : `dynamic-${idx}`,
-        key: `dynamic-${idx}`,
-        name: storeName,
-        url: (item.link || item.url || "").trim() || "https://www.amazon.ae",
-        badgeText: storeName.toUpperCase(),
-        badgeTextColor: palette.btnText,
-        badgeFontWeight: "800",
-        titleLine1: storeName,
-        titleLine2Prefix: "Special ",
-        titleLine2Highlight: "Collection",
-        highlightColor: palette.highlight,
-        subtitle:
-          tr("Featured International Brand") ||
-          "Featured International Brand",
-        btnText: `Shop ${storeName} →`,
-        btnBg: palette.btn,
-        btnTextColor: palette.btnText,
-        gradColors: palette.grad,
-        apiRemoteImg: resolveImageUrl(rawImg),
-        assetImage: null,
-      };
-    });
-
-    return [...matchedStores, ...additionalStores];
+    return DEFAULT_FALLBACK_STORES;
   }, [state.banners, ctxDil]);
 
   const isDark = ctx?.isDark;
@@ -498,10 +366,7 @@ export default function BannerList({ route, navigation }) {
                 <View
                   key={slide.id}
                   style={{ width: activeWidth, paddingHorizontal: 16 }}>
-                  <TouchableOpacity
-                    activeOpacity={0.92}
-                    onPress={() => handleSlidePress(slide)}
-                    style={[styles.heroCard, { height: heroBannerHeight }]}>
+                  <View style={[styles.heroCard, { height: heroBannerHeight }]}>
                     {slide.isFigmaHero ? (
                       <View style={styles.heroBannerWrap}>
                         <Image
@@ -531,7 +396,7 @@ export default function BannerList({ route, navigation }) {
                         resizeMode="cover"
                       />
                     )}
-                  </TouchableOpacity>
+                  </View>
                 </View>
               ))}
             </ScrollView>
@@ -572,12 +437,10 @@ export default function BannerList({ route, navigation }) {
             </Text>
           </View>
 
-          {/* 4. Single-Column Store Cards List (Figma Layout) */}
+          {/* 4. Single-Column Store Cards List (Full-Image Dynamic Cards) */}
           <View style={styles.storeCardsList}>
             {displayStores.map((store, index) => {
-              const gradId = `grad-${store.id || index}`;
-              const c1 = store.gradColors?.[0] || "#1E2633";
-              const c2 = store.gradColors?.[1] || "#111827";
+              const gradId = `card-grad-${store.id || index}`;
 
               return (
                 <TouchableOpacity
@@ -585,15 +448,44 @@ export default function BannerList({ route, navigation }) {
                   activeOpacity={0.92}
                   onPress={() => handleStorePress(store)}
                   style={styles.cardContainer}>
-                  {/* Svg Linear Gradient Background */}
+                  {/* Full-bleed card background image */}
+                  {store.apiRemoteImg && !failedImages[store.id] ? (
+                    <FastImage
+                      source={{ uri: store.apiRemoteImg }}
+                      style={StyleSheet.absoluteFillObject}
+                      resizeMode={FastImage.resizeMode.cover}
+                      onError={() => {
+                        setFailedImages(prev => ({
+                          ...prev,
+                          [store.id]: true,
+                        }));
+                      }}
+                    />
+                  ) : store.assetImage ? (
+                    <Image
+                      source={store.assetImage}
+                      style={StyleSheet.absoluteFillObject}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View
+                      style={[
+                        StyleSheet.absoluteFillObject,
+                        { backgroundColor: "#1E293B" },
+                      ]}
+                    />
+                  )}
+
+                  {/* Subtle Gradient Scrim for contrast */}
                   <Svg
                     style={StyleSheet.absoluteFillObject}
                     width="100%"
                     height="100%">
                     <Defs>
                       <SvgGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-                        <Stop offset="0%" stopColor={c1} />
-                        <Stop offset="100%" stopColor={c2} />
+                        <Stop offset="0%" stopColor="#000000" stopOpacity="0.28" />
+                        <Stop offset="35%" stopColor="#000000" stopOpacity="0.08" />
+                        <Stop offset="100%" stopColor="#000000" stopOpacity="0.0" />
                       </SvgGradient>
                     </Defs>
                     <Rect
@@ -605,75 +497,14 @@ export default function BannerList({ route, navigation }) {
                     />
                   </Svg>
 
-                  {/* Left Column: Badge, Headlines, Subtitle, CTA Button */}
-                  <View style={styles.cardLeftCol}>
-                    {/* Store Badge Pill */}
+                  {/* Card Content Overlay: Only Marketplace Name */}
+                  <View style={styles.cardOverlayContent}>
+                    {/* Marketplace Name Badge */}
                     <View style={styles.storeBadgePill}>
-                      <Text
-                        style={[
-                          styles.storeBadgeText,
-                          {
-                            color: store.badgeTextColor || "#000000",
-                            fontWeight: store.badgeFontWeight || "800",
-                          },
-                        ]}>
-                        {store.badgeText}
+                      <Text style={styles.storeBadgeText} numberOfLines={1}>
+                        {store.name}
                       </Text>
                     </View>
-
-                    {/* Headline */}
-                    <View style={styles.headlineArea}>
-                      <Text style={styles.titleLine1} numberOfLines={1}>
-                        {store.titleLine1}
-                      </Text>
-                      <Text style={styles.titleLine2} numberOfLines={1}>
-                        {store.titleLine2Prefix}
-                        <Text style={{ color: store.highlightColor || "#FBBF24" }}>
-                          {store.titleLine2Highlight}
-                        </Text>
-                      </Text>
-                      <Text style={styles.subtitleText} numberOfLines={1}>
-                        {store.subtitle}
-                      </Text>
-                    </View>
-
-                    {/* Action Button */}
-                    <View
-                      style={[
-                        styles.ctaBtn,
-                        { backgroundColor: store.btnBg || "#FFFFFF" },
-                      ]}>
-                      <Text
-                        style={[
-                          styles.ctaBtnText,
-                          { color: store.btnTextColor || "#000000" },
-                        ]}>
-                        {store.btnText}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Right Column: API Image takes priority; falls back to local asset */}
-                  <View style={styles.cardRightCol}>
-                    {store.apiRemoteImg && !failedImages[store.id] ? (
-                      <FastImage
-                        source={{ uri: store.apiRemoteImg }}
-                        style={styles.cardShowcaseImage}
-                        resizeMode={FastImage.resizeMode.contain}
-                        onError={() => {
-                          setFailedImages(prev => ({
-                            ...prev,
-                            [store.id]: true,
-                          }));
-                        }}
-                      />
-                    ) : store.assetImage ? (
-                      <Image
-                        source={store.assetImage}
-                        style={styles.cardShowcaseImage}
-                        resizeMode="contain"
-                      />
-                    ) : null}
                   </View>
                 </TouchableOpacity>
               );
@@ -810,90 +641,40 @@ const styles = StyleSheet.create({
   },
   cardContainer: {
     width: "100%",
-    height: 172,
+    height: 168,
     borderRadius: 20,
     overflow: "hidden",
-    flexDirection: "row",
     marginBottom: 16,
+    backgroundColor: "#1E293B",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
   },
-  cardLeftCol: {
-    width: "55%",
-    height: "100%",
-    paddingVertical: 14,
-    paddingLeft: 16,
-    paddingRight: 6,
-    justifyContent: "space-between",
+  cardOverlayContent: {
+    ...StyleSheet.absoluteFillObject,
+    padding: 14,
+    alignItems: "flex-start",
     zIndex: 2,
   },
   storeBadgePill: {
     backgroundColor: "#FFFFFF",
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 20,
-    alignSelf: "flex-start",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  storeBadgeText: {
-    fontSize: 12,
-    letterSpacing: 0.2,
-  },
-  headlineArea: {
-    marginVertical: 4,
-  },
-  titleLine1: {
-    fontSize: 16.5,
-    fontWeight: "800",
-    color: "#FFFFFF",
-    letterSpacing: -0.2,
-  },
-  titleLine2: {
-    fontSize: 16.5,
-    fontWeight: "800",
-    color: "#FFFFFF",
-    letterSpacing: -0.2,
-    marginTop: 1,
-  },
-  subtitleText: {
-    fontSize: 11.5,
-    color: "#94A3B8",
-    marginTop: 4,
-    fontWeight: "500",
-  },
-  ctaBtn: {
-    alignSelf: "flex-start",
     paddingHorizontal: 14,
-    paddingVertical: 7.5,
+    paddingVertical: 6,
     borderRadius: 20,
+    alignSelf: "flex-start",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.15,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
   },
-  ctaBtnText: {
-    fontSize: 12.5,
+  storeBadgeText: {
+    fontSize: 13,
     fontWeight: "800",
-    letterSpacing: -0.1,
-  },
-  cardRightCol: {
-    width: "45%",
-    height: "100%",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  cardShowcaseImage: {
-    width: "100%",
-    height: "100%",
+    color: "#111827",
+    letterSpacing: 0.2,
   },
   middleSliderWrap: {
     marginTop: 14,
