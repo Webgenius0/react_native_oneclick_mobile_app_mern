@@ -92,8 +92,8 @@ export default function CartPage({ navigation }) {
     const basePrice = parsePrice(item?.price) || 0;
     const { finalPrice } = calculateMarketplacePrice(basePrice, item, marketplaces);
     const count = Number(item?.count) > 0 ? Number(item.count) : 1;
-
     const { code: itemCurrency, isUsd } = getReceivedCurrencyInfo(item);
+
     const usd = isUsd
       ? finalPrice
       : calculateConvertedPrice(finalPrice, itemCurrency, rates, inverseRates);

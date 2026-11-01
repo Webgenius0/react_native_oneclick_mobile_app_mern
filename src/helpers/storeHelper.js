@@ -1,6 +1,7 @@
 /**
  * Helper to identify store name based on URL host or route params.
  */
+import { getReceivedCurrencyInfo } from './currencyHelper';
 
 export const getStoreNameFromUrl = url => {
   if (!url || typeof url !== 'string') {
@@ -520,8 +521,16 @@ export const calculateMarketplacePrice = (basePrice, item, marketplaces = []) =>
     };
   }
 
+  const { isUsd } = getReceivedCurrencyInfo(item);
+  const isShein = Boolean(
+    (item?.store && String(item.store).toLowerCase().includes('shein')) ||
+    (item?.url && String(item.url).toLowerCase().includes('shein.com')) ||
+    (item?.marketplace && String(item.marketplace).toLowerCase().includes('shein'))
+  );
+
   const matched = findMarketplaceForItem(item, marketplaces);
-  const percent = matched && Number(matched.percent) > 0 ? Number(matched.percent) : 0;
+  // For Shein items, commission percent applies ONLY to non-USD items (AED, SAR, etc.); USD items have 0% commission
+  const percent = (isShein && isUsd) ? 0 : (matched && Number(matched.percent) > 0 ? Number(matched.percent) : 0);
   const percentAmount = percent > 0 ? numericPrice * (percent / 100) : 0;
   const finalPrice = parseFloat((numericPrice + percentAmount).toFixed(2));
 

@@ -96,7 +96,7 @@ describe('API Integration Guide Specifications (v4.0)', () => {
     });
 
     it('getServerNotifications supports unreadOnly parameter (?unread=1)', async () => {
-      ai.get.mockResolvedValueOnce({
+      ai.post.mockResolvedValueOnce({
         data: {
           error: false,
           notifications: [{ id: 105, baslik: 'Unread Alert', okundu: 0 }],
@@ -104,7 +104,7 @@ describe('API Integration Guide Specifications (v4.0)', () => {
       });
 
       const res = await getServerNotifications(0, { unreadOnly: true });
-      expect(ai.get).toHaveBeenCalledWith('notifications', { params: { unread: 1 } });
+      expect(ai.post).toHaveBeenCalledWith('notifications', { id: 0, unread: 1 });
       expect(res).toHaveLength(1);
     });
   });

@@ -522,7 +522,7 @@ export const getMetaTagPriceAndCurrency = page_url => {
           // Convert Arabic-Indic digits ٠-٩ to 0-9
           t = t.replace(/[٠-٩]/g, function(d) { return String.fromCharCode(d.charCodeAt(0) - 1632 + 48); });
           var detectedCurr = '';
-          if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:AED|د\.?إ|درهم)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'AED';
+          if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:AED|د\.?إ|درهم)(?:$|[^a-zA-Z\u0600-\u06FF])|\u20C3/i.test(t)) detectedCurr = 'AED';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:SAR|SR|ر\.?س|ريال)(?:$|[^a-zA-Z\u0600-\u06FF])|[﷼\uFDFC\u20C1⃁]/i.test(t)) detectedCurr = 'SAR';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:KWD|د\.?ك)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'KWD';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:QAR|ر\.?ق)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'QAR';
@@ -682,6 +682,32 @@ export const getMetaTagPriceAndCurrency = page_url => {
                 price = parsed.price;
                 if (parsed.currency && !currency) currency = parsed.currency;
                 priceEl = currEl;
+
+                // Inspect currEl's ancestors up to 6 levels for currency symbols ($ / USD, SAR, AED, TL)
+                if (!currency && currEl) {
+                  var pNode = currEl;
+                  for (var pi = 0; pi < 6 && pNode; pi++) {
+                    var pText = pNode.textContent || '';
+                    if (/\$|\bUSD\b/i.test(pText)) { currency = 'USD'; break; }
+                    if (/[﷼\uFDFC\u20C1⃁]|ر\.?س|ريال|\bSAR\b/i.test(pText)) { currency = 'SAR'; break; }
+                    if (/د\.?إ|درهم|\bAED\b/i.test(pText)) { currency = 'AED'; break; }
+                    if (/₺|\bTL\b|\bTRY\b/i.test(pText)) { currency = 'TL'; break; }
+                    pNode = pNode.parentElement;
+                  }
+                }
+
+                if (!currency && currEl) {
+                  var containerEl = (currEl.closest && currEl.closest(
+                    '[class*="head-price"], [class*="floor-price"], [class*="product-price"], [class*="productPrice"], [class*="goods-price"], [class*="selling-price"], [class*="goodsPrice"], .product-intro__head-price'
+                  )) || currEl.parentElement;
+                  if (containerEl) {
+                    var containerText = getCleanElementPriceText(containerEl);
+                    var parsedContainer = parsePriceAndCurrency(containerText);
+                    if (parsedContainer.currency) {
+                      currency = parsedContainer.currency;
+                    }
+                  }
+                }
                 break;
               }
             }
@@ -722,15 +748,11 @@ export const getMetaTagPriceAndCurrency = page_url => {
         }
 
         // 2b. Check Shein application state
-        if (!price || !currency) {
+        if (!price) {
           try {
             if (window.gbCommonInfo) {
-              if (!currency && window.gbCommonInfo.currency) {
-                currency = String(window.gbCommonInfo.currency).trim();
-              }
               var ssr = window.gbCommonInfo.contextForSSR;
               if (ssr) {
-                if (!currency && ssr.currency) currency = String(ssr.currency).trim();
                 if (!price && ssr.googleSEO && ssr.googleSEO.goodsDetailSchema && ssr.googleSEO.goodsDetailSchema.offers) {
                   var shSchema = ssr.googleSEO.goodsDetailSchema;
                   if (shSchema.offers) {
@@ -870,13 +892,6 @@ export const getMetaTagPriceAndCurrency = page_url => {
             }
           }
         }
-        if (!currency) {
-          var metaCurrency = document.querySelector('meta[property="og:price:currency"], meta[property="product:price:currency"], meta[itemprop="priceCurrency"], meta[name="twitter:label1"]');
-          if (metaCurrency && metaCurrency.content) {
-            currency = metaCurrency.content.trim();
-          }
-        }
-
         // 3b. Check out-of-stock / currently unavailable
         if (!price) {
           var availEl = document.querySelector('#availability, .out-of-stock, [data-testid*="out-of-stock"]');
@@ -885,27 +900,95 @@ export const getMetaTagPriceAndCurrency = page_url => {
           }
         }
 
-        // 4. Extract or infer currency if missing
+        // 4. Extract or infer currency if missing (prioritize live DOM symbols, cookies, localStorage over static SSR)
         if (!currency) {
-          var targetText = (priceEl ? priceEl.textContent : '') || document.body.innerText || '';
-          var currMatch = targetText.match(/\b(TL|TRY|AED|SAR|KWD|QAR|USD|EUR|GBP)\b|[₺$€£]/i);
+          var targetText = (priceEl ? priceEl.textContent : '') || '';
+          if (priceEl && priceEl.parentElement) {
+            targetText += ' ' + priceEl.parentElement.textContent;
+          }
+          if (!targetText && document.body) {
+            targetText = document.body.innerText.slice(0, 3000);
+          }
+          var currMatch = targetText.match(/\b(TL|TRY|AED|SAR|KWD|QAR|USD|EUR|GBP)\b|([₺$€£﷼\uFDFC\u20C1⃁\u20C3]|د\.?إ|درهم|ر\.?س|ريال)/i);
           if (currMatch) {
-            currency = currMatch[1].toUpperCase();
-          } else {
-            var href = window.location.href || '';
-            if (href.indexOf('trendyol.com') > -1 || href.indexOf('hepsiburada.com') > -1 || href.indexOf('.tr') > -1) {
-              currency = 'TL';
-            } else if (href.indexOf('amazon.ae') > -1 || href.indexOf('noon.com') > -1) {
+            var rawMatchedCurr = (currMatch[1] || currMatch[2] || currMatch[0]).trim();
+            if (/د\.?إ|درهم|\u20C3/i.test(rawMatchedCurr) || rawMatchedCurr.toUpperCase() === 'AED') currency = 'AED';
+            else if (/[﷼\uFDFC\u20C1⃁]|ر\.?س|ريال/i.test(rawMatchedCurr) || rawMatchedCurr.toUpperCase() === 'SAR') currency = 'SAR';
+            else if (rawMatchedCurr === '₺' || rawMatchedCurr.toUpperCase() === 'TL') currency = 'TL';
+            else if (rawMatchedCurr === '$' || rawMatchedCurr.toUpperCase() === 'USD') currency = 'USD';
+            else if (rawMatchedCurr === '€' || rawMatchedCurr.toUpperCase() === 'EUR') currency = 'EUR';
+            else if (rawMatchedCurr === '£' || rawMatchedCurr.toUpperCase() === 'GBP') currency = 'GBP';
+            else currency = rawMatchedCurr.toUpperCase();
+          }
+        }
+
+        if (!currency && document.cookie) {
+          try {
+            var ckNative = document.cookie.match(/(?:^|;\s*)currency=([A-Za-z]{3})(?:;|$)/i);
+            if (ckNative && ckNative[1]) {
+              var ckuNat = ckNative[1].toUpperCase();
+              if (['USD', 'SAR', 'AED', 'TRY', 'EUR', 'GBP'].indexOf(ckuNat) > -1) currency = ckuNat;
+            }
+            if (!currency) {
+              var ckM = document.cookie.match(/(?:^|;\s*)(?:currency|shein_currency|sitecurrency|local_currency|user_currency)=([A-Za-z]{3})/i);
+              if (ckM && ckM[1]) {
+                var cku = ckM[1].toUpperCase();
+                if (['USD', 'SAR', 'AED', 'TRY', 'EUR', 'GBP'].indexOf(cku) > -1) currency = cku;
+              }
+            }
+          } catch(eSheinCk) {}
+        }
+
+        if (!currency && window.gbCommonInfo && window.gbCommonInfo.currency) {
+          try {
+            var gbC = String(window.gbCommonInfo.currency).toUpperCase().trim();
+            if (['USD', 'SAR', 'AED', 'TRY', 'EUR', 'GBP'].indexOf(gbC) > -1) currency = gbC;
+          } catch(eGb) {}
+        }
+
+        if (!currency && window.localStorage) {
+          try {
+            var lsCur = window.localStorage.getItem('currency') || window.localStorage.getItem('shein_currency') || window.localStorage.getItem('currency_code');
+            if (lsCur && typeof lsCur === 'string') {
+              lsCur = lsCur.trim().toUpperCase().replace(/[^A-Z]/g, '');
+              if (['USD', 'SAR', 'AED', 'TRY', 'EUR', 'GBP'].indexOf(lsCur) > -1) currency = lsCur;
+            }
+          } catch(eLs) {}
+        }
+
+        if (!currency) {
+          var metaCurrency = document.querySelector('meta[property="og:price:currency"], meta[property="product:price:currency"], meta[itemprop="priceCurrency"], meta[name="twitter:label1"]');
+          if (metaCurrency && metaCurrency.content) {
+            currency = metaCurrency.content.trim();
+          }
+        }
+
+        if (!currency) {
+          var href = window.location.href || '';
+          if (href.indexOf('trendyol.com') > -1 || href.indexOf('hepsiburada.com') > -1 || href.indexOf('.tr') > -1) {
+            currency = 'TL';
+          } else if (href.indexOf('amazon.ae') > -1 || href.indexOf('noon.com') > -1) {
+            currency = 'AED';
+          } else if (href.indexOf('amazon.sa') > -1) {
+            currency = 'SAR';
+          } else if (href.indexOf('amazon.de') > -1) {
+            currency = 'EUR';
+          } else if (href.indexOf('amazon.co.uk') > -1) {
+            currency = 'GBP';
+          } else if (href.indexOf('shein.') > -1) {
+            if (href.indexOf('shein.ae') > -1) {
               currency = 'AED';
-            } else if (href.indexOf('amazon.sa') > -1) {
+            } else if (href.indexOf('us.shein.com') > -1 || href.indexOf('/us/') > -1) {
+              currency = 'USD';
+            } else if (href.indexOf('/sa/') > -1 || href.indexOf('.sa') > -1) {
               currency = 'SAR';
-            } else if (href.indexOf('amazon.de') > -1) {
-              currency = 'EUR';
-            } else if (href.indexOf('amazon.co.uk') > -1) {
-              currency = 'GBP';
-            } else if (href.indexOf('amazon.com') > -1 || href.indexOf('shein.com') > -1 || href.indexOf('aliexpress.com') > -1 || href.indexOf('iherb.com') > -1 || href.indexOf('yesstyle.com') > -1) {
+            } else if (href.indexOf('/ar-en/') > -1 || href.indexOf('/ar/') > -1) {
+              currency = 'SAR';
+            } else {
               currency = 'USD';
             }
+          } else if (href.indexOf('amazon.com') > -1 || href.indexOf('aliexpress.com') > -1 || href.indexOf('iherb.com') > -1 || href.indexOf('yesstyle.com') > -1) {
+            currency = 'USD';
           }
         }
 
@@ -920,6 +1003,9 @@ export const getMetaTagPriceAndCurrency = page_url => {
           if (window.ReactNativeWebView && typeof window.ReactNativeWebView.postMessage === 'function') {
             window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'price', data: price }));
             window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'currency', data: currency || 'TL' }));
+            if (href.indexOf('shein.') > -1 && currency && /^[A-Z]{3}$/.test(currency)) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'shein_currency_selected', currency: currency }));
+            }
           }
         }
 
@@ -2373,7 +2459,7 @@ export const getProductSnapshotBridge = page_url => {
           // Convert Arabic-Indic digits ٠-٩ to 0-9
           t = t.replace(/[٠-٩]/g, function(d) { return String.fromCharCode(d.charCodeAt(0) - 1632 + 48); });
           var detectedCurr = '';
-          if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:AED|د\.?إ|درهم)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'AED';
+          if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:AED|د\.?إ|درهم)(?:$|[^a-zA-Z\u0600-\u06FF])|\u20C3/i.test(t)) detectedCurr = 'AED';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:SAR|SR|ر\.?س|ريال)(?:$|[^a-zA-Z\u0600-\u06FF])|[﷼\uFDFC\u20C1⃁]/i.test(t)) detectedCurr = 'SAR';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:KWD|د\.?ك)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'KWD';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:QAR|ر\.?ق)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'QAR';
@@ -2503,6 +2589,19 @@ export const getProductSnapshotBridge = page_url => {
               if (parsed.price) {
                 snapshot.price = parsed.price;
                 if (parsed.currency && !snapshot.currency) snapshot.currency = parsed.currency;
+
+                // Inspect currEl's ancestors up to 4 levels for currency symbols ($ / USD, SAR, AED, TL)
+                if (!snapshot.currency && currEl) {
+                  var pNodeSnap = currEl;
+                  for (var psi = 0; psi < 4 && pNodeSnap; psi++) {
+                    var psText = pNodeSnap.textContent || '';
+                    if (/\$|\bUSD\b/i.test(psText)) { snapshot.currency = 'USD'; break; }
+                    if (/[﷼\uFDFC\u20C1⃁]|ر\.?س|ريال|\bSAR\b/i.test(psText)) { snapshot.currency = 'SAR'; break; }
+                    if (/د\.?إ|درهم|\bAED\b/i.test(psText)) { snapshot.currency = 'AED'; break; }
+                    if (/₺|\bTL\b|\bTRY\b/i.test(psText)) { snapshot.currency = 'TL'; break; }
+                    pNodeSnap = pNodeSnap.parentElement;
+                  }
+                }
                 break;
               }
             }
@@ -2546,12 +2645,8 @@ export const getProductSnapshotBridge = page_url => {
         if (!snapshot.price) {
           try {
             if (window.gbCommonInfo) {
-              if (!snapshot.currency && window.gbCommonInfo.currency) {
-                snapshot.currency = String(window.gbCommonInfo.currency).trim();
-              }
               var ssrSnap = window.gbCommonInfo.contextForSSR;
               if (ssrSnap) {
-                if (!snapshot.currency && ssrSnap.currency) snapshot.currency = String(ssrSnap.currency).trim();
                 if (!snapshot.price && ssrSnap.googleSEO && ssrSnap.googleSEO.goodsDetailSchema && ssrSnap.googleSEO.goodsDetailSchema.offers) {
                   var offSnap = ssrSnap.googleSEO.goodsDetailSchema.offers;
                   var pOffSnap = offSnap.price || offSnap.lowPrice || '';
@@ -2652,6 +2747,49 @@ export const getProductSnapshotBridge = page_url => {
             }
           }
         }
+        if (!snapshot.currency && snapshot.price) {
+          var bodyTxt = document.body ? document.body.innerText.slice(0, 3000) : '';
+          var currMatchSnap = bodyTxt.match(/\b(TL|TRY|AED|SAR|KWD|QAR|USD|EUR|GBP)\b|([₺$€£﷼\uFDFC\u20C1⃁\u20C3]|د\.?إ|درهم|ر\.?س|ريال)/i);
+          if (currMatchSnap) {
+            var rawCurrMatchSnap = (currMatchSnap[1] || currMatchSnap[2] || currMatchSnap[0]).trim();
+            if (/د\.?إ|درهم|\u20C3/i.test(rawCurrMatchSnap) || rawCurrMatchSnap.toUpperCase() === 'AED') snapshot.currency = 'AED';
+            else if (/[﷼\uFDFC\u20C1⃁]|ر\.?س|ريال/i.test(rawCurrMatchSnap) || rawCurrMatchSnap.toUpperCase() === 'SAR') snapshot.currency = 'SAR';
+            else if (rawCurrMatchSnap === '$' || rawCurrMatchSnap.toUpperCase() === 'USD') snapshot.currency = 'USD';
+            else if (rawCurrMatchSnap === '₺' || rawCurrMatchSnap.toUpperCase() === 'TL') snapshot.currency = 'TL';
+            else snapshot.currency = rawCurrMatchSnap.toUpperCase();
+          }
+        }
+        if (!snapshot.currency && document.cookie) {
+          try {
+            var ckNativeSnap = document.cookie.match(/(?:^|;\s*)currency=([A-Za-z]{3})(?:;|$)/i);
+            if (ckNativeSnap && ckNativeSnap[1]) {
+              var ckuNatSnap = ckNativeSnap[1].toUpperCase();
+              if (['USD', 'SAR', 'AED', 'TRY', 'EUR', 'GBP'].indexOf(ckuNatSnap) > -1) snapshot.currency = ckuNatSnap;
+            }
+            if (!snapshot.currency) {
+              var ckMSnap = document.cookie.match(/(?:^|;\s*)(?:currency|shein_currency|sitecurrency|local_currency|user_currency)=([A-Za-z]{3})/i);
+              if (ckMSnap && ckMSnap[1]) {
+                var ckuSnap = ckMSnap[1].toUpperCase();
+                if (['USD', 'SAR', 'AED', 'TRY', 'EUR', 'GBP'].indexOf(ckuSnap) > -1) snapshot.currency = ckuSnap;
+              }
+            }
+          } catch(eCk) {}
+        }
+        if (!snapshot.currency && window.localStorage) {
+          try {
+            var lsCSnap = window.localStorage.getItem('currency') || window.localStorage.getItem('shein_currency') || window.localStorage.getItem('currency_code');
+            if (lsCSnap && typeof lsCSnap === 'string') {
+              lsCSnap = lsCSnap.trim().toUpperCase().replace(/[^A-Z]/g, '');
+              if (['USD', 'SAR', 'AED', 'TRY', 'EUR', 'GBP'].indexOf(lsCSnap) > -1) snapshot.currency = lsCSnap;
+            }
+          } catch(eLs) {}
+        }
+        if (!snapshot.currency && window.gbCommonInfo && window.gbCommonInfo.currency) {
+          try {
+            var gbCSnap = String(window.gbCommonInfo.currency).toUpperCase().trim();
+            if (['USD', 'SAR', 'AED', 'TRY', 'EUR', 'GBP'].indexOf(gbCSnap) > -1) snapshot.currency = gbCSnap;
+          } catch(eGb) {}
+        }
         if (!snapshot.currency) {
           var metaCurrency = document.querySelector('meta[property="og:price:currency"], meta[property="product:price:currency"], meta[itemprop="priceCurrency"], meta[name="twitter:label1"]');
           if (metaCurrency && metaCurrency.content) snapshot.currency = metaCurrency.content.trim();
@@ -2662,17 +2800,31 @@ export const getProductSnapshotBridge = page_url => {
           var href = window.location.href || '';
           if (href.indexOf('trendyol.com') > -1 || href.indexOf('hepsiburada.com') > -1 || href.indexOf('.tr') > -1) {
             snapshot.currency = 'TL';
-          } else if (href.indexOf('amazon.ae') > -1 || href.indexOf('trendyol.ae') > -1 || href.indexOf('noon.com') > -1) {
+          } else if (href.indexOf('amazon.ae') > -1 || href.indexOf('trendyol.ae') > -1 || href.indexOf('noon.com') > -1 || href.indexOf('shein.ae') > -1) {
             snapshot.currency = 'AED';
-          } else if (href.indexOf('amazon.sa') > -1 || href.indexOf('trendyol.sa') > -1) {
+          } else if (href.indexOf('amazon.sa') > -1 || href.indexOf('trendyol.sa') > -1 || href.indexOf('shein.sa') > -1 || href.indexOf('/ar-en/') > -1 || href.indexOf('/ar/') > -1) {
             snapshot.currency = 'SAR';
           } else if (href.indexOf('amazon.de') > -1) {
             snapshot.currency = 'EUR';
           } else if (href.indexOf('amazon.co.uk') > -1) {
             snapshot.currency = 'GBP';
+          } else if (href.indexOf('shein.') > -1) {
+            var isPageUsdSnap = (document.body && (document.body.innerText.indexOf('$') > -1 || /\bUSD\b/i.test(document.body.innerText.slice(0, 3000))));
+            var isPageSarSnap = (document.body && (/[﷼\uFDFC\u20C1⃁]|ر\.?س|ريাল|\bSAR\b/i.test(document.body.innerText.slice(0, 3000))));
+            snapshot.currency = (isPageUsdSnap && !isPageSarSnap) ? 'USD' : 'SAR';
           } else {
             snapshot.currency = 'USD';
           }
+        }
+        if (snapshot.currency === 'USD' || snapshot.currency === '$') {
+          if (snapshot.price && !snapshot.price.includes('$') && !/USD/i.test(snapshot.price)) {
+            snapshot.price = '$' + snapshot.price;
+          }
+        }
+        if (snapshot.currency && href.indexOf('shein.') > -1 && /^[A-Z]{3}$/.test(snapshot.currency) && window.ReactNativeWebView && typeof window.ReactNativeWebView.postMessage === 'function') {
+          try {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'shein_currency_selected', currency: snapshot.currency }));
+          } catch(e) {}
         }
         if (snapshot.currency === '₺') snapshot.currency = 'TL';
         if (snapshot.currency === '$') snapshot.currency = 'USD';

@@ -37,6 +37,8 @@ export default function CartItem({
   const { rates, inverseRates } = useExchangeRateStore();
   const marketplaces = useSheinPriceStore(state => state.marketplaces) || [];
 
+  const { code: itemCurrency, display: receivedDisplay, isUsd } =
+    getReceivedCurrencyInfo(item);
   const basePrice = parsePrice(item?.price) || 0;
   const { finalPrice } = calculateMarketplacePrice(basePrice, item, marketplaces);
   const displayPrice =
@@ -44,8 +46,6 @@ export default function CartItem({
       ? (finalPrice % 1 === 0 ? finalPrice.toFixed(0) : finalPrice.toFixed(2))
       : item?.price || '';
 
-  const { code: itemCurrency, display: receivedDisplay, isUsd } =
-    getReceivedCurrencyInfo(item);
   const convertedUsd =
     finalPrice > 0
       ? isUsd

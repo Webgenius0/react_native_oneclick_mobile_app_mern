@@ -55,7 +55,7 @@ describe('Exchange Rate & Currency Helpers', () => {
       expect(detectItemCurrency({ price: '$49.99' })).toBe('USD');
       expect(detectItemCurrency({ url: 'https://amazon.com/dp/B08N5WRWNW' })).toBe('USD');
       expect(detectItemCurrency({ store: 'Shein', price: '$12.00' })).toBe('USD');
-      expect(detectItemCurrency({ url: 'https://shein.com/item-p-123' })).toBe('USD');
+      expect(detectItemCurrency({ url: 'https://us.shein.com/item-p-123' })).toBe('USD');
     });
 
     it('detects AED items from store, url, or currency', () => {
@@ -70,6 +70,8 @@ describe('Exchange Rate & Currency Helpers', () => {
     it('detects SAR items from url, currency, or symbols (﷼, ر.س, SAR, SR)', () => {
       expect(detectItemCurrency({ url: 'https://amazon.sa/dp/B08N5WRWNW' })).toBe('SAR');
       expect(detectItemCurrency({ url: 'https://shein.sa/item-p-123' })).toBe('SAR');
+      expect(detectItemCurrency({ url: 'https://m.shein.com/ar-en/item-p-123.html' })).toBe('SAR');
+      expect(detectItemCurrency({ store: 'Shein', price: '25.00' })).toBe('SAR');
       expect(detectItemCurrency({ currency: 'SAR' })).toBe('SAR');
       expect(detectItemCurrency({ price: '150 SR' })).toBe('SAR');
       expect(detectItemCurrency({ price: '150 ﷼' })).toBe('SAR');

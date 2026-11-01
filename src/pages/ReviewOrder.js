@@ -73,9 +73,9 @@ export default function ReviewOrder({ navigation, route }) {
       ? items.reduce((sum, item) => {
           const basePrice = parsePrice(item?.price) || 0;
           const { finalPrice } = calculateMarketplacePrice(basePrice, item, marketplaces);
+          const { code: itemCurrency, isUsd } = getReceivedCurrencyInfo(item);
           const count = Number(item?.count) > 0 ? Number(item.count) : 1;
 
-          const { code: itemCurrency, isUsd } = getReceivedCurrencyInfo(item);
           const usd = isUsd
             ? finalPrice
             : calculateConvertedPrice(finalPrice, itemCurrency, rates, inverseRates);
@@ -161,8 +161,8 @@ export default function ReviewOrder({ navigation, route }) {
           item,
           marketplaces,
         );
-
         const { code: normalizedCurr, isUsd } = getReceivedCurrencyInfo(item);
+
         const convertedPriceVal =
           finalPriceVal !== null
             ? isUsd
@@ -493,11 +493,11 @@ export default function ReviewOrder({ navigation, route }) {
                     getStoreName(item?.url, item?.store || ''),
                   ).toLowerCase() === 'shein',
               );
-              const percentAmount =
-                isShein && safePercent > 0 ? basePrice * (safePercent / 100) : 0;
-              const finalPrice = basePrice + percentAmount;
               const { code: itemCurrency, isUsd } =
                 getReceivedCurrencyInfo(item);
+              const percentAmount =
+                isShein && !isUsd && safePercent > 0 ? basePrice * (safePercent / 100) : 0;
+              const finalPrice = basePrice + percentAmount;
               const usd = isUsd
                 ? finalPrice
                 : calculateConvertedPrice(
@@ -851,14 +851,14 @@ export default function ReviewOrder({ navigation, route }) {
                         getStoreName(item?.url, item?.store || ''),
                       ).toLowerCase() === 'shein',
                   );
+                  const { code: itemCurrency, isUsd } =
+                    getReceivedCurrencyInfo(item);
                   const percentAmount =
-                    isShein && safePercent > 0
+                    isShein && !isUsd && safePercent > 0
                       ? basePrice * (safePercent / 100)
                       : 0;
                   const finalPrice = basePrice + percentAmount;
                   const count = Number(item?.count) > 0 ? Number(item.count) : 1;
-                  const { code: itemCurrency, isUsd } =
-                    getReceivedCurrencyInfo(item);
                   const usd = isUsd
                     ? finalPrice
                     : calculateConvertedPrice(

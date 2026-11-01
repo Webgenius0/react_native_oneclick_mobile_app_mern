@@ -103,16 +103,16 @@ const CartOrderConfirmModal = ({
                 getStoreName(item?.url, item?.store || '') ||
                 'Store';
 
+              const { code: itemCurr, display: receivedDisplay, isUsd } = getReceivedCurrencyInfo(item);
               const basePrice = parsePrice(item?.price) || 0;
               const percentAmount =
-                isShein && safePercent > 0
+                isShein && !isUsd && safePercent > 0
                   ? basePrice * (safePercent / 100)
                   : 0;
               const finalPrice = basePrice + percentAmount;
               const displayLocal =
                 finalPrice > 0 ? finalPrice.toFixed(2) : item?.price || '';
 
-              const { code: itemCurr, display: receivedDisplay, isUsd } = getReceivedCurrencyInfo(item);
               const convertedUsd =
                 finalPrice > 0
                   ? (isUsd ? finalPrice : calculateConvertedPrice(

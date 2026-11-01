@@ -197,7 +197,6 @@ export const normalizeCartItem = item => {
     itemUrl.includes('shein.sa')
   );
 
-  // Detect SAR from price symbols, currency code, or Saudi domains
   const hasSarPriceSymbol =
     String(newPrice).includes('⃁') ||
     String(newPrice).includes('\u20C1') ||
@@ -206,14 +205,54 @@ export const normalizeCartItem = item => {
     String(newPrice).includes('\uFDFC') ||
     /\b(?:SAR|SR|RIYAL)\b/i.test(String(newPrice));
 
-  if (
-    hasSarPriceSymbol ||
+  const hasExplicitAed =
+    currency === 'AED' ||
+    item?.currency === 'AED' ||
+    String(newPrice).includes('د.إ') ||
+    String(newPrice).includes('درهم') ||
+    String(newPrice).includes('\u20C3') ||
+    /\bAED\b/i.test(String(newPrice));
+
+  const hasExplicitSar =
     currency === 'SAR' ||
     item?.currency === 'SAR' ||
-    isSheinArabic ||
-    itemUrl.includes('amazon.sa') ||
-    itemUrl.includes('shein.sa')
-  ) {
+    hasSarPriceSymbol;
+
+  const isUsd =
+    !hasExplicitAed &&
+    !hasExplicitSar &&
+    (
+      currency === '$' ||
+      currency === 'USD' ||
+      item?.currency === '$' ||
+      item?.currency === 'USD' ||
+      String(newPrice).includes('$') ||
+      /\bUSD\b/i.test(String(newPrice))
+    );
+
+  const isAed = !isUsd && hasExplicitAed;
+
+  const isSar =
+    !isUsd && !isAed && (
+      hasExplicitSar ||
+      isSheinArabic ||
+      itemUrl.includes('amazon.sa') ||
+      itemUrl.includes('shein.sa')
+    );
+
+  if (isUsd) {
+    currency = '$';
+    const rawNum = parsePrice(newPrice);
+    if (rawNum && rawNum > 0) {
+      newPrice = String(newPrice).includes('$') ? '$' + rawNum.toFixed(2) : rawNum.toFixed(2);
+    }
+  } else if (isAed) {
+    currency = 'AED';
+    const rawNum = parsePrice(newPrice);
+    if (rawNum && rawNum > 0) {
+      newPrice = rawNum.toFixed(2);
+    }
+  } else if (isSar) {
     currency = 'SAR';
     const rawNum = parsePrice(newPrice);
     if (rawNum && rawNum > 0) {
@@ -222,6 +261,8 @@ export const normalizeCartItem = item => {
   } else if (!currency || currency === 'TL') {
     if (itemUrl.includes('amazon.ae') || itemUrl.includes('noon.com') || itemUrl.includes('shein.ae')) {
       currency = 'AED';
+    } else if (itemUrl.includes('amazon.sa') || itemUrl.includes('shein.sa') || isSheinArabic) {
+      currency = 'SAR';
     } else if (itemUrl.includes('amazon.com') || isShein) {
       currency = 'USD';
     }

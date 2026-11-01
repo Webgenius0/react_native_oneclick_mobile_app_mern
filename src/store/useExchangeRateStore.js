@@ -6,6 +6,7 @@ import {
   DEFAULT_RATES,
   DEFAULT_INVERSE_RATES,
   calculateConvertedPrice,
+  getReceivedCurrencyInfo,
   normalizeCurrency,
   parsePrice,
 } from '../helpers/currencyHelper';
@@ -80,23 +81,34 @@ export const parseExchangeRateData = data => {
   }
 
   // Handle rateSar / rate_sar from API
-  const rawSarRate =
+  const explicitSarInverse =
     data.rateSar ||
     data.rate_sar ||
     data.rateSAR ||
-    data.sar ||
-    data.SAR ||
-    (data.rates && (data.rates.SAR || data.rates.sar)) ||
     (data.inverseRates && (data.inverseRates.SAR || data.inverseRates.sar));
+  const explicitSarDirect = data.rates && (data.rates.SAR || data.rates.sar);
 
-  if (rawSarRate) {
-    const num = Number(rawSarRate);
+  if (explicitSarInverse) {
+    const num = Number(explicitSarInverse);
     if (!isNaN(num) && num > 0) {
       if (num > 1) {
         inverseRatesObj.SAR = num;
-        ratesObj.SAR = Number((1 / num).toFixed(6));
+        if (!ratesObj.SAR) {
+          ratesObj.SAR = Number((1 / num).toFixed(6));
+        }
       } else {
         ratesObj.SAR = num;
+        if (!inverseRatesObj.SAR) {
+          inverseRatesObj.SAR = Number((1 / num).toFixed(6));
+        }
+      }
+    }
+  }
+  if (explicitSarDirect) {
+    const num = Number(explicitSarDirect);
+    if (!isNaN(num) && num > 0 && num < 1) {
+      ratesObj.SAR = num;
+      if (!inverseRatesObj.SAR) {
         inverseRatesObj.SAR = Number((1 / num).toFixed(6));
       }
     }
@@ -157,7 +169,7 @@ export const parseExchangeRateData = data => {
     ),
     rateAed: Number(data.rateAed || newInverseRates.AED || 3.2),
     rateTry: Number(data.rateTry || newInverseRates.TRY || 33.9997),
-    rateSar: Number(rawSarRate || newInverseRates.SAR || 3.75),
+    rateSar: Number(newInverseRates.SAR || 3.75),
     lastFetched: Date.now(),
     loading: false,
     error: null,
@@ -192,24 +204,14 @@ export const useExchangeRateStore = create(
               return;
             }
             const hasNonUsd = contextCurrencyOrItem.some(it => {
-              const p = String(it?.price || '');
-              const c = String(it?.currency || '').trim().toUpperCase();
-              const isUsd = p.includes('$') || /\bUSD\b/i.test(p) || c.includes('$') || /\bUSD\b/i.test(c) || normalizeCurrency(c, p) === 'USD';
-              return !isUsd;
+              return !getReceivedCurrencyInfo(it).isUsd;
             });
             if (!hasNonUsd) {
               return;
             }
           } else if (typeof contextCurrencyOrItem === 'object') {
-            const isShein = Boolean(
-              (contextCurrencyOrItem?.store && String(contextCurrencyOrItem.store).toLowerCase().includes('shein')) ||
-              (contextCurrencyOrItem?.url && String(contextCurrencyOrItem.url).toLowerCase().includes('shein.com')) ||
-              (contextCurrencyOrItem?.marketplace && String(contextCurrencyOrItem.marketplace).toLowerCase().includes('shein')),
-            );
-            const p = String(contextCurrencyOrItem?.price || '');
-            const c = String(contextCurrencyOrItem?.currency || '').trim().toUpperCase();
-            const isUsd = p.includes('$') || /\bUSD\b/i.test(p) || c.includes('$') || /\bUSD\b/i.test(c) || normalizeCurrency(c, p) === 'USD';
-            if ((isShein && isUsd) || isUsd) {
+            const { isUsd } = getReceivedCurrencyInfo(contextCurrencyOrItem);
+            if (isUsd) {
               return;
             }
           } else {

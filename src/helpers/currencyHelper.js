@@ -40,7 +40,7 @@ export const normalizeCurrency = (rawCurrency, rawPrice = '') => {
   if (c === 'UAE') {
     return 'UAE';
   }
-  if (c === 'AED' || c === 'DHS' || c === 'DH' || c.includes('DIRHAM') || c.includes('د.إ') || c.includes('درهم')) {
+  if (c === 'AED' || c === 'DHS' || c === 'DH' || c.includes('DIRHAM') || c.includes('د.إ') || c.includes('درهم') || c.includes('\u20C3')) {
     return 'AED';
   }
   if (c === 'EUR' || c.includes('€') || c.includes('EURO')) {
@@ -89,7 +89,7 @@ export const normalizeCurrency = (rawCurrency, rawPrice = '') => {
   if (p.includes('UAE')) {
     return 'UAE';
   }
-  if (p.includes('AED') || /\bDHS?\b/.test(p) || p.includes('DIRHAM') || p.includes('د.إ') || p.includes('درهم')) {
+  if (p.includes('AED') || /\bDHS?\b/.test(p) || p.includes('DIRHAM') || p.includes('د.إ') || p.includes('درهم') || p.includes('\u20C3')) {
     return 'AED';
   }
   if (p.includes('€') || p.includes('EUR')) {
@@ -147,6 +147,9 @@ export const parsePrice = (rawPrice, rawCurrency = '') => {
   str = str.replace(/[-–]?\s*\d+(?:\.\d+)?\s*%\s*(?:off|indirim)?/gi, '');
   str = str.replace(/%\s*\d+(?:\.\d+)?/gi, '');
   str = str.replace(/\b(?:save|indirim|coupon|kupon|off)\b[^\d]*\d+(?:\.\d+)?%?/gi, '');
+
+  // Strip known Arabic and Latin currency symbols containing dots before digit isolation
+  str = str.replace(/د\.?إ|ر\.?س|د\.?ك|ر\.?ق|د\.?ب|ر\.?ع/gi, ' ');
 
   // Strip currency symbols and letters (keep digits, comma, dot, minus, space)
   str = str.replace(/[^0-9.,\s-]/g, '').trim();
@@ -294,13 +297,23 @@ export const detectItemCurrency = (item = {}, fallbackCurrency = 'USD') => {
   const rawPrice = item.price || '';
   const url = String(item.url || item.link || '').toLowerCase();
   const store = String(item.store || item.marketplace || '').toLowerCase();
+  const isShein = store.includes('shein') || url.includes('shein');
 
-  // 1. Check price string first for explicit symbols or currency codes
+  // 1. Check explicit currency field first (e.g. 'AED', 'SAR')
+  if (rawCurr) {
+    const norm = normalizeCurrency(rawCurr, rawPrice);
+    if (norm === 'SAR') return 'SAR';
+    if (norm === 'AED' || norm === 'UAE') return 'AED';
+    if (norm === 'USD' || norm === '$') return 'USD';
+    if (norm === 'EUR') return 'EUR';
+    if (norm === 'GBP') return 'GBP';
+    if (norm === 'TRY') return 'TRY';
+    return norm;
+  }
+
+  // 2. Check price string for explicit symbols or currency codes
   if (rawPrice) {
     const p = String(rawPrice).trim();
-    if (p.includes('$') || /\bUSD\b/i.test(p)) return 'USD';
-    if (p.includes('€') || /\bEUR\b/i.test(p)) return 'EUR';
-    if (p.includes('£') || /\bGBP\b/i.test(p)) return 'GBP';
     if (
       /\b(?:SAR|SR|RIYAL|RIAL)\b/i.test(p) ||
       p.includes('﷼') ||
@@ -310,23 +323,14 @@ export const detectItemCurrency = (item = {}, fallbackCurrency = 'USD') => {
       p.includes('ر.س') ||
       p.includes('ريال')
     ) return 'SAR';
-    if (/\b(?:AED|DHS|DH|DIRHAM)\b/i.test(p) || p.includes('د.إ') || p.includes('درهم')) return 'AED';
+    if (/\b(?:AED|DHS|DH|DIRHAM)\b/i.test(p) || p.includes('د.إ') || p.includes('درهم') || p.includes('\u20C3')) return 'AED';
+    if (p.includes('$') || /\bUSD\b/i.test(p)) return 'USD';
+    if (p.includes('€') || /\bEUR\b/i.test(p)) return 'EUR';
+    if (p.includes('£') || /\bGBP\b/i.test(p)) return 'GBP';
     if (p.includes('₺') || /\bTL\b/i.test(p) || /\bTRY\b/i.test(p)) return 'TRY';
   }
 
-  // 2. Check explicit currency field
-  if (rawCurr) {
-    const norm = normalizeCurrency(rawCurr, rawPrice);
-    if (norm === 'USD' || norm === '$') return 'USD';
-    if (norm === 'SAR') return 'SAR';
-    if (norm === 'AED' || norm === 'UAE') return 'AED';
-    if (norm === 'EUR') return 'EUR';
-    if (norm === 'GBP') return 'GBP';
-    if (norm === 'TRY') return 'TRY';
-    return norm;
-  }
-
-  // 3. Domain-based detection
+  // 3. Domain and store-based detection
   if (url.includes('shein.ae') || url.includes('amazon.ae') || url.includes('noon.com')) {
     return 'AED';
   }
@@ -337,8 +341,15 @@ export const detectItemCurrency = (item = {}, fallbackCurrency = 'USD') => {
     url.includes('shein.com/ar') ||
     url.includes('shein.com/sa') ||
     url.includes('/ar-en/') ||
-    url.includes('/ar/')
+    url.includes('/ar/') ||
+    url.includes('/sa/')
   ) {
+    return 'SAR';
+  }
+  // Generic Shein URLs (m.shein.com, www.shein.com) without specific region → SAR default.
+  // IMPORTANT: In Webview.js addChart, sheinCurrencyRef.current ALWAYS overrides rawCurrency
+  // before detectItemCurrency is ever called, so this SAR default is never reached for live items.
+  if (isShein && !url.includes('us.shein.com') && !url.includes('/us/')) {
     return 'SAR';
   }
   if (url.includes('shein.com.tr') || url.includes('trendyol.') || url.includes('hepsiburada.')) {
@@ -354,9 +365,7 @@ export const detectItemCurrency = (item = {}, fallbackCurrency = 'USD') => {
     url.includes('us.shein.com') ||
     url.includes('amazon.com') ||
     url.includes('.com/us') ||
-    url.includes('/us/') ||
-    store.includes('shein') ||
-    url.includes('shein.com')
+    url.includes('/us/')
   ) {
     return 'USD';
   }
@@ -377,28 +386,15 @@ export const getReceivedCurrencyInfo = (item = {}) => {
   const rawCurrUpper = rawCurr.toUpperCase();
   const rawPriceUpper = rawPrice.toUpperCase();
 
-  // If explicit 'USD' text is present
-  if (/\bUSD\b/.test(rawCurrUpper) || /\bUSD\b/.test(rawPriceUpper) || rawCurrUpper === 'USD') {
-    return { code: 'USD', display: 'USD', isUsd: true };
+  // 1. If SAR symbols or text are present (preserve received symbol)
+  if (rawCurr.includes('﷼') || rawPrice.includes('﷼')) {
+    return { code: 'SAR', display: '﷼', isUsd: false };
   }
-
-  // If '$' symbol is present in currency (e.g. '$', 'US$') or price (e.g. '$12.99', '12.99$')
-  if (rawCurr.includes('$') || rawPrice.includes('$')) {
-    return { code: 'USD', display: '$', isUsd: true };
-  }
-
-  // If SAR symbols or text are present
-  if (
-    rawCurr.includes('﷼') ||
-    rawCurr.includes('\uFDFC') ||
-    rawCurr.includes('⃁') ||
-    rawCurr.includes('\u20C1') ||
-    rawPrice.includes('﷼') ||
-    rawPrice.includes('\uFDFC') ||
-    rawPrice.includes('⃁') ||
-    rawPrice.includes('\u20C1')
-  ) {
+  if (rawCurr.includes('⃁') || rawCurr.includes('\u20C1') || rawPrice.includes('⃁') || rawPrice.includes('\u20C1')) {
     return { code: 'SAR', display: '⃁', isUsd: false };
+  }
+  if (rawCurr.includes('\uFDFC') || rawPrice.includes('\uFDFC')) {
+    return { code: 'SAR', display: '\uFDFC', isUsd: false };
   }
   if (rawCurr.includes('ر.س') || rawPrice.includes('ر.س')) {
     return { code: 'SAR', display: 'ر.س', isUsd: false };
@@ -412,27 +408,53 @@ export const getReceivedCurrencyInfo = (item = {}) => {
     return { code: 'SAR', display: 'SAR', isUsd: false };
   }
 
-  // If AED Arabic symbols are present
-  if (rawCurr.includes('د.إ') || rawPrice.includes('د.إ') || rawCurr.includes('درهم') || rawPrice.includes('درهم')) {
-    return { code: 'AED', display: 'د.إ', isUsd: false };
+  // 2. If AED Arabic symbols, new UAE Dirham sign, or text are present
+  if (
+    rawCurr.includes('د.إ') ||
+    rawPrice.includes('د.إ') ||
+    rawCurr.includes('درهم') ||
+    rawPrice.includes('درهم') ||
+    rawCurr.includes('\u20C3') ||
+    rawPrice.includes('\u20C3') ||
+    /\b(?:AED|DHS|DIRHAM)\b/i.test(rawCurr) ||
+    /\b(?:AED|DHS|DIRHAM)\b/i.test(rawPrice) ||
+    rawCurrUpper === 'AED'
+  ) {
+    return {
+      code: 'AED',
+      display: rawCurr.includes('د.إ') || rawPrice.includes('د.إ') ? 'د.إ' : (rawCurr.includes('\u20C3') || rawPrice.includes('\u20C3') ? '\u20C3' : 'AED'),
+      isUsd: false,
+    };
   }
 
-  // If TRY symbol is present
-  if (rawCurr.includes('₺') || rawPrice.includes('₺')) {
-    return { code: 'TRY', display: '₺', isUsd: false };
+  // 3. If explicit 'USD' or '$' symbol is present
+  if (
+    rawCurr.includes('$') ||
+    rawPrice.includes('$') ||
+    /\bUSD\b/.test(rawCurrUpper) ||
+    /\bUSD\b/.test(rawPriceUpper) ||
+    rawCurrUpper === 'USD'
+  ) {
+    const isDollarSymbol = rawCurr.includes('$') || rawPrice.includes('$');
+    return { code: 'USD', display: isDollarSymbol ? '$' : 'USD', isUsd: true };
   }
 
-  // If EUR symbol is present
-  if (rawCurr.includes('€') || rawPrice.includes('€')) {
+  // 4. If TRY symbol or text is present
+  if (rawCurr.includes('₺') || rawPrice.includes('₺') || rawCurrUpper === 'TRY' || rawCurrUpper === 'TL') {
+    return { code: 'TRY', display: rawCurr.includes('₺') || rawPrice.includes('₺') ? '₺' : 'TRY', isUsd: false };
+  }
+
+  // 5. If EUR symbol is present
+  if (rawCurr.includes('€') || rawPrice.includes('€') || rawCurrUpper === 'EUR') {
     return { code: 'EUR', display: '€', isUsd: false };
   }
 
-  // If GBP symbol is present
-  if (rawCurr.includes('£') || rawPrice.includes('£')) {
+  // 6. If GBP symbol is present
+  if (rawCurr.includes('£') || rawPrice.includes('£') || rawCurrUpper === 'GBP') {
     return { code: 'GBP', display: '£', isUsd: false };
   }
 
-  const detected = detectItemCurrency(item, 'USD');
+  const detected = detectItemCurrency(item);
   return {
     code: detected,
     display: detected === 'USD' ? '$' : detected,
