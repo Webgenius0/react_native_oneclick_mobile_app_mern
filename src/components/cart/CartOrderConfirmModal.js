@@ -19,7 +19,8 @@ import {
   detectItemCurrency,
   getReceivedCurrencyInfo,
 } from '../../helpers/currencyHelper';
-import { cleanProductTitle, getStoreName } from '../../helpers/storeHelper';
+import { cleanProductTitle, getStoreName, calculateMarketplacePrice } from '../../helpers/storeHelper';
+import { useSheinPriceStore } from '../../store/useSheinPriceStore';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -37,6 +38,7 @@ const CartOrderConfirmModal = ({
   safePercent = 0,
 }) => {
   const { ctxDil } = useContext(EmContext);
+  const marketplaces = useSheinPriceStore(state => state.marketplaces) || [];
 
   if (!visible) {
     return null;
@@ -105,11 +107,7 @@ const CartOrderConfirmModal = ({
 
               const { code: itemCurr, display: receivedDisplay, isUsd } = getReceivedCurrencyInfo(item);
               const basePrice = parsePrice(item?.price) || 0;
-              const percentAmount =
-                isShein && !isUsd && safePercent > 0
-                  ? basePrice * (safePercent / 100)
-                  : 0;
-              const finalPrice = basePrice + percentAmount;
+              const { finalPrice } = calculateMarketplacePrice(basePrice, item, marketplaces);
               const displayLocal =
                 finalPrice > 0 ? finalPrice.toFixed(2) : item?.price || '';
 

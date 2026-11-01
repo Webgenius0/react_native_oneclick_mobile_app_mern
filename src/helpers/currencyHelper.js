@@ -412,6 +412,8 @@ export const getReceivedCurrencyInfo = (item = {}) => {
   if (
     rawCurr.includes('د.إ') ||
     rawPrice.includes('د.إ') ||
+    rawCurr.includes('د.ا') ||
+    rawPrice.includes('د.ا') ||
     rawCurr.includes('درهم') ||
     rawPrice.includes('درهم') ||
     rawCurr.includes('\u20C3') ||

@@ -209,14 +209,17 @@ export const normalizeCartItem = item => {
     currency === 'AED' ||
     item?.currency === 'AED' ||
     String(newPrice).includes('د.إ') ||
+    String(newPrice).includes('د.ا') ||
     String(newPrice).includes('درهم') ||
     String(newPrice).includes('\u20C3') ||
-    /\bAED\b/i.test(String(newPrice));
+    /\bAED\b/i.test(String(newPrice)) ||
+    /\bAED\b/i.test(String(item?.price));
 
   const hasExplicitSar =
     currency === 'SAR' ||
     item?.currency === 'SAR' ||
-    hasSarPriceSymbol;
+    hasSarPriceSymbol ||
+    /\b(?:SAR|SR)\b/i.test(String(item?.price));
 
   const isUsd =
     !hasExplicitAed &&
