@@ -110,6 +110,10 @@ const CartOrderConfirmModal = ({
               const { finalPrice } = calculateMarketplacePrice(basePrice, item, marketplaces);
               const displayLocal =
                 finalPrice > 0 ? finalPrice.toFixed(2) : item?.price || '';
+              const originalProductPrice =
+                basePrice > 0
+                  ? (basePrice % 1 === 0 ? basePrice.toFixed(0) : basePrice.toFixed(2))
+                  : item?.price || '';
 
               const convertedUsd =
                 finalPrice > 0
@@ -181,9 +185,9 @@ const CartOrderConfirmModal = ({
                                 ? (receivedDisplay === '$' ? `$${finalPrice.toFixed(2)}` : `${finalPrice.toFixed(2)} USD`)
                                 : `$${(convertedUsd ?? finalPrice).toFixed(2)}`}
                             </Text>
-                            {!isUsd && (
+                            {!isUsd && basePrice > 0 && (
                               <Text style={styles.itemOriginalPrice}>
-                                {` (${displayLocal} ${itemCurr})`}
+                                {` (${originalProductPrice} ${itemCurr})`}
                               </Text>
                             )}
                           </View>
