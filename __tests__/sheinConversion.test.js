@@ -417,4 +417,34 @@ describe('Shein Dynamic Currency Selection & Conversion Tests', () => {
     expect(convertedUsd).toBe(8.04);
     expect(convertedUsd).not.toBe(27.40);
   });
+
+  test('17. Shein DevTools screenshot test: SR8.63 with SR currency symbol correctly maps to SAR and converts to USD', () => {
+    const rawPriceText = 'SR8.63';
+    // Test regex: SR8.63 must match SAR detection
+    const isSarDetected = /(?:^|[^a-zA-Z])(?:SAR|SR|RIYAL)(?:[^a-zA-Z]|$)/i.test(rawPriceText);
+    expect(isSarDetected).toBe(true);
+
+    const item = normalizeCartItem({
+      store: 'Shein',
+      url: 'https://m.shein.com/2pcs-1pc-Round-Glasses-Suitable-For-Men-And-Women-Perfect-For-Students-After-Returning-To-School-Can-Be-Used-For-Computer-Gaming-Watching-TV-Or-Using-Mobile-Phone-And-Other-Activities-p-441132028.html',
+      price: '8.63',
+      currency: 'SAR',
+      title: '2pcs/1pc Round Glasses, Suitable For Men And Women',
+    });
+
+    const info = getReceivedCurrencyInfo(item);
+    expect(info.isUsd).toBe(false);
+    expect(info.code).toBe('SAR');
+
+    const basePrice = parsePrice(item.price);
+    expect(basePrice).toBe(8.63);
+
+    const finalPrice = parseFloat((basePrice * 1.10).toFixed(2));
+    expect(finalPrice).toBe(9.49);
+
+    // 9.49 / 3.75 = 2.53 USD
+    const convertedUsd = calculateConvertedPrice(finalPrice, 'SAR', sampleRates, sampleInverseRates);
+    expect(convertedUsd).toBe(2.53);
+    expect(convertedUsd).not.toBe(8.63);
+  });
 });
