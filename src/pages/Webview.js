@@ -1973,22 +1973,9 @@ export default function Webview({ route, navigation }) {
               if (price) break;
             }
 
-            // Prioritize on-screen symbols over stale server/cookie state
-            if (!currency && price) {
-              try {
-                var bodySnippet = document.body ? document.body.innerText.slice(0, 4000) : '';
-                if (new RegExp(price.replace('.', '\\.') + '\\s*(?:AED|د\\.?إ|درهم|\\u20C3)').test(bodySnippet) || /د\.?إ|درهم|\bAED\b|\u20C3/i.test(bodySnippet.slice(0, 1500))) {
-                  currency = 'AED';
-                } else if (new RegExp(price.replace('.', '\\.') + '\\s*(?:SAR|ر\\.?س|ريال|[﷼\\uFDFC\\u20C1⃁])').test(bodySnippet) || /[﷼\\uFDFC\\u20C1⃁]|ر\\.?س|ريال|\\bSAR\b/i.test(bodySnippet.slice(0, 1500))) {
-                  currency = 'SAR';
-                } else if (new RegExp('\\$\\s*' + price.replace('.', '\\.')).test(bodySnippet) || bodySnippet.indexOf('$' + price) > -1) {
-                  currency = 'USD';
-                }
-              } catch(_eScan) {}
-            }
-
-            // Check Shein native cookie, gbCommonInfo runtime, or localStorage
-            if (!currency) {
+            // For Shein: Client-side cookie, runtime gbCommonInfo, and localStorage are the absolute ground truth!
+            var isSheinSite = (window.location && window.location.hostname && window.location.hostname.indexOf('shein.') > -1);
+            if (isSheinSite && !currency) {
               try {
                 if (document.cookie) {
                   var nativeCookie = document.cookie.match(/(?:^|;\s*)currency=([A-Za-z]{3})(?:;|$)/i);
@@ -2000,7 +1987,7 @@ export default function Webview({ route, navigation }) {
                     var cookieMatch = document.cookie.match(/(?:^|;\s*)(?:currency|shein_currency|sitecurrency|local_currency|user_currency)=([A-Za-z]{3})/i);
                     if (cookieMatch && cookieMatch[1]) {
                       var cVal = cookieMatch[1].toUpperCase();
-                      if (/^[A-Z]{3}$/.test(cVal)) currency = cVal;
+                      if (['USD', 'SAR', 'AED', 'TRY', 'EUR', 'GBP'].indexOf(cVal) > -1) currency = cVal;
                     }
                   }
                 }
@@ -2012,10 +1999,37 @@ export default function Webview({ route, navigation }) {
                   var lsCur = window.localStorage.getItem('currency') || window.localStorage.getItem('shein_currency') || window.localStorage.getItem('currency_code');
                   if (lsCur && typeof lsCur === 'string') {
                     lsCur = lsCur.trim().toUpperCase().replace(/[^A-Z]/g, '');
-                    if (lsCur.length === 3) currency = lsCur;
+                    if (['USD', 'SAR', 'AED', 'TRY', 'EUR', 'GBP'].indexOf(lsCur) > -1) currency = lsCur;
                   }
                 }
-              } catch(_eCk) {}
+              } catch(_eShNative) {}
+            }
+
+            // On-screen symbols on price element
+            if (!currency && price) {
+              try {
+                var bodySnippet = document.body ? document.body.innerText.slice(0, 4000) : '';
+                if (new RegExp(price.replace('.', '\\.') + '\\s*(?:AED|د\\.?إ|د\\.?ا|درهم|\\u20C3)').test(bodySnippet) || /د\.?إ|د\.?ا|درهم|\bAED\b|\u20C3/i.test(bodySnippet.slice(0, 1500))) {
+                  currency = 'AED';
+                } else if (new RegExp(price.replace('.', '\\.') + '\\s*(?:SAR|ر\\.?س|ريال|[﷼\\uFDFC\\u20C1⃁])').test(bodySnippet) || /[﷼\\uFDFC\\u20C1⃁]|ر\\.?س|ريال|\\bSAR\b/i.test(bodySnippet.slice(0, 1500))) {
+                  currency = 'SAR';
+                } else if (!isSheinSite && (new RegExp('\\$\\s*' + price.replace('.', '\\.')).test(bodySnippet) || bodySnippet.indexOf('$' + price) > -1)) {
+                  currency = 'USD';
+                }
+              } catch(_eScan) {}
+            }
+
+            // General non-Shein fallback cookie / storage check
+            if (!currency) {
+              try {
+                if (document.cookie) {
+                  var genCookie = document.cookie.match(/(?:^|;\s*)currency=([A-Za-z]{3})(?:;|$)/i);
+                  if (genCookie && genCookie[1]) {
+                    var gcVal = genCookie[1].toUpperCase();
+                    if (/^[A-Z]{3}$/.test(gcVal)) currency = gcVal;
+                  }
+                }
+              } catch(_eGenCk) {}
             }
 
             if (!currency && window.location && window.location.href) {
@@ -3217,8 +3231,13 @@ export default function Webview({ route, navigation }) {
                 if (isSheinUrl(currentUrlRef.current)) {
                   const upperCur = currencyRef.current.toUpperCase();
                   if (['USD', 'SAR', 'AED', 'TRY', 'EUR', 'GBP'].includes(upperCur)) {
-                    sheinCurrencyRef.current = upperCur;
-                    AsyncStorage.setItem('@shein_user_currency', upperCur).catch(() => {});
+                    if (upperCur === 'USD' && (sheinCurrencyRef.current === 'AED' || sheinCurrencyRef.current === 'SAR')) {
+                      // Preserve existing AED/SAR selection, do not let generic USD overwrite
+                    } else {
+                      sheinCurrencyRef.current = upperCur;
+                      setSavedSheinCurrency(upperCur);
+                      AsyncStorage.setItem('@shein_user_currency', upperCur).catch(() => {});
+                    }
                   }
                 }
               }
