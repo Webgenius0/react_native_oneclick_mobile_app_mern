@@ -504,10 +504,11 @@ describe('Shein Dynamic Currency Selection & Conversion Tests', () => {
     expect(info1.code).toBe('USD');
     const base1 = parsePrice(item1.price);
     expect(base1).toBe(45.29);
-    // USD Shein items have 0% markup and exact dollar price
-    const final1 = base1;
+    // Dynamic commission applies to USD items just like other currencies
+    const final1 = parseFloat((base1 * 1.10).toFixed(2));
+    expect(final1).toBe(49.82);
     const converted1 = info1.isUsd ? final1 : calculateConvertedPrice(final1, info1.code, sampleRates, sampleInverseRates);
-    expect(converted1).toBe(45.29);
+    expect(converted1).toBe(49.82);
 
     // Item 2: DAZY in SAR (186.58 SAR)
     const item2 = normalizeCartItem({
@@ -653,7 +654,7 @@ describe('Shein Dynamic Currency Selection & Conversion Tests', () => {
     const convertedAed = calculateConvertedPrice(finalAed, 'AED', aedRates, aedInverseRates);
     expect(convertedAed).toBe(54.85);
 
-    // 3. USD Product (Screenshot 3 item 1): $45.29 USD
+    // 3. USD Product: $45.29 USD (dynamic 10% commission applied just like other currencies)
     const itemUsd = normalizeCartItem({
       store: 'Shein',
       url: 'https://m.shein.com/item-blazer.html',
@@ -666,8 +667,13 @@ describe('Shein Dynamic Currency Selection & Conversion Tests', () => {
     expect(infoUsd.code).toBe('USD');
     const baseUsd = parsePrice(itemUsd.price);
     expect(baseUsd).toBe(45.29);
-    // 0% commission for USD Shein
-    const finalUsd = baseUsd;
-    expect(finalUsd).toBe(45.29);
+    // Dynamic commission (e.g. 10%) applied to USD just like other currencies
+    const finalUsd = parseFloat((baseUsd * 1.10).toFixed(2));
+    expect(finalUsd).toBe(49.82);
+
+    // 4. USD Product ($57.29 user example):
+    const base57 = 57.29;
+    const final57 = parseFloat((base57 * 1.10).toFixed(2));
+    expect(final57).toBe(63.02);
   });
 });

@@ -2,6 +2,7 @@
  * Helper to identify store name based on URL host or route params.
  */
 import { getReceivedCurrencyInfo } from './currencyHelper';
+import { useSheinPriceStore } from '../store/useSheinPriceStore';
 
 export const getStoreNameFromUrl = url => {
   if (!url || typeof url !== 'string') {
@@ -521,7 +522,6 @@ export const calculateMarketplacePrice = (basePrice, item, marketplaces = []) =>
     };
   }
 
-  const { isUsd } = getReceivedCurrencyInfo(item);
   const isShein = Boolean(
     (item?.store && String(item.store).toLowerCase().includes('shein')) ||
     (item?.url && String(item.url).toLowerCase().includes('shein.com')) ||
@@ -529,8 +529,23 @@ export const calculateMarketplacePrice = (basePrice, item, marketplaces = []) =>
   );
 
   const matched = findMarketplaceForItem(item, marketplaces);
-  // For Shein items, commission percent applies ONLY to non-USD items (AED, SAR, etc.); USD items have 0% commission
-  const percent = (isShein && isUsd) ? 0 : (matched && Number(matched.percent) > 0 ? Number(matched.percent) : 0);
+  // Dynamic commission percent from GET /api/marketplace-price for all items & currencies (including USD)
+  let percent = matched && Number(matched.percent) > 0 ? Number(matched.percent) : 0;
+  if (percent === 0 && isShein) {
+    try {
+      const sheinStore = useSheinPriceStore?.getState ? useSheinPriceStore.getState() : null;
+      if (sheinStore) {
+        const storedPercent = Number(
+          sheinStore.percent ||
+          sheinStore.sheinPercent ||
+          (sheinStore.marketplaceRates && sheinStore.marketplaceRates.shein) ||
+          0,
+        );
+        if (storedPercent > 0) percent = storedPercent;
+      }
+    } catch (_e) {}
+  }
+
   const percentAmount = percent > 0 ? numericPrice * (percent / 100) : 0;
   const finalPrice = parseFloat((numericPrice + percentAmount).toFixed(2));
 
