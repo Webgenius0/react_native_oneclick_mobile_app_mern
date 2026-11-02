@@ -1046,8 +1046,10 @@ export default function Webview({ route, navigation }) {
   });
   const pendingOptionsResolveRef = useRef(null);
   const pendingSnapshotResolveRef = useRef(null);
+  const isSoldOutRef = useRef(false);
 
   const resetOptionsRef = useCallback(() => {
+    isSoldOutRef.current = false;
     optionsRef.current = {
       hasOptions: false,
       options: [],
@@ -2820,8 +2822,48 @@ export default function Webview({ route, navigation }) {
             var isSarInBody = !!(document.body && (/[﷼\uFDFC\u20C1⃁]|ر\.?س|ريال|\bSAR\b/i.test(document.body.innerText.slice(0, 3000))));
             var isAedInBody = !!(document.body && (/د\.?إ|درهم|\bAED\b/i.test(document.body.innerText.slice(0, 3000))));
 
+            var isSoldOut = false;
+            try {
+              if (window.goodsInfo && (window.goodsInfo.is_on_sale === 0 || window.goodsInfo.stock === 0 || window.goodsInfo.stock_num === 0)) {
+                isSoldOut = true;
+              }
+              var shDataSnap2 = window.productIntroData || window.gbProductIntroData;
+              if (shDataSnap2 && shDataSnap2.detail) {
+                if (shDataSnap2.detail.is_on_sale === 0) isSoldOut = true;
+                if (shDataSnap2.detail.currentSku && shDataSnap2.detail.currentSku.stock === 0) isSoldOut = true;
+              }
+              if (window.gbCommonInfo && window.gbCommonInfo.contextForSSR && window.gbCommonInfo.contextForSSR.detail) {
+                var ssrDetSnap2 = window.gbCommonInfo.contextForSSR.detail;
+                if (ssrDetSnap2.is_on_sale === 0) isSoldOut = true;
+                if (ssrDetSnap2.currentSku && ssrDetSnap2.currentSku.stock === 0) isSoldOut = true;
+              }
+              if (!isSoldOut) {
+                var soCandidates2 = document.querySelectorAll(
+                  'button, [role="button"], input[type="button"], input[type="submit"], .she-btn-black, .she-btn-gray, .bsc-sold-out, .goods-soldout, .sold-out-tag, .product-intro__sold-out, [class*="soldout" i], [class*="sold-out" i], [class*="out-of-stock" i], [class*="outOfStock" i], [class*="add-to-bag"], [class*="addToBag"], [class*="add-to-cart"], [class*="addToCart"]'
+                );
+                var soPhrases2 = [
+                  'sold out', 'out of stock', 'remind me',
+                  'نفدت الكمية', 'غير متوفر',
+                  'tükendi', 'stokta yok'
+                ];
+                for (var si2 = 0; si2 < soCandidates2.length; si2++) {
+                  var soEl2 = soCandidates2[si2];
+                  var soText2 = (soEl2.innerText || soEl2.textContent || soEl2.value || soEl2.getAttribute('aria-label') || '').trim().toLowerCase();
+                  if (!soText2) continue;
+                  for (var spi2 = 0; spi2 < soPhrases2.length; spi2++) {
+                    if (soText2 === soPhrases2[spi2] || soText2.indexOf(soPhrases2[spi2]) > -1) {
+                      isSoldOut = true;
+                      break;
+                    }
+                  }
+                  if (isSoldOut) break;
+                }
+              }
+            } catch (_eSoSnap2) {}
+
             var snapshot = {
-              isProduct: isProduct,
+              isProduct: isProduct && !isSoldOut,
+              isSoldOut: isSoldOut,
               title: title,
               image: image,
               price: price,
@@ -2895,6 +2937,18 @@ export default function Webview({ route, navigation }) {
         if (freshSnapshot.currency) currencyRef.current = freshSnapshot.currency;
       } else if (titleRef.current && /product summary|key product information/i.test(titleRef.current)) {
         titleRef.current = '';
+      }
+
+      if (freshSnapshot?.isSoldOut === true || isSoldOutRef.current) {
+        setIsAddingToCart(false);
+        isAddingRef.current = false;
+        setIsProductPage(false);
+        Alert.alert(
+          t('Warning') || 'Warning',
+          t('urunTukendi') || 'This product is currently out of stock / sold out.',
+          [{ text: t('OK') || 'OK' }],
+        );
+        return;
       }
 
       // --- Determine whether the current page is a product page ---
@@ -3225,8 +3279,13 @@ export default function Webview({ route, navigation }) {
           }
           case 'isProductPage': {
             const isProd = !!message?.data?.isProduct;
+            const isSold = !!message?.data?.isSoldOut;
             const msgUrl = message?.data?.url;
-            if (isProd) {
+            if (isSold) {
+              isSoldOutRef.current = true;
+              setIsProductPage(false);
+            } else if (isProd) {
+              isSoldOutRef.current = false;
               setIsProductPage(true);
             } else if (msgUrl && !isProductUrl(msgUrl)) {
               setIsProductPage(false);
@@ -3269,8 +3328,13 @@ export default function Webview({ route, navigation }) {
           }
           case 'productDetailsSnapshot': {
             if (message.data && typeof message.data === 'object') {
-              if (message.data.isProduct === true || (message.data.title && (message.data.price || message.data.image))) {
-                setIsProductPage(true);
+              if (message.data.isSoldOut === true) {
+                isSoldOutRef.current = true;
+                setIsProductPage(false);
+              } else if (message.data.isProduct === true || (message.data.title && (message.data.price || message.data.image))) {
+                if (!isSoldOutRef.current) {
+                  setIsProductPage(true);
+                }
               }
               if (message.data.title) titleRef.current = cleanProductTitle(String(message.data.title).trim(), currentUrlRef.current);
               if (message.data.image) imageRef.current = normalizeProductImageUrl(String(message.data.image).trim());
@@ -3414,7 +3478,9 @@ export default function Webview({ route, navigation }) {
     injectTrendyolCookies(currentUrlRef.current);
     scheduleInject(currentUrlRef.current);
     if (isProductUrl(currentUrlRef.current)) {
-      setIsProductPage(true);
+      if (!isSoldOutRef.current) {
+        setIsProductPage(true);
+      }
     }
   }, [injectTrendyolCookies, scheduleInject]);
 
@@ -3427,6 +3493,7 @@ export default function Webview({ route, navigation }) {
           imageRef.current = '';
           priceRef.current = '';
           currencyRef.current = '';
+          isSoldOutRef.current = false;
           resetOptionsRef();
         }
       }
@@ -3435,7 +3502,13 @@ export default function Webview({ route, navigation }) {
       loadingRef.current = !!navState.loading;
       setTranslateUrl(currentUrlRef.current);
       injectTrendyolCookies(currentUrlRef.current);
-      setIsProductPage(isProductUrl(currentUrlRef.current));
+      if (isProductUrl(currentUrlRef.current)) {
+        if (!isSoldOutRef.current) {
+          setIsProductPage(true);
+        }
+      } else {
+        setIsProductPage(false);
+      }
 
       if (!navState.loading) {
         scheduleInject(currentUrlRef.current);

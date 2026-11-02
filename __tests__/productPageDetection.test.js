@@ -384,6 +384,166 @@ describe('Product Page & Add to Cart Detection Bridge', () => {
     expect(lastMsg.type).toBe('isProductPage');
     expect(lastMsg.data.isProduct).toBe(true);
   });
+
+  test('Scenario 11: Shein product page with "Sold Out" button -> button hidden (isProduct: false, isSoldOut: true)', () => {
+    mockWindow.location.href = 'https://m.shein.com/ar-en/item-p-100188201.html';
+    mockWindow.location.pathname = '/ar-en/item-p-100188201.html';
+
+    const soldOutBtn = {
+      innerText: 'Sold Out',
+      disabled: true,
+      getAttribute: () => 'true',
+      getBoundingClientRect: () => ({ width: 160, height: 48 }),
+      offsetWidth: 160,
+      offsetHeight: 48,
+      style: { display: 'block', visibility: 'visible', opacity: '1' },
+    };
+
+    const mockDocument = {
+      querySelectorAll: (selector) => {
+        if (selector.includes('she-btn') || selector.includes('button')) {
+          return [soldOutBtn];
+        }
+        return [];
+      },
+      querySelector: () => ({}),
+      body: {},
+    };
+
+    runBridgeInContext(mockWindow, mockDocument);
+
+    expect(postedMessages.length).toBeGreaterThan(0);
+    const lastMsg = postedMessages[postedMessages.length - 1];
+    expect(lastMsg.type).toBe('isProductPage');
+    expect(lastMsg.data.isProduct).toBe(false);
+    expect(lastMsg.data.isSoldOut).toBe(true);
+  });
+
+  test('Scenario 12: Shein product page with Arabic "نفدت الكمية" -> button hidden (isProduct: false, isSoldOut: true)', () => {
+    mockWindow.location.href = 'https://m.shein.com/ar/item-p-100188201.html';
+    mockWindow.location.pathname = '/ar/item-p-100188201.html';
+
+    const soldOutArabicBtn = {
+      innerText: 'نفدت الكمية',
+      disabled: false,
+      getAttribute: () => null,
+      getBoundingClientRect: () => ({ width: 160, height: 48 }),
+      offsetWidth: 160,
+      offsetHeight: 48,
+      style: { display: 'block', visibility: 'visible', opacity: '1' },
+    };
+
+    const mockDocument = {
+      querySelectorAll: (selector) => {
+        if (selector.includes('button') || selector.includes('.she-btn-black')) {
+          return [soldOutArabicBtn];
+        }
+        return [];
+      },
+      querySelector: () => ({}),
+      body: {},
+    };
+
+    runBridgeInContext(mockWindow, mockDocument);
+
+    expect(postedMessages.length).toBeGreaterThan(0);
+    const lastMsg = postedMessages[postedMessages.length - 1];
+    expect(lastMsg.type).toBe('isProductPage');
+    expect(lastMsg.data.isProduct).toBe(false);
+    expect(lastMsg.data.isSoldOut).toBe(true);
+  });
+
+  test('Scenario 13: Shein product page with "Remind Me" -> isSoldOut: true', () => {
+    mockWindow.location.href = 'https://m.shein.com/item-p-100188201.html';
+    mockWindow.location.pathname = '/item-p-100188201.html';
+
+    const restockBtn = {
+      innerText: 'Remind Me',
+      disabled: false,
+      getAttribute: () => null,
+      getBoundingClientRect: () => ({ width: 160, height: 48 }),
+      offsetWidth: 160,
+      offsetHeight: 48,
+      style: { display: 'block', visibility: 'visible', opacity: '1' },
+    };
+
+    const mockDocument = {
+      querySelectorAll: (selector) => {
+        if (selector.includes('button')) {
+          return [restockBtn];
+        }
+        return [];
+      },
+      querySelector: () => ({}),
+      body: {},
+    };
+
+    runBridgeInContext(mockWindow, mockDocument);
+
+    expect(postedMessages.length).toBeGreaterThan(0);
+    const lastMsg = postedMessages[postedMessages.length - 1];
+    expect(lastMsg.type).toBe('isProductPage');
+    expect(lastMsg.data.isProduct).toBe(false);
+    expect(lastMsg.data.isSoldOut).toBe(true);
+  });
+
+  test('Scenario 14: Shein product with goodsInfo.stock === 0 in runtime JS -> isSoldOut: true', () => {
+    mockWindow.location.href = 'https://m.shein.com/item-p-100188201.html';
+    mockWindow.location.pathname = '/item-p-100188201.html';
+    mockWindow.goodsInfo = {
+      goods_id: 100188201,
+      stock: 0,
+      is_on_sale: 0,
+    };
+
+    const mockDocument = {
+      querySelectorAll: () => [],
+      querySelector: () => ({}),
+      body: {},
+    };
+
+    runBridgeInContext(mockWindow, mockDocument);
+
+    expect(postedMessages.length).toBeGreaterThan(0);
+    const lastMsg = postedMessages[postedMessages.length - 1];
+    expect(lastMsg.type).toBe('isProductPage');
+    expect(lastMsg.data.isProduct).toBe(false);
+    expect(lastMsg.data.isSoldOut).toBe(true);
+  });
+
+  test('Scenario 15: Shein product page with .bsc-sold-out badge -> isSoldOut: true', () => {
+    mockWindow.location.href = 'https://m.shein.com/item-p-100188201.html';
+    mockWindow.location.pathname = '/item-p-100188201.html';
+
+    const soldOutBadge = {
+      innerText: 'Sold Out',
+      disabled: false,
+      getAttribute: () => null,
+      getBoundingClientRect: () => ({ width: 80, height: 24 }),
+      offsetWidth: 80,
+      offsetHeight: 24,
+      style: { display: 'block', visibility: 'visible', opacity: '1' },
+    };
+
+    const mockDocument = {
+      querySelectorAll: (selector) => {
+        if (selector.includes('.bsc-sold-out')) {
+          return [soldOutBadge];
+        }
+        return [];
+      },
+      querySelector: () => ({}),
+      body: {},
+    };
+
+    runBridgeInContext(mockWindow, mockDocument);
+
+    expect(postedMessages.length).toBeGreaterThan(0);
+    const lastMsg = postedMessages[postedMessages.length - 1];
+    expect(lastMsg.type).toBe('isProductPage');
+    expect(lastMsg.data.isProduct).toBe(false);
+    expect(lastMsg.data.isSoldOut).toBe(true);
+  });
 });
 
 describe('URL Comparison & Stale Message Prevention', () => {

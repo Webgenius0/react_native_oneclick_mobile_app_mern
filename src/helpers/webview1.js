@@ -77,6 +77,7 @@ export const injectedJavascript = params => {
 
   str += getProductOptionsBridge(page_url);
   str += getProductSnapshotBridge(page_url);
+  str += checkProductPageBridge(page_url);
 
   if (params?.translatePage) {
     str += params.translatePage;
@@ -2145,6 +2146,7 @@ export const getProductSnapshotBridge = page_url => {
         image: '',
         price: '',
         currency: '',
+        isSoldOut: false,
       };
 
       // 1. Title
@@ -2993,6 +2995,47 @@ export const getProductSnapshotBridge = page_url => {
         if (snapshot.currency === '$') snapshot.currency = 'USD';
         if (snapshot.currency === '€') snapshot.currency = 'EUR';
         if (snapshot.currency === '£') snapshot.currency = 'GBP';
+
+        // Check if product or selected variant is sold out
+        try {
+          var isSoldOut = false;
+          if (window.goodsInfo && (window.goodsInfo.is_on_sale === 0 || window.goodsInfo.stock === 0 || window.goodsInfo.stock_num === 0)) {
+            isSoldOut = true;
+          }
+          var shDataSnap = window.productIntroData || window.gbProductIntroData;
+          if (shDataSnap && shDataSnap.detail) {
+            if (shDataSnap.detail.is_on_sale === 0) isSoldOut = true;
+            if (shDataSnap.detail.currentSku && shDataSnap.detail.currentSku.stock === 0) isSoldOut = true;
+          }
+          if (window.gbCommonInfo && window.gbCommonInfo.contextForSSR && window.gbCommonInfo.contextForSSR.detail) {
+            var ssrDetSnap = window.gbCommonInfo.contextForSSR.detail;
+            if (ssrDetSnap.is_on_sale === 0) isSoldOut = true;
+            if (ssrDetSnap.currentSku && ssrDetSnap.currentSku.stock === 0) isSoldOut = true;
+          }
+          if (!isSoldOut) {
+            var soCandidates = document.querySelectorAll(
+              'button, [role="button"], input[type="button"], input[type="submit"], .she-btn-black, .she-btn-gray, .bsc-sold-out, .goods-soldout, .sold-out-tag, .product-intro__sold-out, [class*="soldout" i], [class*="sold-out" i], [class*="out-of-stock" i], [class*="outOfStock" i], [class*="add-to-bag"], [class*="addToBag"], [class*="add-to-cart"], [class*="addToCart"]'
+            );
+            var soPhrases = [
+              'sold out', 'out of stock', 'remind me',
+              'نفدت الكمية', 'غير متوفر',
+              'tükendi', 'stokta yok'
+            ];
+            for (var si = 0; si < soCandidates.length; si++) {
+              var soEl = soCandidates[si];
+              var soText = (soEl.innerText || soEl.textContent || soEl.value || soEl.getAttribute('aria-label') || '').trim().toLowerCase();
+              if (!soText) continue;
+              for (var spi = 0; spi < soPhrases.length; spi++) {
+                if (soText === soPhrases[spi] || soText.indexOf(soPhrases[spi]) > -1) {
+                  isSoldOut = true;
+                  break;
+                }
+              }
+              if (isSoldOut) break;
+            }
+          }
+          snapshot.isSoldOut = isSoldOut;
+        } catch (_eSoSnap) {}
       } catch(e) {}
 
       return snapshot;
@@ -3037,22 +3080,23 @@ export const checkProductPageBridge = page_url => {
     var maxAttempts = 25;
     var lastPostedState = null;
 
-    var postStatus = function(isProduct, currentHref) {
+    var postStatus = function(isProduct, isSoldOut, currentHref) {
       if (window.ReactNativeWebView && typeof window.ReactNativeWebView.postMessage === 'function') {
         window.ReactNativeWebView.postMessage(JSON.stringify({
           type: 'isProductPage',
           data: {
             isProduct: !!isProduct,
+            isSoldOut: !!isSoldOut,
             url: currentHref || window.location.href
           }
         }));
       }
     };
 
-    var isElementVisible = function(el) {
+    var isElementVisible = function(el, allowDisabled) {
       if (!el) return false;
       try {
-        if (el.disabled || el.getAttribute('aria-disabled') === 'true') {
+        if (!allowDisabled && (el.disabled || el.getAttribute('aria-disabled') === 'true')) {
           return false;
         }
         var style = window.getComputedStyle(el);
@@ -3089,6 +3133,11 @@ export const checkProductPageBridge = page_url => {
         '[class*="addToBag"]',
         '[class*="buy-now"]',
         '[class*="buyNow"]',
+        '.she-btn-black',
+        '.she-btn-gray',
+        '[class*="btn-add-to-bag"]',
+        '[class*="btn-add-cart"]',
+        '[class*="btn-addToBag"]',
         'form[action*="/cart/add"] button[type="submit"]',
         'form[action*="/cart/add"] input[type="submit"]',
         'button[name="add"]',
@@ -3105,12 +3154,10 @@ export const checkProductPageBridge = page_url => {
           if (
             btnText.indexOf('tükendi') > -1 ||
             btnText.indexOf('stokta yok') > -1 ||
-            btnText.indexOf('gelince haber ver') > -1 ||
-            btnText.indexOf('haber ver') > -1 ||
-            btnText.indexOf('out of stock') > -1 ||
             btnText.indexOf('sold out') > -1 ||
-            btnText.indexOf('currently unavailable') > -1 ||
-            btnText.indexOf('notify me') > -1 ||
+            btnText.indexOf('out of stock') > -1 ||
+            btnText.indexOf('remind me') > -1 ||
+            btnText.indexOf('نفدت الكمية') > -1 ||
             btnText.indexOf('غير متوفر') > -1
           ) {
             continue;
@@ -3143,9 +3190,10 @@ export const checkProductPageBridge = page_url => {
         'أضف إلى عربة التسوق', 'أضف إلى السلة', 'اشتري الآن', 'شراء الآن', 'إضافة إلى السلة', 'أضف إلى الحقيبة', 'اضف الى السلة'
       ];
       var invalidPhrases = [
-        'tükendi', 'stokta yok', 'gelince haber ver', 'out of stock', 'sold out',
-        'currently unavailable', 'notify me', 'view cart', 'go to cart', 'sepeti görüntüle',
-        'sepete git', 'sepetim', 'cart', 'basket', 'checkout', 'odeme', 'ödeme'
+        'tükendi', 'stokta yok', 'sold out', 'out of stock', 'remind me',
+        'نفدت الكمية', 'غير متوفر',
+        'view cart', 'go to cart', 'sepeti görüntüle', 'sepete git',
+        'sepetim', 'cart', 'basket', 'checkout', 'odeme', 'ödeme'
       ];
 
       for (var k = 0; k < genericCandidates.length; k++) {
@@ -3171,6 +3219,84 @@ export const checkProductPageBridge = page_url => {
         }
       }
 
+      return false;
+    };
+
+    var checkIsSoldOut = function() {
+      try {
+        if (window.goodsInfo) {
+          if (window.goodsInfo.is_on_sale === 0 || window.goodsInfo.stock === 0 || window.goodsInfo.stock_num === 0) {
+            return true;
+          }
+        }
+        var shData = window.productIntroData || window.gbProductIntroData;
+        if (shData && shData.detail) {
+          if (shData.detail.is_on_sale === 0) return true;
+          if (shData.detail.currentSku && shData.detail.currentSku.stock === 0) return true;
+        }
+        if (window.gbCommonInfo && window.gbCommonInfo.contextForSSR && window.gbCommonInfo.contextForSSR.detail) {
+          var ssrDet = window.gbCommonInfo.contextForSSR.detail;
+          if (ssrDet.is_on_sale === 0) return true;
+          if (ssrDet.currentSku && ssrDet.currentSku.stock === 0) return true;
+        }
+
+        var soldOutSelectors = [
+          '.bsc-sold-out',
+          '.goods-soldout',
+          '.sold-out-tag',
+          '.product-intro__sold-out',
+          '[class*="soldout" i]',
+          '[class*="sold-out" i]',
+          '[class*="out-of-stock" i]',
+          '[class*="outOfStock" i]',
+          '[data-sold-out="true"]',
+          '[data-status="sold_out"]'
+        ];
+        for (var s = 0; s < soldOutSelectors.length; s++) {
+          var soEls = document.querySelectorAll(soldOutSelectors[s]);
+          for (var se = 0; se < soEls.length; se++) {
+            var soEl = soEls[se];
+            if (isElementVisible(soEl, true)) {
+              var sText = (soEl.innerText || soEl.textContent || '').trim().toLowerCase();
+              if (sText && (
+                sText.indexOf('sold out') > -1 ||
+                sText.indexOf('out of stock') > -1 ||
+                sText.indexOf('remind me') > -1 ||
+                sText.indexOf('نفدت الكمية') > -1 ||
+                sText.indexOf('غير متوفر') > -1 ||
+                sText.indexOf('tükendi') > -1 ||
+                sText.indexOf('stokta yok') > -1
+              )) {
+                return true;
+              }
+            }
+          }
+        }
+
+        var btnCandidates = document.querySelectorAll(
+          'button, [role="button"], input[type="button"], input[type="submit"], .she-btn-black, .she-btn-gray, [class*="btn-main"], [class*="btn-primary"], [class*="buy-button"], [class*="cart-button"], [class*="action-button"], [class*="add-to-bag"], [class*="addToBag"], [class*="add-to-cart"], [class*="addToCart"]'
+        );
+        var soldOutPhrases = [
+          'sold out',
+          'out of stock',
+          'remind me',
+          'نفدت الكمية',
+          'غير متوفر',
+          'tükendi',
+          'stokta yok'
+        ];
+        for (var b = 0; b < btnCandidates.length; b++) {
+          var btnItem = btnCandidates[b];
+          if (!isElementVisible(btnItem, true)) continue;
+          var bText = (btnItem.innerText || btnItem.textContent || btnItem.value || btnItem.getAttribute('aria-label') || '').trim().toLowerCase();
+          if (!bText) continue;
+          for (var p = 0; p < soldOutPhrases.length; p++) {
+            if (bText === soldOutPhrases[p] || bText.indexOf(soldOutPhrases[p]) > -1) {
+              return true;
+            }
+          }
+        }
+      } catch (_eSo) {}
       return false;
     };
 
@@ -3263,20 +3389,25 @@ export const checkProductPageBridge = page_url => {
       try {
         var currentHref = window.location.href || '';
         var isSingleProduct = isSingleProductPage(currentHref);
+        var isSoldOut = false;
         var hasBuyButton = false;
 
         if (isSingleProduct) {
-          hasBuyButton = hasActiveCartOrBuyButton();
+          isSoldOut = checkIsSoldOut();
+          if (!isSoldOut) {
+            hasBuyButton = hasActiveCartOrBuyButton();
+          }
         }
 
-        var isProduct = isSingleProduct && hasBuyButton;
+        var isProduct = isSingleProduct && hasBuyButton && !isSoldOut;
 
-        if (lastPostedState !== isProduct) {
-          lastPostedState = isProduct;
-          postStatus(isProduct, currentHref);
+        var stateKey = isProduct ? 'prod' : (isSoldOut ? 'sold' : 'not');
+        if (lastPostedState !== stateKey) {
+          lastPostedState = stateKey;
+          postStatus(isProduct, isSoldOut, currentHref);
         }
 
-        if (isProduct || attempts >= maxAttempts) {
+        if (isProduct || isSoldOut || attempts >= maxAttempts) {
           if (window.__RN_PRODUCT_CHECK_TIMER__) {
             try {
               if (typeof window.clearInterval === 'function') {
