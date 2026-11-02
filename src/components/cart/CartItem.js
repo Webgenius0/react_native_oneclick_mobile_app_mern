@@ -46,6 +46,12 @@ export default function CartItem({
       ? (finalPrice % 1 === 0 ? finalPrice.toFixed(0) : finalPrice.toFixed(2))
       : item?.price || '';
 
+  // Original product price directly as on the product page (no commission markup, exact original price)
+  const originalProductPrice =
+    basePrice > 0
+      ? (basePrice % 1 === 0 ? basePrice.toFixed(0) : basePrice.toFixed(2))
+      : item?.price || '';
+
   const convertedUsd =
     finalPrice > 0
       ? isUsd
@@ -211,9 +217,9 @@ export default function CartItem({
                 {t('Calculating Price...') || 'Calculating price...'}
               </Text>
             )}
-            {!isUsd && finalPrice > 0 ? (
+            {!isUsd && basePrice > 0 ? (
               <Text style={[styles.originalPriceText, { color: subTextColor }]}>
-                {` (${displayPrice} ${itemCurrency})`}
+                {` (${originalProductPrice} ${itemCurrency})`}
               </Text>
             ) : null}
           </View>

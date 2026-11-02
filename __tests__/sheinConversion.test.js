@@ -417,4 +417,65 @@ describe('Shein Dynamic Currency Selection & Conversion Tests', () => {
     expect(convertedUsd).toBe(8.04);
     expect(convertedUsd).not.toBe(27.40);
   });
+
+  test('17. Shein DevTools screenshot test: SR8.63 with SR currency symbol correctly maps to SAR and converts to USD', () => {
+    const rawPriceText = 'SR8.63';
+    // Test regex: SR8.63 must match SAR detection
+    const isSarDetected = /(?:^|[^a-zA-Z])(?:SAR|SR|RIYAL)(?:[^a-zA-Z]|$)/i.test(rawPriceText);
+    expect(isSarDetected).toBe(true);
+
+    const item = normalizeCartItem({
+      store: 'Shein',
+      url: 'https://m.shein.com/2pcs-1pc-Round-Glasses-Suitable-For-Men-And-Women-Perfect-For-Students-After-Returning-To-School-Can-Be-Used-For-Computer-Gaming-Watching-TV-Or-Using-Mobile-Phone-And-Other-Activities-p-441132028.html',
+      price: '8.63',
+      currency: 'SAR',
+      title: '2pcs/1pc Round Glasses, Suitable For Men And Women',
+    });
+
+    const info = getReceivedCurrencyInfo(item);
+    expect(info.isUsd).toBe(false);
+    expect(info.code).toBe('SAR');
+
+    const basePrice = parsePrice(item.price);
+    expect(basePrice).toBe(8.63);
+
+    const finalPrice = parseFloat((basePrice * 1.10).toFixed(2));
+    expect(finalPrice).toBe(9.49);
+
+    // 9.49 / 3.75 = 2.53 USD
+    const convertedUsd = calculateConvertedPrice(finalPrice, 'SAR', sampleRates, sampleInverseRates);
+    expect(convertedUsd).toBe(2.53);
+    expect(convertedUsd).not.toBe(8.63);
+  });
+
+  test('18. User screenshot scenario (71.90 SAR tracksuit): Converted USD has commission ($21.09), but bracketed original price shows unaltered 71.90 SAR', () => {
+    const item = normalizeCartItem({
+      store: 'Shein',
+      url: 'https://m.shein.com/item-tracksuit.html',
+      price: '71.90',
+      currency: 'SAR',
+      title: "YZMJAFU Women's 2 Pieces Solid Color Sports Set",
+    });
+
+    const info = getReceivedCurrencyInfo(item);
+    expect(info.isUsd).toBe(false);
+    expect(info.code).toBe('SAR');
+
+    // Base/original price from product page
+    const basePrice = parsePrice(item.price);
+    expect(basePrice).toBe(71.90);
+
+    // 10% Shein commission applied to final calculation
+    const finalPrice = parseFloat((basePrice * 1.10).toFixed(2));
+    expect(finalPrice).toBe(79.09);
+
+    // Converted USD: 79.09 / 3.75 = $21.09 (shown in bold orange in cart)
+    const convertedUsd = calculateConvertedPrice(finalPrice, 'SAR', sampleRates, sampleInverseRates);
+    expect(convertedUsd).toBe(21.09);
+
+    // Original local price shown in brackets next to dollar price:
+    const originalProductPrice = basePrice % 1 === 0 ? basePrice.toFixed(0) : basePrice.toFixed(2);
+    expect(originalProductPrice).toBe('71.90'); // Must be 71.90, NOT 79.09!
+    expect(`(${originalProductPrice} ${info.code})`).toBe('(71.90 SAR)');
+  });
 });
