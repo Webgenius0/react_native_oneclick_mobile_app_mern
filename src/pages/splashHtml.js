@@ -117,7 +117,7 @@ export const SPLASH_HTML = `<!DOCTYPE html>
   .play .moto       { animation: ride 0.40s cubic-bezier(.3,.7,.3,1) 1.30s forwards; }
   .play .home       { animation: pop 0.35s cubic-bezier(.2,1.4,.5,1) 1.85s forwards; }
   .play .journey    { animation: journey-out 0.26s cubic-bezier(.6,0,.8,.4) 2.45s forwards; }
-  .play ~ .loader i { animation: load 2.7s cubic-bezier(.4,0,.2,1) forwards; }
+  .play ~ .loader i { animation: load 3.8s cubic-bezier(.4,0,.2,1) forwards; }
 
   @keyframes reveal { to { transform: scaleX(1); } }
   @keyframes takeoff {
@@ -235,7 +235,7 @@ export const SPLASH_HTML = `<!DOCTYPE html>
         window.ReactNativeWebView.postMessage('READY');
       }
     } catch (e) {}
-  }, 2750);
+  }, 4400);
 </script>
 </body>
 </html>`;
