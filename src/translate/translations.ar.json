@@ -145,7 +145,8 @@
         "Koyu Tema": "Koyu Tema",
         "Yeni bir versiyon mevcut Lütfen uygulamayı güncelleyiniz": "Yeni bir versiyon mevcut. Lütfen uygulamayı güncelleyiniz",
         "Güncelleme Gerekli": "Güncelleme Gerekli",
-        "Kur": "Kur"
+        "Kur": "Kur",
+        "urunTukendi": "Bu ürün tükenmiştir."
     },
     "en": {
         "Müşteri Kodu": "Customer Code",
@@ -588,7 +589,8 @@
         "Koyu Tema": "ڕووکاری ڕەش",
         "Yeni bir versiyon mevcut Lütfen uygulamayı güncelleyiniz": "پێویستە نوێکردنی بەرنامەکەیت بکەیت",
         "Güncelleme Gerekli": "پێویستە نوێکردنی بەرنامەکەیت بکەیت",
-        "Kur": "نرخی گۆڕانکاری"
+        "Kur": "نرخی گۆڕانکاری",
+        "urunTukendi": "This product is currently out of stock / sold out."
     },
     "ar": {
         "Müşteri Kodu": " كود العميل",
@@ -735,6 +737,7 @@
         "Koyu Tema": "موضوع داكن",
         "Yeni bir versiyon mevcut Lütfen uygulamayı güncelleyiniz": "تنبيهيوجد تحديث للتطبيقالرجاء تحديث التطبيق",
         "Güncelleme Gerekli": "تحديث مطلوب",
-        "Kur": "سعر الصرف"
+        "Kur": "سعر الصرف",
+        "urunTukendi": "هذا المنتج غير متوفر حالياً / نفدت الكمية."
     }
 }
