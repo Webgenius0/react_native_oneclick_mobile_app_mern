@@ -18,10 +18,10 @@ export default function Splash({ navigation }) {
   const [destination, setDestination] = useState('Onboarding');
 
   useEffect(() => {
-    // Safety timer: animation completes in ~2.75s, fallback guarantee at 3.1s
+    // Safety timer: animation completes in ~3.5s + resting hold, fallback guarantee at 4.8s
     const timer = setTimeout(() => {
       setAnimationDone(true);
-    }, 3100);
+    }, 4800);
 
     const checkState = async () => {
       try {
