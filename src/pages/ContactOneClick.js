@@ -2,9 +2,7 @@ import React, { useContext, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
   Linking,
-  Platform,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -27,13 +25,16 @@ import WhatsappIcon from '../assets/svg/whatsapp.svg';
 import PhoneIcon from '../assets/svg/phone.svg';
 import MailIcon from '../assets/svg/mail.svg';
 import InfoCircleIcon from '../assets/svg/info_circle.svg';
+import YoutubeIcon from '../assets/svg/youtube.svg';
+import FacebookIcon from '../assets/svg/facebook.svg';
+import InstagramIcon from '../assets/svg/instagram.svg';
+import TiktokIcon from '../assets/svg/tiktok.svg';
 
-const { width } = Dimensions.get('window');
-
-export default function ContactOneClick({ navigation, route }) {
+export default function ContactOneClick({ navigation }) {
   const { ctx } = useContext(EmContext);
   const [phoneList, setPhoneList] = useState([]);
   const [socialMedia, setSocialMedia] = useState([]);
+  const [howToOrder, setHowToOrder] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -45,8 +46,15 @@ export default function ContactOneClick({ navigation, route }) {
       if (!isRefresh) {
         const cached = await storageGet('contact_cache');
         if (cached) {
-          if (Array.isArray(cached.phone)) setPhoneList(cached.phone);
-          if (Array.isArray(cached.social)) setSocialMedia(cached.social);
+          if (Array.isArray(cached.phone)) {
+            setPhoneList(cached.phone);
+          }
+          if (Array.isArray(cached.social)) {
+            setSocialMedia(cached.social);
+          }
+          if (cached.howToOrder) {
+            setHowToOrder(cached.howToOrder);
+          }
           setLoading(false);
         }
       }
@@ -58,6 +66,9 @@ export default function ContactOneClick({ navigation, route }) {
         }
         if (Array.isArray(res.data.social)) {
           setSocialMedia(res.data.social);
+        }
+        if (res.data.howToOrder) {
+          setHowToOrder(res.data.howToOrder);
         }
         await storageSet('contact_cache', res.data);
       }
@@ -129,6 +140,48 @@ export default function ContactOneClick({ navigation, route }) {
     }
   };
 
+  const handleHowToOrder = async () => {
+    const ytSocial = socialMedia.find(s => s.ad?.toLowerCase() === 'youtube');
+    const url =
+      howToOrder ||
+      ytSocial?.url ||
+      'https://www.youtube.com';
+    try {
+      await Linking.openURL(url);
+    } catch (e) {
+      Alert.alert(tr('Error') || 'Error', 'Could not open link');
+    }
+  };
+
+  const handleOpenSocial = async platform => {
+    if (platform === 'whatsapp') {
+      return handleWhatsApp();
+    }
+    const target = platform.toLowerCase();
+    const item = socialMedia.find(
+      s =>
+        s.ad?.toLowerCase() === target ||
+        s.url?.toLowerCase().includes(target),
+    );
+    let url = item?.url;
+    if (!url) {
+      if (target === 'instagram') {
+        url = 'https://www.instagram.com';
+      } else if (target === 'facebook') {
+        url = 'https://www.facebook.com';
+      } else if (target === 'tiktok') {
+        url = 'https://www.tiktok.com';
+      }
+    }
+    if (url) {
+      try {
+        await Linking.openURL(url);
+      } catch (e) {
+        Alert.alert(tr('Error') || 'Error', `Could not open ${platform}`);
+      }
+    }
+  };
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: cardBg }]}>
       <StatusBar
@@ -141,11 +194,13 @@ export default function ContactOneClick({ navigation, route }) {
         navigation={navigation}
         showBack={true}
         title={tr('Contact 1 Click') || 'Contact 1 Click'}
-        style={{
-          borderBottomWidth: 1,
-          borderBottomColor: borderColor,
-          backgroundColor: cardBg,
-        }}
+        style={[
+          styles.headerCustom,
+          {
+            borderBottomColor: borderColor,
+            backgroundColor: cardBg,
+          },
+        ]}
       />
 
       <ScrollView
@@ -262,6 +317,54 @@ export default function ContactOneClick({ navigation, route }) {
                 </Text>
               </View>
             </View>
+
+            {/* Top Divider Line */}
+            <View style={[styles.divider, { backgroundColor: borderColor }]} />
+
+            {/* How To Order */}
+            <TouchableOpacity
+              activeOpacity={0.75}
+              style={styles.howToOrderButton}
+              onPress={handleHowToOrder}>
+              <YoutubeIcon width={36} height={26} />
+              <Text style={[styles.howToOrderText, { color: textColor }]}>
+                {tr('Nasıl Sipariş Verilir?') || 'HOW TO ORDER?'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Social Media Row */}
+            <View style={styles.socialRow}>
+              <TouchableOpacity
+                activeOpacity={0.75}
+                style={styles.socialItem}
+                onPress={() => handleWhatsApp()}>
+                <WhatsappIcon width={46} height={46} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.75}
+                style={styles.socialItem}
+                onPress={() => handleOpenSocial('instagram')}>
+                <InstagramIcon width={46} height={46} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.75}
+                style={styles.socialItem}
+                onPress={() => handleOpenSocial('facebook')}>
+                <FacebookIcon width={46} height={46} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.75}
+                style={styles.socialItem}
+                onPress={() => handleOpenSocial('tiktok')}>
+                <TiktokIcon width={46} height={46} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Bottom Divider Line */}
+            <View style={[styles.divider, { backgroundColor: borderColor }]} />
           </>
         )}
       </ScrollView>
@@ -273,6 +376,9 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+  },
+  headerCustom: {
+    borderBottomWidth: 1,
   },
   container: {
     flex: 1,
@@ -407,6 +513,37 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginTop: 4,
   },
+
+  // How to Order & Social
+  howToOrderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  howToOrderText: {
+    fontSize: 16.5,
+    fontWeight: '700',
+    marginLeft: 10,
+    letterSpacing: 0.3,
+  },
+  socialRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 22,
+    paddingVertical: 6,
+  },
+  socialItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 4,
+  },
+
   loadingWrap: {
     paddingTop: 80,
     alignItems: 'center',
