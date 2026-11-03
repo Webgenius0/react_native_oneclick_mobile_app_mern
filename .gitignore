@@ -2,11 +2,8 @@
 .DS_Store
 
 # Environment and local editor settings
-.env
-.env.*
 !.env.example
 .idea/
-.vscode/
 .claude/
 .kiro/
 compile_flags.txt
@@ -95,3 +92,4 @@ xcuserdata/
 * copy.js
 *.js.b*
 .agents
+config.bat
