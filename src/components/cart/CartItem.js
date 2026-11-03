@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   ScrollView,
   TextInput,
   Alert,
+  Keyboard,
 } from 'react-native';
 import FastImage from 'react-native-fast-image';
 import { t, tr } from '../../translate/i18n';
@@ -62,6 +63,71 @@ export default function CartItem({
   const changeItem = (field, value) => {
     onChange(targetId, field, value);
   };
+
+  const [localCustomSize, setLocalCustomSize] = useState(
+    item?.custom_size || '',
+  );
+  const [localDesc, setLocalDesc] = useState(
+    item?.desc || item?.description || '',
+  );
+  const hasCustomDetails = Boolean(
+    (item?.custom_size && String(item.custom_size).trim()) ||
+      (item?.desc && String(item.desc).trim()) ||
+      (item?.description && String(item.description).trim()),
+  );
+  const [isExpanded, setIsExpanded] = useState(hasCustomDetails);
+
+  const debounceTimerRef = useRef(null);
+
+  const handleSizeChange = text => {
+    setLocalCustomSize(text);
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      changeItem('custom_size', text);
+    }, 300);
+  };
+
+  const handleSizeBlur = () => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    changeItem('custom_size', localCustomSize);
+  };
+
+  const handleDescChange = text => {
+    setLocalDesc(text);
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      changeItem('desc', text);
+    }, 300);
+  };
+
+  const handleDescBlur = () => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    changeItem('desc', localDesc);
+  };
+
+  useEffect(() => {
+    setLocalCustomSize(item?.custom_size || '');
+  }, [item?.custom_size]);
+
+  useEffect(() => {
+    setLocalDesc(item?.desc || item?.description || '');
+  }, [item?.desc, item?.description]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   const changeOption = (optionName, selectedValue) => {
     if (typeof onUpdateOption === 'function') {
@@ -148,6 +214,9 @@ export default function CartItem({
   const subTextColor = isDark ? '#9CA3AF' : '#64748B';
   const borderColor = isDark ? '#374151' : '#F1F5F9';
   const stepperBg = isDark ? '#374151' : '#F8FAFC';
+  const inputBg = isDark ? '#111827' : '#F8FAFC';
+  const inputBorder = isDark ? '#374151' : '#E2E8F0';
+  const placeholderColor = isDark ? '#6B7280' : '#94A3B8';
 
   return (
     <View
@@ -299,6 +368,95 @@ export default function CartItem({
           })}
         </View>
       ) : null}
+
+      {/* Optional Custom Size & Description / Notes Section */}
+      <View style={styles.customDetailsSection}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => setIsExpanded(prev => !prev)}
+          style={styles.detailsToggle}>
+          <Text
+            style={[
+              styles.detailsToggleText,
+              { color: hasCustomDetails ? '#F67922' : subTextColor },
+            ]}>
+            {isExpanded ? '− ' : '+ '}
+            {tr('Custom Size & Note (Optional)') ||
+              'Custom Size & Note (Optional)'}
+            {hasCustomDetails && !isExpanded ? ' • Filled' : ''}
+          </Text>
+        </TouchableOpacity>
+
+        {isExpanded && (
+          <View
+            style={[
+              styles.customInputsContainer,
+              {
+                backgroundColor: stepperBg,
+                borderColor: borderColor,
+              },
+            ]}>
+            {/* Custom Size Field */}
+            <View style={styles.customFieldRow}>
+              <Text style={[styles.fieldLabel, { color: subTextColor }]}>
+                {tr('Beden') || 'Size'} ({tr('Optional') || 'Optional'}):
+              </Text>
+              <TextInput
+                style={[
+                  styles.sizeInput,
+                  {
+                    backgroundColor: inputBg,
+                    borderColor: inputBorder,
+                    color: textColor,
+                  },
+                ]}
+                value={localCustomSize}
+                placeholder={
+                  tr('e.g. EU 42, XL, 120cm') || 'e.g. EU 42, XL, 120cm'
+                }
+                placeholderTextColor={placeholderColor}
+                onChangeText={handleSizeChange}
+                onBlur={handleSizeBlur}
+                returnKeyType="done"
+              />
+            </View>
+
+            {/* Description / Special Instruction Field */}
+            <View style={styles.customFieldRow}>
+              <Text style={[styles.fieldLabel, { color: subTextColor }]}>
+                {tr('Açıklama') || 'Note'} ({tr('Optional') || 'Optional'}):
+              </Text>
+              <TextInput
+                style={[
+                  styles.descInput,
+                  {
+                    backgroundColor: inputBg,
+                    borderColor: inputBorder,
+                    color: textColor,
+                  },
+                ]}
+                multiline={true}
+                textAlignVertical="top"
+                value={localDesc}
+                maxLength={500}
+                placeholder={
+                  tr('sepetAciklama') ||
+                  'Description - Model / Weight / Measurement etc.'
+                }
+                placeholderTextColor={placeholderColor}
+                onChangeText={handleDescChange}
+                onBlur={handleDescBlur}
+                returnKeyType="done"
+                onKeyPress={e => {
+                  if (e.nativeEvent.key === 'Enter') {
+                    Keyboard.dismiss();
+                  }
+                }}
+              />
+            </View>
+          </View>
+        )}
+      </View>
     </View>
   );
 }
@@ -442,5 +600,47 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#F67922',
     fontWeight: '600',
+  },
+  customDetailsSection: {
+    marginTop: 8,
+    paddingLeft: 28,
+  },
+  detailsToggle: {
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+  },
+  detailsToggleText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  customInputsContainer: {
+    marginTop: 6,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 8,
+  },
+  customFieldRow: {
+    flexDirection: 'column',
+  },
+  fieldLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  sizeInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 12.5,
+  },
+  descInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 12.5,
+    minHeight: 52,
   },
 });

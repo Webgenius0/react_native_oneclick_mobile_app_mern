@@ -288,6 +288,7 @@ export const normalizeCartItem = item => {
     store: item.store ?? item.storeName ?? '',
     desc: item.desc ?? item.description ?? '',
     description: item.description ?? item.desc ?? '',
+    custom_size: item.custom_size ?? item.customSize ?? '',
     price: newPrice,
     currency: currency,
   };
@@ -445,7 +446,8 @@ const useCartStore = create(
             const updated = {
               ...i,
               [field]: value,
-              ...(field === 'desc' ? { description: value } : {}),
+              ...(field === 'desc' ? { description: value, desc: value } : {}),
+              ...(field === 'description' ? { desc: value, description: value } : {}),
             };
             if (field === 'size' || field === 'color') {
               return normalizeCartItem(updated);
