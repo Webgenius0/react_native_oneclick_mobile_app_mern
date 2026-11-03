@@ -23,6 +23,14 @@ import { supportPhone } from '../../config';
 import WhatsAppIcon from '../assets/svg/whatsapp.svg';
 import { useOrderStore } from '../store/useOrderStore';
 
+const parsePrice = val => {
+  if (val == null) return 0;
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  const str = String(val).replace(/[^0-9.-]/g, '');
+  const parsed = parseFloat(str);
+  return isNaN(parsed) ? 0 : parsed;
+};
+
 export default function OrderDetail({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { ctx } = useContext(EmContext);
@@ -77,15 +85,28 @@ export default function OrderDetail({ route, navigation }) {
       try {
         const timeoutConfig = { timeout: 4000 };
 
-        // Concurrently query order-detail (POST) and order-tracking (GET)
-        const [detailRes, trackingRes] = await Promise.allSettled([
-          ai.post(
+        // Concurrently query order-detail (GET with fallback to POST) and order-tracking (GET)
+        const fetchDetail = async () => {
+          try {
+            const res = await ai.get('order-detail', {
+              params: { id: orderId, ...(grupId ? { grupID: grupId } : {}) },
+              ...timeoutConfig,
+            });
+            if (res?.data && res.data.error === false) {
+              return res;
+            }
+          } catch (_) {}
+          return ai.post(
             'order-detail',
             { id: orderId, grupID: grupId },
             timeoutConfig,
-          ),
+          );
+        };
+
+        const [detailRes, trackingRes] = await Promise.allSettled([
+          fetchDetail(),
           ai.get('order-tracking', {
-            params: { id: orderId, grupID: grupId },
+            params: { id: orderId, ...(grupId ? { grupID: grupId } : {}) },
             ...timeoutConfig,
           }),
         ]);
@@ -105,6 +126,12 @@ export default function OrderDetail({ route, navigation }) {
             setOrder(prev => ({
               ...(prev || {}),
               ...orderData,
+              order_number: raw.order_number || orderData.order_number,
+              order_date: raw.order_date || orderData.order_date,
+              status_banner: raw.status_banner || orderData.status_banner,
+              ordered_items: raw.ordered_items || orderData.ordered_items,
+              price_summary: raw.price_summary || orderData.price_summary,
+              customer_tracking: raw.customer_tracking || orderData.customer_tracking,
               payment_information:
                 orderData.payment_information ||
                 raw.payment_information ||
@@ -125,10 +152,17 @@ export default function OrderDetail({ route, navigation }) {
         if (
           trackingRes.status === 'fulfilled' &&
           trackingRes.value?.data &&
-          trackingRes.value.data.error === false &&
-          trackingRes.value.data.customer_tracking
+          trackingRes.value.data.error === false
         ) {
-          setCustomerTracking(trackingRes.value.data.customer_tracking);
+          const trackData =
+            trackingRes.value.data.customer_tracking ||
+            trackingRes.value.data.tracking;
+          if (trackData) {
+            setCustomerTracking(prev => ({
+              ...(prev || {}),
+              ...trackData,
+            }));
+          }
         }
       } catch (e) {
         console.log('fetchOrderDetail note:', e?.message || e);
@@ -152,6 +186,9 @@ export default function OrderDetail({ route, navigation }) {
   // 3. Normalize Ordered Items list
   const ordersList = useMemo(() => {
     if (!order) return [];
+    if (Array.isArray(order.ordered_items) && order.ordered_items.length > 0) {
+      return order.ordered_items;
+    }
     if (Array.isArray(order.orders) && order.orders.length > 0) {
       return order.orders;
     }
@@ -169,7 +206,7 @@ export default function OrderDetail({ route, navigation }) {
   const orderId =
     order?.id || firstItem.id || route.params?.id || '1CLK-582941';
 
-  const rawDate = order?.tarih || firstItem.tarih;
+  const rawDate = order?.tarih || firstItem.tarih || order?.order_date;
   const formattedDate = rawDate
     ? moment(rawDate).format('MMM DD, YYYY')
     : moment().format('MMM DD, YYYY');
@@ -211,58 +248,63 @@ export default function OrderDetail({ route, navigation }) {
     firstItem?.teslimat_sehir ||
     'Borama';
 
-  // 4. Robust Price Summary Calculations (supports urun_tutar_usd, fiyat_usd, total_usd)
+  // 4. Robust Price Summary Calculations (supports price_summary, urun_tutar_usd, fiyat_usd, total_usd)
   const calculatedItemsSubtotal = useMemo(() => {
     return ordersList.reduce((sum, it) => {
-      const price =
-        parseFloat(
+      const price = parsePrice(
+        it.price ??
           it.fiyat_usd ??
-            it.price_usd ??
-            it.converted_price ??
-            it.tutar_usd ??
-            it.tutar ??
-            it.price ??
-            it.fiyat ??
-            0,
-        ) || 0;
+          it.price_usd ??
+          it.converted_price ??
+          it.tutar_usd ??
+          it.tutar ??
+          it.fiyat ??
+          0,
+      );
       const qty =
-        Number(it.sayi || it.count || it.qty || it.quantity || 1) || 1;
+        Number(it.quantity || it.sayi || it.count || it.qty || 1) || 1;
       return sum + price * qty;
     }, 0);
   }, [ordersList]);
 
   const subtotal =
-    parseFloat(
-      order?.urun_tutar_usd ??
-        order?.subtotal_usd ??
-        order?.subtotal ??
-        order?.urun_fiyat_usd ??
-        (calculatedItemsSubtotal > 0
-          ? calculatedItemsSubtotal
-          : order?.tutar_usd || order?.tutar || firstItem?.tutar || 0),
-    ) || 0;
+    order?.price_summary?.subtotal != null
+      ? parsePrice(order.price_summary.subtotal)
+      : parseFloat(
+          order?.urun_tutar_usd ??
+            order?.subtotal_usd ??
+            order?.subtotal ??
+            order?.urun_fiyat_usd ??
+            (calculatedItemsSubtotal > 0
+              ? calculatedItemsSubtotal
+              : order?.tutar_usd || order?.tutar || firstItem?.tutar || 0),
+        ) || 0;
 
   const shippingCost =
-    parseFloat(
-      order?.nakliye_usd ??
-        order?.nakliye ??
-        order?.shipping_usd ??
-        order?.shipping_cost ??
-        firstItem?.nakliye ??
-        0,
-    ) || 0;
+    order?.price_summary?.shipping != null
+      ? parsePrice(order.price_summary.shipping)
+      : parseFloat(
+          order?.nakliye_usd ??
+            order?.nakliye ??
+            order?.shipping_usd ??
+            order?.shipping_cost ??
+            firstItem?.nakliye ??
+            0,
+        ) || 0;
 
   const finalTotal =
-    parseFloat(
-      order?.total_usd ??
-        order?.tutar_usd ??
-        order?.total ??
-        order?.total_amount ??
-        order?.tutar ??
-        firstItem?.tutar_usd ??
-        firstItem?.tutar ??
-        subtotal + shippingCost,
-    ) || subtotal + shippingCost;
+    order?.price_summary?.total != null
+      ? parsePrice(order.price_summary.total)
+      : parseFloat(
+          order?.total_usd ??
+            order?.tutar_usd ??
+            order?.total ??
+            order?.total_amount ??
+            order?.tutar ??
+            firstItem?.tutar_usd ??
+            firstItem?.tutar ??
+            subtotal + shippingCost,
+        ) || subtotal + shippingCost;
 
   // 5. Accurate Payment Information
   const paymentInfo =
@@ -349,25 +391,44 @@ export default function OrderDetail({ route, navigation }) {
   const subTextColor = isDark ? '#9CA3AF' : '#64748B';
   const borderColor = isDark ? '#374151' : '#F1F5F9';
 
+  const banner = order?.status_banner;
   const displayOrderNumber =
-    customerTracking?.order_number ||
     order?.order_number ||
+    customerTracking?.order_number ||
     (orderId ? `1CLK-${orderId}` : '1CLK-582941');
-  const displayDate = customerTracking?.order_date || formattedDate;
-  const displayStatusTitle = customerTracking?.status_title || statusTitle;
-  const displayStatusDesc = customerTracking?.status_subtitle || statusDesc;
+  const displayDate =
+    order?.order_date ||
+    customerTracking?.order_date ||
+    formattedDate;
+  const displayStatusTitle =
+    banner?.title ||
+    customerTracking?.status_title ||
+    statusTitle;
+  const displayStatusDesc =
+    banner?.subtitle ||
+    customerTracking?.status_subtitle ||
+    statusDesc;
+  const badgeColorKey =
+    banner?.badge_color ||
+    customerTracking?.status_badge_color ||
+    banner?.state ||
+    '';
   const displayBadgeColor =
-    customerTracking?.status_badge_color === 'green'
+    badgeColorKey === 'green'
       ? '#16A34A'
-      : customerTracking?.status_badge_color === 'red'
+      : badgeColorKey === 'red'
       ? '#DC2626'
-      : customerTracking?.status_badge_color === 'orange'
+      : badgeColorKey === 'orange'
       ? '#D97706'
+      : badgeColorKey === 'blue' || badgeColorKey === 'shipped'
+      ? '#2563EB'
       : statusBadgeColor;
 
   const canTrackOrder =
     customerTracking?.can_track !== undefined
       ? Boolean(customerTracking.can_track)
+      : order?.customer_tracking?.can_track !== undefined
+      ? Boolean(order.customer_tracking.can_track)
       : statusNum !== 6 &&
         statusNum !== 7 &&
         statusNum !== 8 &&
@@ -466,6 +527,7 @@ export default function OrderDetail({ route, navigation }) {
                   navigation.navigate('TrackOrder', {
                     id: orderId,
                     s: order,
+                    customerTracking: customerTracking || order?.customer_tracking,
                     statusText: displayStatusTitle,
                     formattedDate: displayDate,
                   });
@@ -542,9 +604,9 @@ export default function OrderDetail({ route, navigation }) {
 
             {ordersList.map((item, idx) => {
               const imgUri =
+                item.image ||
                 item.resim ||
                 item.img ||
-                item.image ||
                 item.pic ||
                 item.photo ||
                 (Array.isArray(item.images) && item.images[0]) ||
@@ -557,22 +619,20 @@ export default function OrderDetail({ route, navigation }) {
                 getStoreName(item.link || item.url, '') ||
                 '1Click Store';
 
-              const itemPrice = (
-                parseFloat(
+              const itemPrice = parsePrice(
+                item.price ??
                   item.fiyat_usd ??
-                    item.price_usd ??
-                    item.converted_price ??
-                    item.tutar_usd ??
-                    item.tutar ??
-                    item.price ??
-                    item.fiyat ??
-                    0,
-                ) || 0
+                  item.price_usd ??
+                  item.converted_price ??
+                  item.tutar_usd ??
+                  item.tutar ??
+                  item.fiyat ??
+                  0,
               ).toFixed(2);
 
               const itemQty =
                 Number(
-                  item.sayi || item.count || item.qty || item.quantity || 1,
+                  item.quantity || item.sayi || item.count || item.qty || 1,
                 ) || 1;
 
               const variantDetails = [
@@ -590,11 +650,11 @@ export default function OrderDetail({ route, navigation }) {
                 .join(' • ');
 
               const itemName = cleanProductTitle(
-                item.ad ||
+                item.name ||
+                  item.ad ||
                   item.title ||
                   item.product_name ||
                   item.urun_adi ||
-                  item.name ||
                   item.acik ||
                   'Product Item',
                 item.link || item.url || '',
@@ -678,6 +738,17 @@ export default function OrderDetail({ route, navigation }) {
                 ${subtotal.toFixed(2)}
               </Text>
             </View>
+
+            {shippingCost > 0 ? (
+              <View style={styles.priceRow}>
+                <Text style={[styles.priceLabel, { color: subTextColor }]}>
+                  {tr('Shipping') || 'Shipping'}
+                </Text>
+                <Text style={[styles.priceValue, { color: textColor }]}>
+                  ${shippingCost.toFixed(2)}
+                </Text>
+              </View>
+            ) : null}
 
             <View
               style={[

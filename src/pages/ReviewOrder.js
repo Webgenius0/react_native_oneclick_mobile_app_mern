@@ -482,22 +482,13 @@ export default function ReviewOrder({ navigation, route }) {
                 item.store || getStoreName(item.url, '') || 'Store';
 
               const basePrice = parsePrice(item?.price) || 0;
-              const isShein = Boolean(
-                (item?.store &&
-                  String(item.store).toLowerCase().includes('shein')) ||
-                  (item?.url &&
-                    String(item.url).toLowerCase().includes('shein.com')) ||
-                  (item?.marketplace &&
-                    String(item.marketplace).toLowerCase().includes('shein')) ||
-                  String(
-                    getStoreName(item?.url, item?.store || ''),
-                  ).toLowerCase() === 'shein',
+              const { finalPrice } = calculateMarketplacePrice(
+                basePrice,
+                item,
+                marketplaces,
               );
               const { code: itemCurrency, isUsd } =
                 getReceivedCurrencyInfo(item);
-              const percentAmount =
-                isShein && !isUsd && safePercent > 0 ? basePrice * (safePercent / 100) : 0;
-              const finalPrice = basePrice + percentAmount;
               const usd = isUsd
                 ? finalPrice
                 : calculateConvertedPrice(
@@ -838,26 +829,13 @@ export default function ReviewOrder({ navigation, route }) {
                 ]}>
                 {items.slice(0, 3).map((item, idx) => {
                   const basePrice = parsePrice(item?.price) || 0;
-                  const isShein = Boolean(
-                    (item?.store &&
-                      String(item.store).toLowerCase().includes('shein')) ||
-                      (item?.url &&
-                        String(item.url).toLowerCase().includes('shein.com')) ||
-                      (item?.marketplace &&
-                        String(item.marketplace)
-                          .toLowerCase()
-                          .includes('shein')) ||
-                      String(
-                        getStoreName(item?.url, item?.store || ''),
-                      ).toLowerCase() === 'shein',
+                  const { finalPrice } = calculateMarketplacePrice(
+                    basePrice,
+                    item,
+                    marketplaces,
                   );
                   const { code: itemCurrency, isUsd } =
                     getReceivedCurrencyInfo(item);
-                  const percentAmount =
-                    isShein && !isUsd && safePercent > 0
-                      ? basePrice * (safePercent / 100)
-                      : 0;
-                  const finalPrice = basePrice + percentAmount;
                   const count = Number(item?.count) > 0 ? Number(item.count) : 1;
                   const usd = isUsd
                     ? finalPrice

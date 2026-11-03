@@ -33,6 +33,7 @@ export default function({ route, navigation }) {
     navigation.setOptions({
       title: (tr("Order Form") || "Order Form") + " - " + route.params.id,
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [state, setState] = useState({
@@ -156,25 +157,33 @@ export default function({ route, navigation }) {
   const fetchOrder = async () => {
     console.log('fetchOrder');
     let ns;
-    const response = await ai.post("order-detail", { id: route.params.id });
+    let response;
+    try {
+      response = await ai.get("order-detail", { params: { id: route.params.id } });
+      if (!response?.data || response.data.error !== false) {
+        throw new Error('Fallback to post');
+      }
+    } catch (_) {
+      response = await ai.post("order-detail", { id: route.params.id });
+    }
     console.log(response.data);
-    if (response.data.error === false) {
-      let s = response.data.s;
+    if (response.data && response.data.error === false) {
+      let s = response.data.s || response.data.data || (Array.isArray(response.data.ordered_items) ? response.data.ordered_items[0] : null) || response.data;
+      const imgUrl = s.img || s.image || s.resim;
       ns = {
         ...state,
-        id: parseInt(s.id),
-        desc: s.acik,
-        qty: s.sayi,
-        url: s.link,
-        link: s.link,
+        id: parseInt(s.id || route.params.id, 10),
+        desc: s.acik || s.name || s.desc,
+        qty: s.sayi || s.quantity || s.qty || 1,
+        url: s.link || s.url,
+        link: s.link || s.url,
         size: s.size,
-        img: s.img,
+        img: imgUrl,
         loading: false,
       };
 
-
-      if(s.img){
-      setUploadFile({ uri: s.img, type: mimeType(s.img), name: "image." + ext(s.img) });
+      if (imgUrl) {
+        setUploadFile({ uri: imgUrl, type: mimeType(imgUrl), name: "image." + ext(imgUrl) });
       }
     } else {
       ns = { ...state, loading: false };
@@ -185,6 +194,7 @@ export default function({ route, navigation }) {
 
   useEffect(() => {
     fetchOrder();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
 
