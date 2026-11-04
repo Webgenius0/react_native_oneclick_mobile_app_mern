@@ -72,3 +72,4 @@ describe('Cart Size and Description Fields Tests', () => {
     expect(submittedSize).toBe('XL');
   });
 });
+
