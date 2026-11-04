@@ -461,8 +461,19 @@ export const getDomainParts = url => {
  * Universal Marketplace Rule Finder:
  * Matches an item by URL domain or store name against the marketplaces list from /api/marketplace-price
  */
-export const findMarketplaceForItem = (item, marketplaces = []) => {
-  if (!item || !Array.isArray(marketplaces) || marketplaces.length === 0) {
+export const findMarketplaceForItem = (item, marketplaces) => {
+  if (!item) return null;
+
+  // If marketplaces is explicitly passed as an array, use it;
+  // otherwise safely fall back to stored marketplaces
+  const activeMarketplaces =
+    Array.isArray(marketplaces)
+      ? marketplaces
+      : (typeof useSheinPriceStore?.getState === 'function'
+          ? useSheinPriceStore.getState()?.marketplaces
+          : []) || [];
+
+  if (!Array.isArray(activeMarketplaces) || activeMarketplaces.length === 0) {
     return null;
   }
 
@@ -473,7 +484,7 @@ export const findMarketplaceForItem = (item, marketplaces = []) => {
   ).toLowerCase();
   const cleanStore = rawStore.replace(/[^a-z0-9]/g, '');
 
-  for (const m of marketplaces) {
+  for (const m of activeMarketplaces) {
     if (!m) continue;
     const mpSlug = String(m.marketplace || '').toLowerCase().trim();
     const cleanMpSlug = mpSlug.replace(/[^a-z0-9]/g, '');
@@ -505,13 +516,29 @@ export const findMarketplaceForItem = (item, marketplaces = []) => {
     }
   }
 
+  // 4. Detected store name fallback from URL
+  const detectedStore = getStoreNameFromUrl(url).toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (detectedStore) {
+    for (const m of activeMarketplaces) {
+      if (!m) continue;
+      const mpSlug = String(m.marketplace || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const mpName = String(m.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (mpSlug && (detectedStore === mpSlug || detectedStore.includes(mpSlug))) {
+        return m;
+      }
+      if (mpName && (detectedStore === mpName || detectedStore.includes(mpName))) {
+        return m;
+      }
+    }
+  }
+
   return null;
 };
 
 /**
  * Calculates marketplace fee and markup for an item
  */
-export const calculateMarketplacePrice = (basePrice, item, marketplaces = []) => {
+export const calculateMarketplacePrice = (basePrice, item, marketplaces) => {
   const numericPrice = typeof basePrice === 'number' ? basePrice : parseFloat(basePrice);
   if (isNaN(numericPrice) || numericPrice <= 0) {
     return {
@@ -522,30 +549,50 @@ export const calculateMarketplacePrice = (basePrice, item, marketplaces = []) =>
     };
   }
 
-  const isShein = Boolean(
-    (item?.store && String(item.store).toLowerCase().includes('shein')) ||
-    (item?.url && String(item.url).toLowerCase().includes('shein.com')) ||
-    (item?.marketplace && String(item.marketplace).toLowerCase().includes('shein'))
-  );
+  // If caller explicitly passed marketplaces (e.g. in tests or component props), respect it
+  const isExplicitList = Array.isArray(marketplaces);
+  const activeMarketplaces =
+    isExplicitList
+      ? marketplaces
+      : (typeof useSheinPriceStore?.getState === 'function'
+          ? useSheinPriceStore.getState()?.marketplaces
+          : []) || [];
 
-  const matched = findMarketplaceForItem(item, marketplaces);
-  // Dynamic commission percent from GET /api/marketplace-price for all items & currencies (including USD)
-  let percent = matched && Number(matched.percent) > 0 ? Number(matched.percent) : 0;
-  if (percent === 0 && isShein) {
-    try {
-      const sheinStore = useSheinPriceStore?.getState ? useSheinPriceStore.getState() : null;
-      if (sheinStore) {
-        const storedPercent = Number(
-          sheinStore.percent ||
-          sheinStore.sheinPercent ||
-          (sheinStore.marketplaceRates && sheinStore.marketplaceRates.shein) ||
-          0,
-        );
-        if (storedPercent > 0) percent = storedPercent;
-      }
-    } catch (_e) {}
+  const matched = findMarketplaceForItem(item, activeMarketplaces);
+
+  let percent = 0;
+  if (matched && matched.percent !== undefined && matched.percent !== null) {
+    const p =
+      typeof matched.percent === 'number'
+        ? matched.percent
+        : parseFloat(String(matched.percent).replace(/%/g, '').trim());
+    if (!isNaN(p) && p > 0) {
+      percent = p;
+    }
   }
 
+  // If not matched directly and caller did not pass an explicit empty list, check rates dictionary
+  if (percent === 0 && !isExplicitList) {
+    try {
+      const storeState = useSheinPriceStore?.getState?.();
+      const rates = storeState?.marketplaceRates || {};
+      const storeKey = String(
+        item?.store ||
+        getStoreName(item?.url, '') ||
+        item?.marketplace ||
+        ''
+      ).toLowerCase().replace(/[^a-z0-9]/g, '');
+
+      if (storeKey && rates[storeKey] !== undefined) {
+        const p = parseFloat(String(rates[storeKey]));
+        if (!isNaN(p) && p > 0) {
+          percent = p;
+        }
+      }
+    } catch (_) {}
+  }
+
+  // If commission is 0 or not configured, NO commission is added to product
   const percentAmount = percent > 0 ? numericPrice * (percent / 100) : 0;
   const finalPrice = parseFloat((numericPrice + percentAmount).toFixed(2));
 

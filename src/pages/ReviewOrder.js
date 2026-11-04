@@ -48,6 +48,15 @@ export default function ReviewOrder({ navigation, route }) {
 
   const { rates, inverseRates } = useExchangeRateStore();
   const marketplaces = useSheinPriceStore(state => state.marketplaces) || [];
+  const fetchMarketplacePrices = useSheinPriceStore(
+    state => state.fetchMarketplacePrices || state.fetchSheinPrice,
+  );
+
+  useEffect(() => {
+    if (typeof fetchMarketplacePrices === 'function') {
+      fetchMarketplacePrices();
+    }
+  }, [fetchMarketplacePrices]);
 
   useEffect(() => {
     async function loadUserCity() {
