@@ -45,7 +45,7 @@ const resolveImageUrl = img => {
   const trimmed = img.trim();
   if (!trimmed) return null;
   if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-    return trimmed;
+    return trimmed.replace(/^http:\/\//i, "https://");
   }
   if (trimmed.startsWith("/")) {
     return `https://1click.thesyndicates.team${trimmed}`;
@@ -174,6 +174,7 @@ export default function BannerList({ route, navigation }) {
   useFocusEffect(
     useCallback(() => {
       fetchData(false);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [ulkeID])
   );
 
@@ -239,6 +240,7 @@ export default function BannerList({ route, navigation }) {
     }, 4500);
 
     return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [carouselSlides.length, activeWidth]);
 
   const handleCarouselScroll = event => {
@@ -289,18 +291,27 @@ export default function BannerList({ route, navigation }) {
           item.img ||
           null;
 
-        const nameLower = storeName.toLowerCase();
-        const linkLower = storeUrl.toLowerCase();
+        const nameClean = storeName.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const linkClean = storeUrl.toLowerCase().replace(/[^a-z0-9]/g, "");
 
         let assetFallback = null;
-        if (nameLower.includes("amazon") || linkLower.includes("amazon")) {
+        if (nameClean.includes("amazon") || linkClean.includes("amazon")) {
           assetFallback = STORE_AMAZON_IMG;
-        } else if (nameLower.includes("shein") || linkLower.includes("shein")) {
+        } else if (nameClean.includes("shein") || linkClean.includes("shein")) {
           assetFallback = STORE_SHEIN_IMG;
-        } else if (nameLower.includes("iherb") || linkLower.includes("iherb")) {
+        } else if (nameClean.includes("iherb") || linkClean.includes("iherb")) {
           assetFallback = STORE_IHERB_IMG;
-        } else if (nameLower.includes("yesstyle") || linkLower.includes("yesstyle")) {
+        } else if (nameClean.includes("yesstyle") || linkClean.includes("yesstyle")) {
           assetFallback = STORE_YESSTYLE_IMG;
+        } else {
+          // Guaranteed fallback from available branded assets so card background is never blank
+          const defaultPool = [
+            STORE_SHEIN_IMG,
+            STORE_AMAZON_IMG,
+            STORE_IHERB_IMG,
+            STORE_YESSTYLE_IMG,
+          ];
+          assetFallback = defaultPool[index % defaultPool.length] || STORE_AMAZON_IMG;
         }
 
         return {
@@ -384,11 +395,21 @@ export default function BannerList({ route, navigation }) {
                         </View>
                       </View>
                     ) : slide.remoteImage ? (
-                      <FastImage
-                        source={{ uri: slide.remoteImage }}
-                        style={styles.heroImage}
-                        resizeMode={FastImage.resizeMode.cover}
-                      />
+                      <View style={[styles.heroBannerWrap, { overflow: "hidden" }]}>
+                        <Image
+                          source={HERO_PEDESTALS_IMG}
+                          style={styles.heroImage}
+                          resizeMode="cover"
+                        />
+                        <FastImage
+                          source={{
+                            uri: slide.remoteImage,
+                            priority: FastImage.priority.high,
+                          }}
+                          style={StyleSheet.absoluteFillObject}
+                          resizeMode={FastImage.resizeMode.cover}
+                        />
+                      </View>
                     ) : (
                       <Image
                         source={slide.image || HERO_PEDESTALS_IMG}
@@ -448,20 +469,8 @@ export default function BannerList({ route, navigation }) {
                   activeOpacity={0.92}
                   onPress={() => handleStorePress(store)}
                   style={styles.cardContainer}>
-                  {/* Full-bleed card background image */}
-                  {store.apiRemoteImg && !failedImages[store.id] ? (
-                    <FastImage
-                      source={{ uri: store.apiRemoteImg }}
-                      style={StyleSheet.absoluteFillObject}
-                      resizeMode={FastImage.resizeMode.cover}
-                      onError={() => {
-                        setFailedImages(prev => ({
-                          ...prev,
-                          [store.id]: true,
-                        }));
-                      }}
-                    />
-                  ) : store.assetImage ? (
+                  {/* 1. Guaranteed Baseline Asset Image Layer: Always mounted underneath, loads in 0ms offline, ensures cards NEVER appear empty */}
+                  {store.assetImage ? (
                     <Image
                       source={store.assetImage}
                       style={StyleSheet.absoluteFillObject}
@@ -475,6 +484,25 @@ export default function BannerList({ route, navigation }) {
                       ]}
                     />
                   )}
+
+                  {/* 2. Dynamic Remote Image Layer: Overlays smoothly when available from API */}
+                  {store.apiRemoteImg && !failedImages[store.id] ? (
+                    <FastImage
+                      source={{
+                        uri: store.apiRemoteImg,
+                        priority: FastImage.priority.high,
+                        cache: FastImage.cacheControl.immutable,
+                      }}
+                      style={StyleSheet.absoluteFillObject}
+                      resizeMode={FastImage.resizeMode.cover}
+                      onError={() => {
+                        setFailedImages(prev => ({
+                          ...prev,
+                          [store.id]: true,
+                        }));
+                      }}
+                    />
+                  ) : null}
 
                   {/* Subtle Gradient Scrim for contrast */}
                   <Svg
