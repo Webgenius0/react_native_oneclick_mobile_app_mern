@@ -23,6 +23,7 @@ export const useSheinPriceStore = create(
       fetchMarketplacePrices: async () => {
         try {
           set({loading: true, error: null});
+          console.log('[MarketplacePrice] Calling GET /api/marketplace-price...');
           const response = await ai.get('marketplace-price');
 
           if (response?.data && response.data.error === false) {
@@ -49,6 +50,12 @@ export const useSheinPriceStore = create(
               : parsePercent(rates.shein ?? 0);
             const sheinPriceVal = Number(sheinItem?.price ?? 0);
 
+            console.log('[MarketplacePrice] API response received successfully:', {
+              marketplacesCount: marketplaces.length,
+              sheinPercent,
+              rates,
+            });
+
             set({
               marketplaces,
               marketplaceRates: rates,
@@ -61,10 +68,11 @@ export const useSheinPriceStore = create(
             });
             return data;
           } else {
+            console.warn('[MarketplacePrice] API responded without error=false:', response?.data);
             set({loading: false});
           }
         } catch (err) {
-          console.log('fetchMarketplacePrices error:', err?.message || err);
+          console.warn('[MarketplacePrice] Axios fetch failed, attempting native fetch fallback:', err?.message || err);
           // Fallback to direct fetch if axios wrapper encounters network issues
           try {
             const directUrl =

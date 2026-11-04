@@ -528,14 +528,23 @@ export const calculateMarketplacePrice = (basePrice, item, marketplaces = []) =>
     (item?.marketplace && String(item.marketplace).toLowerCase().includes('shein'))
   );
 
+  const parsePercent = val => {
+    if (val === null || val === undefined || val === '') return 0;
+    const num =
+      typeof val === 'number'
+        ? val
+        : parseFloat(String(val).replace(/%/g, '').trim());
+    return isNaN(num) ? 0 : num;
+  };
+
   const matched = findMarketplaceForItem(item, marketplaces);
   // Dynamic commission percent from GET /api/marketplace-price for all items & currencies (including USD)
-  let percent = matched && Number(matched.percent) > 0 ? Number(matched.percent) : 0;
+  let percent = matched ? parsePercent(matched.percent) : 0;
   if (percent === 0 && isShein) {
     try {
       const sheinStore = useSheinPriceStore?.getState ? useSheinPriceStore.getState() : null;
       if (sheinStore) {
-        const storedPercent = Number(
+        const storedPercent = parsePercent(
           sheinStore.percent ||
           sheinStore.sheinPercent ||
           (sheinStore.marketplaceRates && sheinStore.marketplaceRates.shein) ||

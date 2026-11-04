@@ -18,6 +18,7 @@ import { cleanProductTitle, getFallbackTitleFromUrl, getStoreName, isProductUrl 
 import { isPlaceholderValue } from '../helpers/variantUtils';
 import { getReceivedCurrencyInfo, calculateConvertedPrice, parsePrice } from '../helpers/currencyHelper';
 import { useExchangeRateStore } from '../store/useExchangeRateStore';
+import { useSheinPriceStore } from '../store/useSheinPriceStore';
 import { t } from '../translate/i18n';
 
 const styles = StyleSheet.create({
@@ -3192,6 +3193,21 @@ export default function Webview({ route, navigation }) {
         try {
           useExchangeRateStore.getState().fetchRates(finalCurrency);
         } catch (_eFr) {}
+      }
+
+      // Wait for dynamic marketplace commission API and exchange rates while loader is visible
+      // Configurable timeout (default 3500ms) to ensure exact amount match from API
+      const MARKETPLACE_API_TIMEOUT_MS = 3500;
+      try {
+        await Promise.race([
+          Promise.all([
+            useSheinPriceStore.getState().fetchMarketplacePrices(),
+            !isUsdFinal ? useExchangeRateStore.getState().fetchRates(finalCurrency) : Promise.resolve(),
+          ]),
+          new Promise(resolve => setTimeout(resolve, MARKETPLACE_API_TIMEOUT_MS)),
+        ]);
+      } catch (_eApiWait) {
+        console.warn('[Webview] Waiting for marketplace API/rates timed out or had error:', _eApiWait);
       }
 
       const baseParsedPrice = parsePrice(resolvedPrice);
