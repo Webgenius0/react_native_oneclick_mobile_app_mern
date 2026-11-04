@@ -65,57 +65,56 @@ export default function CartItem({
   };
 
   const [localCustomSize, setLocalCustomSize] = useState(
-    item?.custom_size || '',
+    item?.custom_size || item?.size || '',
   );
   const [localDesc, setLocalDesc] = useState(
     item?.desc || item?.description || '',
   );
-  const hasCustomDetails = Boolean(
-    (item?.custom_size && String(item.custom_size).trim()) ||
-      (item?.desc && String(item.desc).trim()) ||
-      (item?.description && String(item.description).trim()),
-  );
-  const [isExpanded, setIsExpanded] = useState(hasCustomDetails);
 
-  const debounceTimerRef = useRef(null);
+  const sizeDebounceRef = useRef(null);
+  const descDebounceRef = useRef(null);
 
   const handleSizeChange = text => {
     setLocalCustomSize(text);
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
+    if (sizeDebounceRef.current) {
+      clearTimeout(sizeDebounceRef.current);
     }
-    debounceTimerRef.current = setTimeout(() => {
+    sizeDebounceRef.current = setTimeout(() => {
       changeItem('custom_size', text);
+      changeItem('size', text);
     }, 300);
   };
 
   const handleSizeBlur = () => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
+    if (sizeDebounceRef.current) {
+      clearTimeout(sizeDebounceRef.current);
     }
     changeItem('custom_size', localCustomSize);
+    changeItem('size', localCustomSize);
   };
 
   const handleDescChange = text => {
     setLocalDesc(text);
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
+    if (descDebounceRef.current) {
+      clearTimeout(descDebounceRef.current);
     }
-    debounceTimerRef.current = setTimeout(() => {
+    descDebounceRef.current = setTimeout(() => {
       changeItem('desc', text);
+      changeItem('description', text);
     }, 300);
   };
 
   const handleDescBlur = () => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
+    if (descDebounceRef.current) {
+      clearTimeout(descDebounceRef.current);
     }
     changeItem('desc', localDesc);
+    changeItem('description', localDesc);
   };
 
   useEffect(() => {
-    setLocalCustomSize(item?.custom_size || '');
-  }, [item?.custom_size]);
+    setLocalCustomSize(item?.custom_size || item?.size || '');
+  }, [item?.custom_size, item?.size]);
 
   useEffect(() => {
     setLocalDesc(item?.desc || item?.description || '');
@@ -123,8 +122,11 @@ export default function CartItem({
 
   useEffect(() => {
     return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
+      if (sizeDebounceRef.current) {
+        clearTimeout(sizeDebounceRef.current);
+      }
+      if (descDebounceRef.current) {
+        clearTimeout(descDebounceRef.current);
       }
     };
   }, []);
@@ -369,93 +371,56 @@ export default function CartItem({
         </View>
       ) : null}
 
-      {/* Optional Custom Size & Description / Notes Section */}
-      <View style={styles.customDetailsSection}>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => setIsExpanded(prev => !prev)}
-          style={styles.detailsToggle}>
-          <Text
+      {/* Client Requirement: Always-visible side-by-side preferred size (small) & description/special instructions (longer) */}
+      <View style={styles.customInputsRow}>
+        {/* Preferred Size Field (Small) */}
+        <View style={styles.sizeFieldWrap}>
+          <TextInput
             style={[
-              styles.detailsToggleText,
-              { color: hasCustomDetails ? '#F67922' : subTextColor },
-            ]}>
-            {isExpanded ? '− ' : '+ '}
-            {tr('Custom Size & Note (Optional)') ||
-              'Custom Size & Note (Optional)'}
-            {hasCustomDetails && !isExpanded ? ' • Filled' : ''}
-          </Text>
-        </TouchableOpacity>
-
-        {isExpanded && (
-          <View
-            style={[
-              styles.customInputsContainer,
+              styles.sizeInput,
               {
-                backgroundColor: stepperBg,
-                borderColor: borderColor,
+                backgroundColor: inputBg,
+                borderColor: inputBorder,
+                color: textColor,
               },
-            ]}>
-            {/* Custom Size Field */}
-            <View style={styles.customFieldRow}>
-              <Text style={[styles.fieldLabel, { color: subTextColor }]}>
-                {tr('Beden') || 'Size'} ({tr('Optional') || 'Optional'}):
-              </Text>
-              <TextInput
-                style={[
-                  styles.sizeInput,
-                  {
-                    backgroundColor: inputBg,
-                    borderColor: inputBorder,
-                    color: textColor,
-                  },
-                ]}
-                value={localCustomSize}
-                placeholder={
-                  tr('e.g. EU 42, XL, 120cm') || 'e.g. EU 42, XL, 120cm'
-                }
-                placeholderTextColor={placeholderColor}
-                onChangeText={handleSizeChange}
-                onBlur={handleSizeBlur}
-                returnKeyType="done"
-              />
-            </View>
+            ]}
+            value={localCustomSize}
+            placeholder={tr('Size (e.g. M)') || 'Size (e.g. M)'}
+            placeholderTextColor={placeholderColor}
+            onChangeText={handleSizeChange}
+            onBlur={handleSizeBlur}
+            returnKeyType="done"
+          />
+        </View>
 
-            {/* Description / Special Instruction Field */}
-            <View style={styles.customFieldRow}>
-              <Text style={[styles.fieldLabel, { color: subTextColor }]}>
-                {tr('Açıklama') || 'Note'} ({tr('Optional') || 'Optional'}):
-              </Text>
-              <TextInput
-                style={[
-                  styles.descInput,
-                  {
-                    backgroundColor: inputBg,
-                    borderColor: inputBorder,
-                    color: textColor,
-                  },
-                ]}
-                multiline={true}
-                textAlignVertical="top"
-                value={localDesc}
-                maxLength={500}
-                placeholder={
-                  tr('sepetAciklama') ||
-                  'Description - Model / Weight / Measurement etc.'
-                }
-                placeholderTextColor={placeholderColor}
-                onChangeText={handleDescChange}
-                onBlur={handleDescBlur}
-                returnKeyType="done"
-                onKeyPress={e => {
-                  if (e.nativeEvent.key === 'Enter') {
-                    Keyboard.dismiss();
-                  }
-                }}
-              />
-            </View>
-          </View>
-        )}
+        {/* Description / Special Instructions Field (Longer, next to size) */}
+        <View style={styles.descFieldWrap}>
+          <TextInput
+            style={[
+              styles.descInput,
+              {
+                backgroundColor: inputBg,
+                borderColor: inputBorder,
+                color: textColor,
+              },
+            ]}
+            value={localDesc}
+            maxLength={500}
+            placeholder={
+              tr('Description / Special instructions') ||
+              'Description / instructions...'
+            }
+            placeholderTextColor={placeholderColor}
+            onChangeText={handleDescChange}
+            onBlur={handleDescBlur}
+            returnKeyType="done"
+            onKeyPress={e => {
+              if (e.nativeEvent.key === 'Enter') {
+                Keyboard.dismiss();
+              }
+            }}
+          />
+        </View>
       </View>
     </View>
   );
@@ -601,46 +566,33 @@ const styles = StyleSheet.create({
     color: '#F67922',
     fontWeight: '600',
   },
-  customDetailsSection: {
-    marginTop: 8,
+  customInputsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
     paddingLeft: 28,
-  },
-  detailsToggle: {
-    paddingVertical: 4,
-    alignSelf: 'flex-start',
-  },
-  detailsToggleText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  customInputsContainer: {
-    marginTop: 6,
-    padding: 10,
-    borderRadius: 10,
-    borderWidth: 1,
     gap: 8,
   },
-  customFieldRow: {
-    flexDirection: 'column',
+  sizeFieldWrap: {
+    flex: 0.35,
   },
-  fieldLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    marginBottom: 4,
+  descFieldWrap: {
+    flex: 0.65,
   },
   sizeInput: {
+    height: 38,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    fontSize: 12.5,
+    fontSize: 12,
   },
   descInput: {
+    height: 38,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    fontSize: 12.5,
-    minHeight: 52,
+    fontSize: 12,
   },
 });

@@ -197,11 +197,6 @@ export default function ReviewOrder({ navigation, route }) {
         postData.append('cart[' + i + '][link]', item.url);
         postData.append('cart[' + i + '][sayi]', count);
         postData.append('cart[' + i + '][adet]', count);
-        postData.append('cart[' + i + '][size]', item.size || '');
-        postData.append('cart[' + i + '][color]', item.color || '');
-        postData.append('cart[' + i + '][store]', storeName);
-        postData.append('cart[' + i + '][img]', item.image || item.img || '');
-        postData.append('cart[' + i + '][image]', item.image || item.img || '');
         const customSizeVal = item.custom_size && String(item.custom_size).trim();
         const descVal =
           (item.desc && String(item.desc).trim()) ||
@@ -214,6 +209,11 @@ export default function ReviewOrder({ navigation, route }) {
           .filter(Boolean)
           .join(' | ');
 
+        postData.append('cart[' + i + '][size]', customSizeVal || item.size || '');
+        postData.append('cart[' + i + '][color]', item.color || '');
+        postData.append('cart[' + i + '][store]', storeName);
+        postData.append('cart[' + i + '][img]', item.image || item.img || '');
+        postData.append('cart[' + i + '][image]', item.image || item.img || '');
         postData.append('cart[' + i + '][acik]', combinedDesc);
 
         if (finalPriceVal !== null) {
@@ -521,6 +521,9 @@ export default function ReviewOrder({ navigation, route }) {
               const itemTotalUsd = (usd !== null ? usd : finalPrice) * (item.count || 1);
 
               const variantParts = [];
+              if (item?.custom_size && String(item.custom_size).trim()) {
+                variantParts.push(`Size: ${String(item.custom_size).trim()}`);
+              }
               if (Array.isArray(item?.options) && item.options.length > 0) {
                 item.options.forEach(opt => {
                   if (opt && opt.selected) variantParts.push(opt.selected);
@@ -574,6 +577,14 @@ export default function ReviewOrder({ navigation, route }) {
                         numberOfLines={1}
                         style={[styles.itemVariant, { color: subTextColor }]}>
                         {variantText}
+                      </Text>
+                    ) : null}
+
+                    {item?.desc || item?.description ? (
+                      <Text
+                        numberOfLines={1}
+                        style={[styles.itemVariant, { color: subTextColor, fontStyle: 'italic' }]}>
+                        {item.desc || item.description}
                       </Text>
                     ) : null}
 
