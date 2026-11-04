@@ -494,7 +494,11 @@ export default function ReviewOrder({ navigation, route }) {
                 item.store || getStoreName(item.url, '') || 'Store';
 
               const basePrice = parsePrice(item?.price) || 0;
-              const { finalPrice } = calculateMarketplacePrice(basePrice, item, marketplaces);
+              const { finalPrice } = calculateMarketplacePrice(
+                basePrice,
+                item,
+                marketplaces,
+              );
               const { code: itemCurrency, isUsd } =
                 getReceivedCurrencyInfo(item);
               const usd = isUsd
@@ -837,7 +841,11 @@ export default function ReviewOrder({ navigation, route }) {
                 ]}>
                 {items.slice(0, 3).map((item, idx) => {
                   const basePrice = parsePrice(item?.price) || 0;
-                  const { finalPrice } = calculateMarketplacePrice(basePrice, item, marketplaces);
+                  const { finalPrice } = calculateMarketplacePrice(
+                    basePrice,
+                    item,
+                    marketplaces,
+                  );
                   const { code: itemCurrency, isUsd } =
                     getReceivedCurrencyInfo(item);
                   const count = Number(item?.count) > 0 ? Number(item.count) : 1;
