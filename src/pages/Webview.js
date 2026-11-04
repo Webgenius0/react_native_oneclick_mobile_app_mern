@@ -13,7 +13,6 @@ import { delay } from '../helpers/common';
 import AddToCart from '../components/webview/AddToCart';
 import { useScriptServiceStore } from '../store/useScriptServiceStore';
 import { useWebviewStore } from '../store/useWebviewStore';
-import { userAgent } from '../helpers/webview';
 import { injectedJavascript, normalizeProductImageUrl } from '../helpers/webview1';
 import { cleanProductTitle, getFallbackTitleFromUrl, getStoreName, isProductUrl } from '../helpers/storeHelper';
 import { isPlaceholderValue } from '../helpers/variantUtils';
@@ -948,10 +947,8 @@ export default function Webview({ route, navigation }) {
     [sourceUrl],
   );
 
-  const webViewUserAgent = useMemo(
-    () => (useSheinCompatibilityMode ? '' : userAgent()),
-    [useSheinCompatibilityMode],
-  );
+  // Use native system default User-Agent across all stores to match real hardware fingerprints and reduce bot challenges
+  const webViewUserAgent = '';
 
   const [savedSheinCurrency, setSavedSheinCurrency] = useState('');
   const sheinCurrencyRef = useRef('');
@@ -3647,8 +3644,8 @@ export default function Webview({ route, navigation }) {
           {...(webViewUserAgent ? { userAgent: webViewUserAgent } : {})}
           javaScriptEnabled={true}
           domStorageEnabled={true}
-          cacheEnabled={!useSheinCompatibilityMode}
-          cacheMode={useSheinCompatibilityMode ? 'LOAD_NO_CACHE' : 'LOAD_DEFAULT'}
+          cacheEnabled={true}
+          cacheMode="LOAD_DEFAULT"
           cookiesEnabled={true}
           sharedCookiesEnabled={true}
           thirdPartyCookiesEnabled={true}
