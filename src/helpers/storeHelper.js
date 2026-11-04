@@ -558,15 +558,21 @@ export const calculateMarketplacePrice = (basePrice, item, marketplaces) => {
           ? useSheinPriceStore.getState()?.marketplaces
           : []) || [];
 
+  const parsePercent = val => {
+    if (val === null || val === undefined || val === '') return 0;
+    const num =
+      typeof val === 'number'
+        ? val
+        : parseFloat(String(val).replace(/%/g, '').trim());
+    return isNaN(num) ? 0 : num;
+  };
+
   const matched = findMarketplaceForItem(item, activeMarketplaces);
 
   let percent = 0;
   if (matched && matched.percent !== undefined && matched.percent !== null) {
-    const p =
-      typeof matched.percent === 'number'
-        ? matched.percent
-        : parseFloat(String(matched.percent).replace(/%/g, '').trim());
-    if (!isNaN(p) && p > 0) {
+    const p = parsePercent(matched.percent);
+    if (p > 0) {
       percent = p;
     }
   }
