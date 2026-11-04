@@ -21,12 +21,13 @@ import { supportPhone } from '../../config';
 import WhatsAppIcon from '../assets/svg/whatsapp.svg';
 
 const DEFAULT_TIMELINE_STEPS = [
-  { step: 1, key: 'order_placed', title: 'Order Placed', description: 'Your order has been submitted successfully.', state: 'completed', is_completed: true, is_current: false, date: null },
-  { step: 2, key: 'order_confirmed', title: 'Order Confirmed', description: 'Payment confirmed and order verified.', state: 'completed', is_completed: true, is_current: false, date: null },
-  { step: 3, key: 'preparing', title: 'Preparing Your Order', description: 'Items are being procured and prepared at the fulfillment hub.', state: 'current', is_completed: false, is_current: true, date: null },
-  { step: 4, key: 'shipped', title: 'Shipped', description: 'Package dispatched in international cargo transit.', state: 'pending', is_completed: false, is_current: false, date: null },
-  { step: 5, key: 'out_for_delivery', title: 'Out for Delivery', description: 'Assigned to local delivery agent for doorstep delivery.', state: 'pending', is_completed: false, is_current: false, date: null },
-  { step: 6, key: 'delivered', title: 'Delivered', description: 'Package has been delivered to customer.', state: 'pending', is_completed: false, is_current: false, date: null },
+  { step: 1, key: 'order_received', title: 'Order Received', state: 'completed', is_completed: true, is_current: false, date: null },
+  { step: 2, key: 'order_placed', title: 'Order Placed', state: 'completed', is_completed: true, is_current: false, date: null },
+  { step: 3, key: 'in_transit', title: 'In Transit', state: 'completed', is_completed: true, is_current: false, date: null },
+  { step: 4, key: 'shipped', title: 'Shipped', state: 'current', is_completed: false, is_current: true, date: null },
+  { step: 5, key: 'in_delivery_warehouse', title: 'In Delivery Warehouse', state: 'pending', is_completed: false, is_current: false, date: null },
+  { step: 6, key: 'out_for_delivery', title: 'Out For Delivery', state: 'pending', is_completed: false, is_current: false, date: null },
+  { step: 7, key: 'delivered', title: 'Delivered', state: 'pending', is_completed: false, is_current: false, date: null },
 ];
 
 export default function TrackOrder({ route, navigation }) {
@@ -37,9 +38,11 @@ export default function TrackOrder({ route, navigation }) {
   const orderId = route.params?.id || orderParam.id || '1CLK-582941';
   const grupId = route.params?.grupID || orderParam.grupID || orderParam.id;
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!route.params?.customerTracking);
   const [refreshing, setRefreshing] = useState(false);
-  const [customerTracking, setCustomerTracking] = useState(null);
+  const [customerTracking, setCustomerTracking] = useState(
+    route.params?.customerTracking || null,
+  );
 
   // Fallback defaults if API call fails or while loading
   const rawDate = orderParam.tarih || new Date();
@@ -47,11 +50,11 @@ export default function TrackOrder({ route, navigation }) {
   const initialExpectedDate = moment(rawDate).add(3, 'days').format('MMM DD, YYYY');
 
   const fetchTracking = useCallback(async (isRefresh = false) => {
-    if (!isRefresh) {
+    if (!isRefresh && !customerTracking) {
       setLoading(true);
     }
     try {
-      // Primary v4 endpoint: GET /api/order-tracking?id={orderId}
+      // Primary endpoint: GET /api/order-tracking?id={orderId}
       const res = await ai.get('order-tracking', {
         params: {
           id: orderId,
@@ -59,8 +62,12 @@ export default function TrackOrder({ route, navigation }) {
         },
       });
 
-      if (res?.data && res.data.error === false && res.data.customer_tracking) {
-        setCustomerTracking(res.data.customer_tracking);
+      if (res?.data && res.data.error === false) {
+        if (res.data.customer_tracking) {
+          setCustomerTracking(res.data.customer_tracking);
+        } else if (res.data.tracking) {
+          setCustomerTracking(res.data.tracking);
+        }
       }
     } catch (e) {
       console.log('fetchTracking API note:', e?.message || e);
@@ -68,7 +75,7 @@ export default function TrackOrder({ route, navigation }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [orderId, grupId]);
+  }, [orderId, grupId, customerTracking]);
 
   useEffect(() => {
     fetchTracking();
@@ -84,7 +91,15 @@ export default function TrackOrder({ route, navigation }) {
   const orderDate = customerTracking?.order_date || initialFormattedDate;
   const statusTitle = customerTracking?.status_title || route.params?.statusText || 'In Progress';
   const statusDesc = customerTracking?.status_subtitle || `Your order is on the way. Expected delivery on ${initialExpectedDate}`;
-  const badgeColor = customerTracking?.status_badge_color || 'blue';
+  const rawBadgeColor = customerTracking?.status_badge_color || customerTracking?.status_badge || 'blue';
+  const badgeColor =
+    rawBadgeColor === 'green'
+      ? 'green'
+      : rawBadgeColor === 'red'
+      ? 'red'
+      : rawBadgeColor === 'orange'
+      ? 'orange'
+      : 'blue';
 
   const steps = (customerTracking?.steps && Array.isArray(customerTracking.steps) && customerTracking.steps.length > 0)
     ? customerTracking.steps
@@ -162,6 +177,8 @@ export default function TrackOrder({ route, navigation }) {
                     ? { backgroundColor: '#DCFCE7' }
                     : badgeColor === 'red'
                     ? { backgroundColor: '#FEE2E2' }
+                    : badgeColor === 'orange'
+                    ? { backgroundColor: '#FEF3C7' }
                     : { backgroundColor: '#EFF6FF' },
                 ]}>
                 <View
@@ -171,19 +188,21 @@ export default function TrackOrder({ route, navigation }) {
                       ? { backgroundColor: '#BBF7D0' }
                       : badgeColor === 'red'
                       ? { backgroundColor: '#FECACA' }
+                      : badgeColor === 'orange'
+                      ? { backgroundColor: '#FDE68A' }
                       : { backgroundColor: '#DBEAFE' },
                   ]}>
                   <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
                     <Path
                       d="M1 3h15v13H1zM16 8h4l3 3v5h-7V8z"
-                      stroke={badgeColor === 'green' ? '#16A34A' : badgeColor === 'red' ? '#DC2626' : '#2563EB'}
+                      stroke={badgeColor === 'green' ? '#16A34A' : badgeColor === 'red' ? '#DC2626' : badgeColor === 'orange' ? '#D97706' : '#2563EB'}
                       strokeWidth={2}
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />
                     <Path
                       d="M5.5 18a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM18.5 18a2.5 2.5 0 100-5 2.5 2.5 0 000 5z"
-                      fill={badgeColor === 'green' ? '#16A34A' : badgeColor === 'red' ? '#DC2626' : '#2563EB'}
+                      fill={badgeColor === 'green' ? '#16A34A' : badgeColor === 'red' ? '#DC2626' : badgeColor === 'orange' ? '#D97706' : '#2563EB'}
                     />
                   </Svg>
                 </View>
@@ -195,6 +214,8 @@ export default function TrackOrder({ route, navigation }) {
                         ? { color: '#16A34A' }
                         : badgeColor === 'red'
                         ? { color: '#DC2626' }
+                        : badgeColor === 'orange'
+                        ? { color: '#D97706' }
                         : { color: '#2563EB' },
                     ]}>
                     {tr(statusTitle) || statusTitle}

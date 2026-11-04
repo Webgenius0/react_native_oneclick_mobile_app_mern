@@ -9,7 +9,7 @@ import Toast from 'react-native-toast-message';
 import { fetchAllNotifications } from './src/helpers/notificationV2';
 import { loadTheme } from './src/helpers/theme';
 import { i18n, tr } from './src/translate/i18n';
-import { storageGet } from './src/helpers/storage';
+import { storageGet, storageSet } from './src/helpers/storage';
 import { DEV_REDIRECT_STORE, FIREBASE_ENABLED, MOBIL_SCRIPT } from './config';
 import { useScriptServiceStore } from './src/store/useScriptServiceStore';
 import { useSheinPriceStore } from './src/store/useSheinPriceStore';
