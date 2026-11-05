@@ -21,6 +21,7 @@ import { storageDelete, storageGet, storageSet } from '../helpers/storage';
 import { getFcmToken, fcmUpdate } from '../helpers/notification';
 import * as RootNavigation from '../services/RootNavigation';
 import { logoutUser, setUser } from '../helpers/auth';
+import { prefetchLegalPages } from '../helpers/legalHelper';
 
 // SVG Icons matching Figma design
 import ProfileIcon from '../assets/svg/profile1.svg';
@@ -171,11 +172,13 @@ export default function Account({ navigation }) {
 
   useEffect(() => {
     fetchData();
+    prefetchLegalPages(ctxDil || i18n?.locale);
   }, [fetchData]);
 
   useFocusEffect(
     useCallback(() => {
       fetchData();
+    prefetchLegalPages(ctxDil || i18n?.locale);
     }, [fetchData]),
   );
 

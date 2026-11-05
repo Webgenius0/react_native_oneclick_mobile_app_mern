@@ -248,8 +248,16 @@ export default function Register({ navigation }) {
             style={styles.checkboxWrap}>
             <Text style={styles.termsText}>
               I agree to the{' '}
-              <Text style={styles.orangeLink}>Terms of Service</Text> and{' '}
-              <Text style={styles.orangeLink}>Privacy Policy</Text>
+              <Text
+                style={styles.orangeLink}
+                onPress={() => navigation.navigate('TermsOfService')}>
+                Terms of Service
+              </Text> and{' '}
+              <Text
+                style={styles.orangeLink}
+                onPress={() => navigation.navigate('PrivacyPolicy')}>
+                Privacy Policy
+              </Text>
             </Text>
           </AppCheckbox>
 

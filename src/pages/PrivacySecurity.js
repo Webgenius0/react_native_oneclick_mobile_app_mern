@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useContext, useEffect } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -11,9 +11,14 @@ import {
 import Svg, { Path, Rect } from 'react-native-svg';
 import { EmContext } from '../contexts/EmContext';
 import { tr } from '../translate/i18n';
+import { prefetchLegalPages } from '../helpers/legalHelper';
 
 export default function PrivacySecurity({ navigation }) {
-  const { ctx } = useContext(EmContext);
+  const { ctx, ctxDil } = useContext(EmContext);
+
+  useEffect(() => {
+    prefetchLegalPages(ctxDil);
+  }, [ctxDil]);
 
   const isDark = ctx.isDark;
   const pageBg = isDark ? '#111827' : '#FFFFFF';
