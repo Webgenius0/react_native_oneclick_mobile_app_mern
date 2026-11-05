@@ -191,5 +191,100 @@ describe('Marketplace Price and Dynamic Matching Tests', () => {
       expect(calculateMarketplacePrice(null, item, mockMarketplaces).finalPrice).toBe(0);
       expect(calculateMarketplacePrice('invalid', item, mockMarketplaces).finalPrice).toBe(0);
     });
+
+    it('calculates 12% markup for Amazon when admin sets Amazon to 12%', () => {
+      const liveAdminMarketplaces = [
+        {
+          id: 1,
+          marketplace: 'shein',
+          name: 'SHEIN',
+          percent: 10,
+          price: 10,
+        },
+        {
+          id: 3,
+          marketplace: 'amazon',
+          name: 'AMAZON',
+          percent: 12,
+          price: 12,
+        },
+      ];
+
+      const itemAmazon = { url: 'https://www.amazon.ae/dp/B08N5WRWNW', store: 'Amazon' };
+      const resultAmazon = calculateMarketplacePrice(100, itemAmazon, liveAdminMarketplaces);
+
+      expect(resultAmazon.percent).toBe(12);
+      expect(resultAmazon.percentAmount).toBe(12);
+      expect(resultAmazon.finalPrice).toBe(112);
+
+      const itemShein = { url: 'https://m.shein.com/goods-p-123.html', store: 'SHEIN' };
+      const resultShein = calculateMarketplacePrice(100, itemShein, liveAdminMarketplaces);
+
+      expect(resultShein.percent).toBe(10);
+      expect(resultShein.percentAmount).toBe(10);
+      expect(resultShein.finalPrice).toBe(110);
+    });
+
+    it('does NOT add commission to products if shop is removed or not configured by admin', () => {
+      const liveAdminMarketplaces = [
+        {
+          id: 1,
+          marketplace: 'shein',
+          name: 'SHEIN',
+          percent: 10,
+        },
+        {
+          id: 3,
+          marketplace: 'amazon',
+          name: 'AMAZON',
+          percent: 12,
+        },
+      ];
+
+      // iHerb is not in the live admin marketplaces right now
+      const itemIherb = { url: 'https://www.iherb.com/pr/vitamin-c/123', store: 'iHerb' };
+      const resultIherb = calculateMarketplacePrice(50, itemIherb, liveAdminMarketplaces);
+
+      expect(resultIherb.percent).toBe(0);
+      expect(resultIherb.percentAmount).toBe(0);
+      expect(resultIherb.finalPrice).toBe(50);
+
+      // Trendyol is also not in the admin marketplaces
+      const itemTrendyol = { url: 'https://www.trendyol.com/p/123', store: 'Trendyol' };
+      const resultTrendyol = calculateMarketplacePrice(75, itemTrendyol, liveAdminMarketplaces);
+
+      expect(resultTrendyol.percent).toBe(0);
+      expect(resultTrendyol.percentAmount).toBe(0);
+      expect(resultTrendyol.finalPrice).toBe(75);
+    });
+
+    it('dynamically adapts when admin adds iHerb (8%) and removes Amazon', () => {
+      const updatedAdminMarketplaces = [
+        {
+          id: 1,
+          marketplace: 'shein',
+          name: 'SHEIN',
+          percent: 10,
+        },
+        {
+          id: 5,
+          marketplace: 'iherb',
+          name: 'IHERB',
+          percent: 8,
+        },
+      ];
+
+      // Newly added iHerb now gets 8%
+      const itemIherb = { url: 'https://www.iherb.com/pr/omega3/456', store: 'iHerb' };
+      const resultIherb = calculateMarketplacePrice(100, itemIherb, updatedAdminMarketplaces);
+      expect(resultIherb.percent).toBe(8);
+      expect(resultIherb.finalPrice).toBe(108);
+
+      // Removed Amazon now gets 0% (no commission added)
+      const itemAmazon = { url: 'https://www.amazon.ae/dp/B08123', store: 'Amazon' };
+      const resultAmazon = calculateMarketplacePrice(100, itemAmazon, updatedAdminMarketplaces);
+      expect(resultAmazon.percent).toBe(0);
+      expect(resultAmazon.finalPrice).toBe(100);
+    });
   });
 });

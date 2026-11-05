@@ -31,7 +31,7 @@ export const useSheinPriceStore = create(
             const marketplaces = Array.isArray(data.marketplaces)
               ? data.marketplaces
               : [];
-            const rates = data.rates || {};
+            const rates = { ...(data.rates || {}) };
 
             const parsePercent = val => {
               if (val === null || val === undefined || val === '') return 0;
@@ -41,6 +41,15 @@ export const useSheinPriceStore = create(
                   : parseFloat(String(val).replace(/%/g, '').trim());
               return isNaN(num) ? 0 : num;
             };
+
+            // Ensure rates dictionary contains every marketplace canonical key
+            marketplaces.forEach(m => {
+              if (!m) return;
+              const key = String(m.marketplace || '').toLowerCase().trim();
+              if (key && rates[key] === undefined) {
+                rates[key] = parsePercent(m.percent);
+              }
+            });
 
             const sheinItem = marketplaces.find(
               m => String(m.marketplace || '').toLowerCase() === 'shein',
@@ -83,13 +92,31 @@ export const useSheinPriceStore = create(
               const marketplaces = Array.isArray(data.marketplaces)
                 ? data.marketplaces
                 : [];
-              const rates = data.rates || {};
+              const rates = { ...(data.rates || {}) };
+
+              const parsePercent = val => {
+                if (val === null || val === undefined || val === '') return 0;
+                const num =
+                  typeof val === 'number'
+                    ? val
+                    : parseFloat(String(val).replace(/%/g, '').trim());
+                return isNaN(num) ? 0 : num;
+              };
+
+              marketplaces.forEach(m => {
+                if (!m) return;
+                const key = String(m.marketplace || '').toLowerCase().trim();
+                if (key && rates[key] === undefined) {
+                  rates[key] = parsePercent(m.percent);
+                }
+              });
+
               const sheinItem = marketplaces.find(
                 m => String(m.marketplace || '').toLowerCase() === 'shein',
               );
               const sheinPercent = sheinItem
-                ? Number(sheinItem.percent ?? 0)
-                : Number(rates.shein ?? 0);
+                ? parsePercent(sheinItem.percent)
+                : parsePercent(rates.shein ?? 0);
 
               set({
                 marketplaces,
@@ -108,6 +135,40 @@ export const useSheinPriceStore = create(
             error: err?.message || 'Failed to fetch marketplace price',
           });
         }
+      },
+
+      /**
+       * Returns commission percent for a given marketplace name or URL
+       * @param {string} marketplaceName
+       * @returns {number}
+       */
+      getMarketplacePercent: (marketplaceName = '') => {
+        if (!marketplaceName || typeof marketplaceName !== 'string') return 0;
+        const clean = marketplaceName.toLowerCase().trim();
+        const cleanSlug = clean.replace(/[^a-z0-9]/g, '');
+        const state = get();
+        const rates = state.marketplaceRates || {};
+        if (rates[clean] !== undefined && Number(rates[clean]) > 0) {
+          return Number(rates[clean]);
+        }
+        if (rates[cleanSlug] !== undefined && Number(rates[cleanSlug]) > 0) {
+          return Number(rates[cleanSlug]);
+        }
+        const marketplaces = state.marketplaces || [];
+        const matched = marketplaces.find(m => {
+          const mSlug = String(m.marketplace || '').toLowerCase().trim();
+          const mName = String(m.name || '').toLowerCase().trim();
+          return (
+            mSlug === clean ||
+            mSlug === cleanSlug ||
+            mName === clean ||
+            mName === cleanSlug
+          );
+        });
+        if (matched && Number(matched.percent) > 0) {
+          return Number(matched.percent);
+        }
+        return 0;
       },
 
       /**
