@@ -12,10 +12,14 @@ jest.mock('react-native-device-info', () =>
 const mockToastComponent = () => <View />;
 mockToastComponent.show = jest.fn();
 mockToastComponent.hide = jest.fn();
+const mockBaseToast = props => <View {...props} />;
+const mockErrorToast = props => <View {...props} />;
 
 jest.mock('react-native-toast-message', () => ({
   __esModule: true,
   default: mockToastComponent,
+  BaseToast: mockBaseToast,
+  ErrorToast: mockErrorToast,
   show: jest.fn(),
   hide: jest.fn(),
 }));
