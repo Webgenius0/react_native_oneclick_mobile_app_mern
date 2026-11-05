@@ -5,7 +5,7 @@ import {
   Dimensions,
   Platform,
   RefreshControl,
-  SafeAreaView,
+
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import ReactNative from 'react-native';
 import { EmContext } from '../contexts/EmContext';
 import ai from '../helpers/ai';
@@ -208,7 +209,9 @@ export default function Profile({ navigation }) {
   const displayEmail = email || state.s?.email || state.s?.eposta || '';
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: cardBg }]}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: cardBg }]}
+      edges={['top', 'bottom', 'left', 'right']}>
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}
         backgroundColor={cardBg}

@@ -13,7 +13,18 @@ import { storageGet } from './src/helpers/storage';
 import { DEV_REDIRECT_STORE, FIREBASE_ENABLED, MOBIL_SCRIPT } from './config';
 import { useScriptServiceStore } from './src/store/useScriptServiceStore';
 import { useSheinPriceStore } from './src/store/useSheinPriceStore';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { toastConfig } from './src/helpers/toastConfig';
+
+const ToastWrapper = () => {
+  const insets = useSafeAreaInsets();
+  return (
+    <Toast
+      config={toastConfig}
+      topOffset={Math.max(insets.top, 24) + 12}
+    />
+  );
+};
 import ErrorBoundary from './src/components/common/ErrorBoundary';
 
 // @ts-ignore
@@ -174,7 +185,7 @@ const App = () => {
         <EmContext.Provider value={contextData}>
           {/*__DEV__ ? <WaafiPay /> : <AppNavigator />*/}
           <AppNavigator />
-          <Toast />
+          <ToastWrapper />
         </EmContext.Provider>
       </ErrorBoundary>
     </SafeAreaProvider>

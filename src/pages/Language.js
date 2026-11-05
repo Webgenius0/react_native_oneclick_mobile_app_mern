@@ -2,7 +2,7 @@ import React, { useContext, useState } from 'react';
 import {
   Alert,
   Dimensions,
-  SafeAreaView,
+
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmContext } from '../contexts/EmContext';
 import { availableLanguages, i18n, tr } from '../translate/i18n';
 import { storageSet } from '../helpers/storage';
@@ -56,7 +57,9 @@ export default function Language({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: cardBg }]}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: cardBg }]}
+      edges={['top', 'bottom', 'left', 'right']}>
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}
         backgroundColor={cardBg}

@@ -3,11 +3,12 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
+
   TouchableOpacity,
   StatusBar,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AppButton from '../components/common/AppButton';
 import IllustrationPlaceholder from '../components/common/IllustrationPlaceholder';
 import AppHeader from '../components/common/AppHeader';
@@ -101,7 +102,9 @@ export default function ContinueGuest({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={styles.container}
+      edges={['top', 'bottom', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       <AppHeader

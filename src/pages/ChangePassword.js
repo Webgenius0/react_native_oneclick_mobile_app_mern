@@ -4,7 +4,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
+
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { EmContext } from '../contexts/EmContext';
 import { tr } from '../translate/i18n';
@@ -184,7 +185,9 @@ export default function ChangePassword({ navigation }) {
   );
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: pageBg }]}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: pageBg }]}
+      edges={['top', 'bottom', 'left', 'right']}>
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}
         backgroundColor={pageBg}

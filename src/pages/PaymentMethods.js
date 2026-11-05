@@ -2,7 +2,7 @@ import React, { useContext } from 'react';
 import {
   Dimensions,
   Image,
-  SafeAreaView,
+
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmContext } from '../contexts/EmContext';
 import { tr } from '../translate/i18n';
 import AppHeader from '../components/common/AppHeader';
@@ -48,7 +49,9 @@ export default function PaymentMethods({ navigation, route }) {
   const borderColor = isDark ? '#374151' : '#F1F5F9';
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: cardBg }]}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: cardBg }]}
+      edges={['top', 'bottom', 'left', 'right']}>
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}
         backgroundColor={cardBg}

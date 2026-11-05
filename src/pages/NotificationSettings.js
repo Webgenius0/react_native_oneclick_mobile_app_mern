@@ -5,7 +5,7 @@ import {
   Dimensions,
   Platform,
   RefreshControl,
-  SafeAreaView,
+
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
 import moment from 'moment';
 import { EmContext } from '../contexts/EmContext';
@@ -251,7 +252,9 @@ export default function NotificationSettings({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: cardBg }]}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: cardBg }]}
+      edges={['top', 'bottom', 'left', 'right']}>
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}
         backgroundColor={cardBg}

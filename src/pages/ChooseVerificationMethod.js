@@ -3,11 +3,12 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
+
   TouchableOpacity,
   StatusBar,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '../components/common/AppHeader';
 import AppButton from '../components/common/AppButton';
 import Svg, { Path, Rect } from 'react-native-svg';
@@ -95,7 +96,9 @@ export default function ChooseVerificationMethod({ route, navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={styles.container}
+      edges={['top', 'bottom', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       <AppHeader navigation={navigation} showBack={true} />

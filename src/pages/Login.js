@@ -3,12 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
+
   ScrollView,
   TouchableOpacity,
   StatusBar,
   Alert,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppHeader from '../components/common/AppHeader';
 import AppTextInput from '../components/common/AppTextInput';
 import AppButton from '../components/common/AppButton';
@@ -24,6 +25,7 @@ import { CommonActions } from '@react-navigation/native';
 import { getFcmToken, fcmUpdate } from '../helpers/notification';
 
 export default function Login({ navigation }) {
+  const insets = useSafeAreaInsets();
   const { setCtx, setCtxDil } = useContext(EmContext);
 
   const [identifier, setIdentifier] = useState('');
@@ -163,8 +165,14 @@ export default function Login({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+    <SafeAreaView
+      style={styles.container}
+      edges={['top', 'bottom', 'left', 'right']}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="#FFFFFF"
+        translucent={false}
+      />
 
       <AppHeader
         navigation={navigation}
@@ -180,7 +188,10 @@ export default function Login({ navigation }) {
 
       <KeyboardAvoidingComponent>
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: Math.max(insets.bottom, 20) + 24 },
+          ]}
           showsVerticalScrollIndicator={false}>
           {/* Header Section */}
           <View style={styles.titleSection}>

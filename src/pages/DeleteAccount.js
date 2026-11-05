@@ -5,7 +5,7 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
-  SafeAreaView,
+
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Path } from 'react-native-svg';
 import { EmContext } from '../contexts/EmContext';
@@ -123,7 +124,9 @@ export default function DeleteAccount({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: pageBg }]}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: pageBg }]}
+      edges={['top', 'bottom', 'left', 'right']}>
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}
         backgroundColor={pageBg}

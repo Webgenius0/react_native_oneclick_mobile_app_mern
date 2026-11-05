@@ -3,12 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
+
   ScrollView,
   TouchableOpacity,
   StatusBar,
   Alert,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppHeader from '../components/common/AppHeader';
 import AppButton from '../components/common/AppButton';
 import OtpInput from '../components/common/OtpInput';
@@ -20,6 +21,7 @@ import { storageSet } from '../helpers/storage';
 import { EmContext } from '../contexts/EmContext';
 
 export default function VerifyOtp({ route, navigation }) {
+  const insets = useSafeAreaInsets();
   const { setCtx } = useContext(EmContext);
   const {
     method = 'phone', // 'phone' | 'email'
@@ -226,14 +228,19 @@ export default function VerifyOtp({ route, navigation }) {
   const formattedTimer = `00:${countdown < 10 ? '0' : ''}${countdown}`;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={styles.container}
+      edges={['top', 'bottom', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       <AppHeader navigation={navigation} showBack={true} />
 
       <KeyboardAvoidingComponent>
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: Math.max(insets.bottom, 20) + 24 },
+          ]}
           showsVerticalScrollIndicator={false}>
           {/* Header Title & Subtitle */}
           <View style={styles.headerSection}>

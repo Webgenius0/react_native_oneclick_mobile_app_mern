@@ -3,9 +3,10 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
+
   StatusBar,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppButton from '../components/common/AppButton';
 import IllustrationPlaceholder from '../components/common/IllustrationPlaceholder';
 import { CommonActions } from '@react-navigation/native';
@@ -14,6 +15,7 @@ import { storageSet } from '../helpers/storage';
 import { EmContext } from '../contexts/EmContext';
 
 export default function AccountCreatedSuccess({ route, navigation }) {
+  const insets = useSafeAreaInsets();
   const { setCtx } = useContext(EmContext);
   const { registrationData = null, user = null } = route?.params || {};
 
@@ -63,7 +65,9 @@ export default function AccountCreatedSuccess({ route, navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={styles.container}
+      edges={['top', 'bottom', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* Top spacer */}

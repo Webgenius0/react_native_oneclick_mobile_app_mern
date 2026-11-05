@@ -3,11 +3,12 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
+
   ScrollView,
   StatusBar,
   Alert,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppHeader from '../components/common/AppHeader';
 import AppTextInput from '../components/common/AppTextInput';
 import AppButton from '../components/common/AppButton';
@@ -15,6 +16,7 @@ import KeyboardAvoidingComponent from '../components/KeyboardAvoidingComponent';
 import ai from '../helpers/ai';
 
 export default function ForgotPassword({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [target, setTarget] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -59,14 +61,19 @@ export default function ForgotPassword({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={styles.container}
+      edges={['top', 'bottom', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       <AppHeader navigation={navigation} showBack={true} />
 
       <KeyboardAvoidingComponent>
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: Math.max(insets.bottom, 20) + 24 },
+          ]}
           showsVerticalScrollIndicator={false}>
           {/* Header Title & Subtitle */}
           <View style={styles.headerSection}>

@@ -4,7 +4,7 @@ import {
   Text,
   StyleSheet,
   TextInput,
-  SafeAreaView,
+
   TouchableOpacity,
   Keyboard,
   ActivityIndicator,
@@ -13,7 +13,7 @@ import {
   Image,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { tr, localizeApiMessage, i18n } from '../translate/i18n';
 import Toast from 'react-native-toast-message';
 import ai from '../helpers/ai';
@@ -261,7 +261,9 @@ export default function WaafiPay({ navigation, route }) {
   const exampleTextColor = isDark ? '#E2E8F0' : '#334155';
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: cardBg }]}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: cardBg }]}
+      edges={['top', 'bottom', 'left', 'right']}>
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}
         backgroundColor={cardBg}
@@ -281,7 +283,10 @@ export default function WaafiPay({ navigation, route }) {
 
       <ScrollView
         style={[styles.container, { backgroundColor: pageBg }]}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(insets.bottom, 20) + 24 },
+        ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
         {/* Brand & Amount Card */}

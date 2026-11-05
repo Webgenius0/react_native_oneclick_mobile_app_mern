@@ -5,7 +5,7 @@ import {
   LayoutAnimation,
   Platform,
   RefreshControl,
-  SafeAreaView,
+
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -15,6 +15,7 @@ import {
   UIManager,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { EmContext } from '../contexts/EmContext';
 import { i18n, tr } from '../translate/i18n';
@@ -162,7 +163,9 @@ export default function Faq({ navigation }) {
   }, [faqs, selectedCategory, searchQuery]);
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: cardBg }]}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: cardBg }]}
+      edges={['top', 'bottom', 'left', 'right']}>
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}
         backgroundColor={cardBg}

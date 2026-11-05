@@ -3,18 +3,21 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
+
   TouchableOpacity,
   StatusBar,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import BrandLogo from '../components/common/BrandLogo';
 import AppButton from '../components/common/AppButton';
 import IllustrationPlaceholder from '../components/common/IllustrationPlaceholder';
 
 export default function AuthWelcome({ navigation }) {
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={styles.container}
+      edges={['top', 'bottom', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* Top Logo */}

@@ -5,7 +5,7 @@ import {
   FlatList,
   Platform,
   RefreshControl,
-  SafeAreaView,
+
   StatusBar,
   StyleSheet,
   Text,
@@ -13,6 +13,7 @@ import {
   View,
   ActivityIndicator,
 } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmContext } from "../contexts/EmContext";
 import moment from "moment";
 import { tr } from "../translate/i18n";
@@ -254,7 +255,9 @@ export default function Notifications({ route, navigation }) {
   );
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: bgColor }]}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: bgColor }]}
+      edges={['top', 'bottom', 'left', 'right']}>
       <StatusBar
         barStyle={isDark ? "light-content" : "dark-content"}
         backgroundColor={bgColor}
