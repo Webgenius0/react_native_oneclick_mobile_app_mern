@@ -58,18 +58,14 @@ export default function Account({ navigation }) {
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     if (loggingOut) {
       return;
     }
-    try {
-      setLoggingOut(true);
-      await logoutUser(navigation, setCtx);
-    } catch (e) {
-      console.log('Logout error:', e);
-    } finally {
-      setLoggingOut(false);
-    }
+    setLoggingOut(true);
+    setTimeout(() => {
+      logoutUser(navigation, setCtx);
+    }, 120);
   };
 
   const fetchData = useCallback(

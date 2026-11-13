@@ -66,6 +66,31 @@ export const useOrderStore = create((set, get) => ({
     }));
   },
 
+  // Completely wipe in-memory order data on logout
+  clearOrders: () => {
+    set(() => ({
+      isDirty: true,
+      tabs: {
+        all: createInitialTabState(),
+        pending: createInitialTabState(),
+        confirmed: createInitialTabState(),
+        in_progress: createInitialTabState(),
+        delivered: createInitialTabState(),
+        cancelled: createInitialTabState(),
+      },
+      searchCache: {
+        query: '',
+        tabId: 'all',
+        orders: [],
+        page: 1,
+        totalPages: 1,
+        hasNextPage: false,
+        loading: false,
+        loadingMore: false,
+      },
+    }));
+  },
+
   // Hydrate initial cached orders on app cold start (instant 0ms display)
   loadInitialCache: async () => {
     try {

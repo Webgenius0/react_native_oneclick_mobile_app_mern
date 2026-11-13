@@ -2,10 +2,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CommonActions } from '@react-navigation/native';
 import { storageDelete, storageGet, storageSet } from './storage';
 import { useUserStore } from '../store/useUserStore';
+import { useCartStore } from '../store/useCartStore';
+import { useOrderStore } from '../store/useOrderStore';
 import * as RootNavigation from '../services/RootNavigation';
 import ai from './ai';
 import { getFcmToken } from './notification';
 import { i18n } from '../translate/i18n';
+
+let isLoggingOut = false;
 
 export const isGuestUser = async (userParam = null) => {
   try {
@@ -85,6 +89,7 @@ export const getUser = async () => {
 };
 
 export const setUser = async user => {
+  isLoggingOut = false;
   try {
     if (!user) {
       await storageDelete('user');
@@ -95,104 +100,132 @@ export const setUser = async user => {
     }
 
     const existing = (await storageGet('user')) || {};
-    const existingToken =
+    // Only merge properties if it is confirmed to be the SAME user account
+    const isSameUser = Boolean(
+      existing &&
+        ((user.id && existing.id && String(user.id) === String(existing.id)) ||
+          (user.kod &&
+            existing.kod &&
+            String(user.kod).trim().toLowerCase() === String(existing.kod).trim().toLowerCase())),
+    );
+
+    const activeUser = isSameUser ? { ...existing, ...user } : { ...user };
+
+    const tokenToSave =
       user?.token ||
-      existing?.token ||
+      (isSameUser ? existing?.token : null) ||
       (await storageGet('auth_token')) ||
       (await AsyncStorage.getItem('auth_token'));
 
-    const merged = { ...existing, ...user };
-    if (existingToken && existingToken !== 'GUEST') {
-      merged.token = existingToken;
-      await storageSet('auth_token', existingToken);
-      await AsyncStorage.setItem('auth_token', existingToken);
+    if (tokenToSave && tokenToSave !== 'GUEST') {
+      activeUser.token = tokenToSave;
+      await storageSet('auth_token', tokenToSave);
+      await AsyncStorage.setItem('auth_token', tokenToSave);
     }
-    await storageSet('user', merged);
-    useUserStore.getState().setUser?.(merged);
+
+    await storageSet('user', activeUser);
+    useUserStore.getState().setUser?.(activeUser);
   } catch (error) {
     console.log('Something went wrong setUser', error);
   }
 };
 
 export const logoutUser = async (navigation, setCtx) => {
-  // 1. Notify backend (non-blocking) per API guide
-  try {
-    const fcmToken = await getFcmToken().catch(() => null);
-    await ai.post('logout', {
-      device_token: fcmToken || '',
-      fcm_token: fcmToken || '',
-    }).catch(err => {
-      console.log('Logout API note:', err?.response?.data?.msg || err?.message || err);
-    });
-  } catch (apiErr) {}
+  if (isLoggingOut) {
+    return;
+  }
+  isLoggingOut = true;
 
-  // 2. Clear storage (original implementation)
   try {
+    // 1. Immediately reset navigation to Login (0ms UI latency, no waiting)
+    const resetAction = CommonActions.reset({
+      index: 0,
+      routes: [{ name: 'Login' }],
+    });
+
+    let navigated = false;
+    try {
+      if (RootNavigation.navigationRef && RootNavigation.navigationRef.isReady()) {
+        RootNavigation.navigationRef.dispatch(resetAction);
+        navigated = true;
+      }
+    } catch (e) {
+      console.log('logout reset root error:', e);
+    }
+
+    if (!navigated) {
+      try {
+        const parentNav = navigation?.getParent ? navigation.getParent() : null;
+        if (parentNav?.dispatch) {
+          parentNav.dispatch(resetAction);
+          navigated = true;
+        }
+      } catch (e) {}
+    }
+
+    if (!navigated) {
+      try {
+        if (navigation?.dispatch) {
+          navigation.dispatch(resetAction);
+          navigated = true;
+        }
+      } catch (e) {}
+    }
+
+    if (!navigated) {
+      try {
+        RootNavigation.reset('Login');
+      } catch (e) {}
+    }
+
+    // 2. Clear all in-memory Zustand stores immediately (<0.1ms)
+    try {
+      useUserStore.getState().clearUser?.();
+    } catch (e) {}
+    try {
+      useCartStore.getState().clearCart?.();
+    } catch (e) {}
+    try {
+      useOrderStore.getState().clearOrders?.();
+    } catch (e) {}
+
+    // 3. Clear global Context immediately
+    if (setCtx) {
+      try {
+        setCtx(prev => ({
+          ...prev,
+          user: null,
+          token: null,
+        }));
+      } catch (e) {}
+    }
+
+    // 4. Notify backend API of logout
+    try {
+      const fcmToken = await getFcmToken().catch(() => '');
+      await ai.post('logout', {
+        device_token: fcmToken || '',
+        fcm_token: fcmToken || '',
+      }).catch(err => {
+        console.log('Logout API note:', err?.response?.data?.msg || err?.message || err);
+      });
+    } catch (e) {}
+
+    // 5. Clear all user storage keys in a single batch native call (comprehensive wipe)
     await AsyncStorage.multiRemove([
       'user',
       'is_guest',
       'user-storage',
       'tokenSend',
-      'has_seen_onboarding',
       'auth_token',
+      'cached_orders_master',
+      'cached_orders_list',
+      'cart-storage',
+      'cached_home_data',
     ]);
-    await storageDelete('user');
-    await storageDelete('is_guest');
-    await storageDelete('tokenSend');
-    await storageDelete('auth_token');
-  } catch (e) {
-    console.log('Error clearing storage in logoutUser:', e);
+  } catch (err) {
+    console.log('logoutUser error:', err);
+  } finally {
+    isLoggingOut = false;
   }
-
-  try {
-    useUserStore.getState().clearUser?.();
-  } catch (e) {}
-
-  if (setCtx) {
-    try {
-      setCtx(prev => ({
-        ...prev,
-        user: null,
-        token: null,
-      }));
-    } catch (e) {}
-  }
-
-  // 3. Reset navigation to Login (original implementation)
-  const resetAction = CommonActions.reset({
-    index: 0,
-    routes: [{ name: 'Login' }],
-  });
-
-  // Reset root navigation directly (clearing entire back history)
-  try {
-    if (RootNavigation.navigationRef && RootNavigation.navigationRef.isReady()) {
-      RootNavigation.navigationRef.dispatch(resetAction);
-      return;
-    }
-  } catch (e) {
-    console.log('logout reset root error:', e);
-  }
-
-  // Reset parent navigation if inside a nested stack/tab
-  try {
-    const parentNav = navigation?.getParent ? navigation.getParent() : null;
-    if (parentNav?.dispatch) {
-      parentNav.dispatch(resetAction);
-      return;
-    }
-  } catch (e) {}
-
-  // Reset provided navigation
-  try {
-    if (navigation?.dispatch) {
-      navigation.dispatch(resetAction);
-      return;
-    }
-  } catch (e) {}
-
-  // Fallback to RootNavigation helper
-  try {
-    RootNavigation.reset('Login');
-  } catch (e) {}
 };

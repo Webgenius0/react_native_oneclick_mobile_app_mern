@@ -19,10 +19,8 @@ import { EmContext } from '../contexts/EmContext';
 import ai from '../helpers/ai';
 import Colors from '../assets/Colors';
 import { availableLanguages, i18n, tr } from '../translate/i18n';
-import { storageDelete, storageGet, storageSet } from '../helpers/storage';
+import { storageGet, storageSet } from '../helpers/storage';
 import { getFcmToken, fcmUpdate } from '../helpers/notification';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useUserStore } from '../store/useUserStore';
 import AppHeader from '../components/common/AppHeader';
 import { logoutUser } from '../helpers/auth';
 
@@ -53,6 +51,7 @@ export default function Profile({ navigation }) {
   const [email, setEmail] = useState(initialUser?.email || initialUser?.eposta || '');
   const [adres, setAdres] = useState(initialUser?.adres || initialUser?.sehir || '');
   const [refreshing, setRefreshing] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const isDark = ctx?.isDark;
   const pageBg = isDark ? '#111827' : '#F8FAFC';
@@ -200,8 +199,14 @@ export default function Profile({ navigation }) {
     }
   };
 
-  const handleLogout = async () => {
-    await logoutUser(navigation, setCtx);
+  const handleLogout = () => {
+    if (loggingOut) {
+      return;
+    }
+    setLoggingOut(true);
+    setTimeout(() => {
+      logoutUser(navigation, setCtx);
+    }, 120);
   };
 
   const displayName = state.s.ad || state.s.name || tr('User') || 'User';
@@ -449,11 +454,20 @@ export default function Profile({ navigation }) {
             <View style={styles.footerActions}>
               <TouchableOpacity
                 activeOpacity={0.8}
-                style={[styles.footerBtn, { backgroundColor: cardBg, borderColor: borderColor }]}
+                disabled={loggingOut}
+                style={[
+                  styles.footerBtn,
+                  { backgroundColor: cardBg, borderColor: borderColor },
+                  loggingOut && { opacity: 0.7 },
+                ]}
                 onPress={handleLogout}>
-                <Text style={[styles.footerBtnText, { color: '#EF4444' }]}>
-                  {tr('Log Out') || 'Log Out'}
-                </Text>
+                {loggingOut ? (
+                  <ActivityIndicator size="small" color="#EF4444" />
+                ) : (
+                  <Text style={[styles.footerBtnText, { color: '#EF4444' }]}>
+                    {tr('Log Out') || 'Log Out'}
+                  </Text>
+                )}
               </TouchableOpacity>
             </View>
           </>
