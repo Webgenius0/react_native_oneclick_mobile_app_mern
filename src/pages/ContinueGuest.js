@@ -6,17 +6,15 @@ import {
   SafeAreaView,
   TouchableOpacity,
   StatusBar,
-  Alert,
 } from 'react-native';
 import AppButton from '../components/common/AppButton';
 import IllustrationPlaceholder from '../components/common/IllustrationPlaceholder';
 import AppHeader from '../components/common/AppHeader';
 import { CommonActions } from '@react-navigation/native';
-import { storageDelete, storageGet, storageSet } from '../helpers/storage';
-import { setUser } from '../helpers/auth';
+import { storageSet } from '../helpers/storage';
+import { setUser, loginGuestUser } from '../helpers/auth';
 import { EmContext } from '../contexts/EmContext';
 import { getFcmToken, fcmUpdate } from '../helpers/notification';
-import { i18n } from '../translate/i18n';
 
 export default function ContinueGuest({ navigation }) {
   const { setCtx } = useContext(EmContext);
@@ -25,21 +23,9 @@ export default function ContinueGuest({ navigation }) {
   const handleContinueGuest = async () => {
     setLoading(true);
     try {
-      const activeDil = (await storageGet('language')) || i18n.locale || 'en';
+      const guestUser = await loginGuestUser();
 
-      const res = await ai.post('login', {
-        email: 'HG1000',
-        kod: 'HG1000',
-        password: '123',
-        sifre: '123',
-        dil: activeDil,
-      });
-
-      if (res && res.data && res.data.error === false) {
-        const guestUser = res.data.s;
-        await setUser(guestUser);
-        await storageSet('is_guest', '1');
-        await storageSet('has_seen_onboarding', '1');
+      if (guestUser && guestUser.token) {
         if (setCtx) {
           setCtx(prev => ({
             ...prev,
@@ -67,8 +53,30 @@ export default function ContinueGuest({ navigation }) {
           }
         }, 0);
       } else {
-        const errorMsg = res?.data?.msg || 'Could not log in as guest.';
-        Alert.alert('Guest Login', errorMsg);
+        // Offline fallback if server was unreachable
+        const offlineUser = {
+          kod: 'HG1000',
+          ad: 'Misafir',
+          name: 'Guest User',
+          token: 'GUEST',
+        };
+        await setUser(offlineUser);
+        await storageSet('is_guest', '1');
+        await storageSet('has_seen_onboarding', '1');
+        if (setCtx) {
+          setCtx(prev => ({
+            ...prev,
+            user: offlineUser,
+            token: 'GUEST',
+          }));
+        }
+
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'AuthAfter' }],
+          }),
+        );
       }
     } catch (e) {
       console.log('Error logging in as guest:', e);

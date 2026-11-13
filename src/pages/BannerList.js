@@ -26,7 +26,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import AuthHeader from "../components/AuthHeader";
 import CustomSlider from "../components/CustomSlider";
 import UlkeBar from "../components/UlkeBar";
-import { getToken } from "../helpers/auth";
+import { getToken, getUser, loginGuestUser } from "../helpers/auth";
 import ai from "../helpers/ai";
 import { storageGet, storageSet } from "../helpers/storage";
 import { EmContext } from "../contexts/EmContext";
@@ -92,6 +92,87 @@ const DEFAULT_MARKET_DATA = {
   banners: [],
 };
 
+const StoreCardItem = React.memo(({ store, onPress }) => {
+  const [nativeImageFallback, setNativeImageFallback] = useState(false);
+  const [remoteFailed, setRemoteFailed] = useState(false);
+  const gradId = `card-grad-${store.id}`;
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.92}
+      onPress={() => onPress(store)}
+      style={styles.cardContainer}>
+      {/* 1. Base dark background */}
+      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#1E293B' }]} />
+
+      {/* 2. Matched local asset fallback (only if remote image is missing or failed) */}
+      {store.assetImage && (!store.apiRemoteImg || remoteFailed) ? (
+        <Image
+          source={store.assetImage}
+          style={StyleSheet.absoluteFillObject}
+          resizeMode="cover"
+        />
+      ) : null}
+
+      {/* 3. Primary Remote Image: FastImage with automatic fallback to React Native Image */}
+      {store.apiRemoteImg && !remoteFailed ? (
+        !nativeImageFallback ? (
+          <FastImage
+            source={{
+              uri: store.apiRemoteImg,
+              priority: FastImage.priority.high,
+            }}
+            style={StyleSheet.absoluteFillObject}
+            resizeMode={FastImage.resizeMode.cover}
+            onError={() => {
+              setNativeImageFallback(true);
+            }}
+          />
+        ) : (
+          <Image
+            source={{ uri: store.apiRemoteImg }}
+            style={StyleSheet.absoluteFillObject}
+            resizeMode="cover"
+            onError={() => {
+              setRemoteFailed(true);
+            }}
+          />
+        )
+      ) : null}
+
+      {/* Subtle Gradient Scrim for contrast */}
+      <Svg
+        style={StyleSheet.absoluteFillObject}
+        width="100%"
+        height="100%">
+        <Defs>
+          <SvgGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+            <Stop offset="0%" stopColor="#000000" stopOpacity="0.28" />
+            <Stop offset="35%" stopColor="#000000" stopOpacity="0.08" />
+            <Stop offset="100%" stopColor="#000000" stopOpacity="0.0" />
+          </SvgGradient>
+        </Defs>
+        <Rect
+          width="100%"
+          height="100%"
+          rx={20}
+          ry={20}
+          fill={`url(#${gradId})`}
+        />
+      </Svg>
+
+      {/* Card Content Overlay: Only Marketplace Name */}
+      <View style={styles.cardOverlayContent}>
+        <View style={styles.storeBadgePill}>
+          <Text style={styles.storeBadgeText} numberOfLines={1}>
+            {store.name}
+          </Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
 export default function BannerList({ route, navigation }) {
   const { ctx, ctxDil } = useContext(EmContext);
   const carouselRef = useRef(null);
@@ -107,8 +188,8 @@ export default function BannerList({ route, navigation }) {
 
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [ulkeID, setUlkeID] = useState(0);
-  const [failedImages, setFailedImages] = useState({});
 
   const [state, setState] = useState({
     banners: [],
@@ -139,16 +220,44 @@ export default function BannerList({ route, navigation }) {
               ulkes: cached.ulkes || [],
               kur: cached.kur ?? "",
             }));
+            setInitialLoading(false);
           }
         } catch (_) {}
       }
 
+      // Ensure guest session has real database token if currently missing or set to dummy 'GUEST'
+      try {
+        const currentToken = await getToken();
+        if (!currentToken || currentToken === "GUEST") {
+          const user = await getUser();
+          const isGuestStorage = (await storageGet("is_guest")) === "1";
+          if (isGuestStorage || user?.kod === "HG1000" || user?.kod === "GUEST") {
+            await loginGuestUser();
+          }
+        }
+      } catch (_) {}
+
       // 2. Fetch fresh data from backend
-      const res = await ai.post(
+      let res = await ai.post(
         "home",
         { ulkeID: ulkeID },
         { timeout: 6000 }
       );
+
+      // If token expired or invalid for guest, auto-relogin once and retry
+      if (res?.data?.error === true && (res.data.msg === "Session expired" || res.data.msg?.includes("expired"))) {
+        const isGuestStorage = (await storageGet("is_guest")) === "1";
+        if (isGuestStorage) {
+          const freshGuest = await loginGuestUser();
+          if (freshGuest?.token) {
+            res = await ai.post(
+              "home",
+              { ulkeID: ulkeID },
+              { timeout: 6000 }
+            );
+          }
+        }
+      }
 
       if (res?.data && res.data.error === false) {
         setState(prev => ({
@@ -160,6 +269,7 @@ export default function BannerList({ route, navigation }) {
           kur: res.data?.kur ?? "",
           loading: false,
         }));
+        setInitialLoading(false);
         try {
           await storageSet("cached_home_data", res.data);
         } catch (_) {}
@@ -168,6 +278,7 @@ export default function BannerList({ route, navigation }) {
       console.log("BannerList fetchData note:", error?.message);
     } finally {
       setRefreshing(false);
+      setInitialLoading(false);
     }
   };
 
@@ -303,15 +414,6 @@ export default function BannerList({ route, navigation }) {
           assetFallback = STORE_IHERB_IMG;
         } else if (nameClean.includes("yesstyle") || linkClean.includes("yesstyle")) {
           assetFallback = STORE_YESSTYLE_IMG;
-        } else {
-          // Guaranteed fallback from available branded assets so card background is never blank
-          const defaultPool = [
-            STORE_SHEIN_IMG,
-            STORE_AMAZON_IMG,
-            STORE_IHERB_IMG,
-            STORE_YESSTYLE_IMG,
-          ];
-          assetFallback = defaultPool[index % defaultPool.length] || STORE_AMAZON_IMG;
         }
 
         return {
@@ -325,8 +427,12 @@ export default function BannerList({ route, navigation }) {
       });
     }
 
-    return DEFAULT_FALLBACK_STORES;
-  }, [state.banners, ctxDil]);
+    if (!initialLoading) {
+      return DEFAULT_FALLBACK_STORES;
+    }
+
+    return [];
+  }, [state.banners, ctxDil, initialLoading]);
 
   const isDark = ctx?.isDark;
   const pageBg = isDark ? "#111827" : "#FFFFFF";
@@ -460,83 +566,63 @@ export default function BannerList({ route, navigation }) {
 
           {/* 4. Single-Column Store Cards List (Full-Image Dynamic Cards) */}
           <View style={styles.storeCardsList}>
-            {displayStores.map((store, index) => {
-              const gradId = `card-grad-${store.id || index}`;
-
-              return (
-                <TouchableOpacity
-                  key={store.id || index}
-                  activeOpacity={0.92}
-                  onPress={() => handleStorePress(store)}
-                  style={styles.cardContainer}>
-                  {/* 1. Guaranteed Baseline Asset Image Layer: Always mounted underneath, loads in 0ms offline, ensures cards NEVER appear empty */}
-                  {store.assetImage ? (
-                    <Image
-                      source={store.assetImage}
-                      style={StyleSheet.absoluteFillObject}
-                      resizeMode="cover"
-                    />
-                  ) : (
+            {initialLoading && (!displayStores || displayStores.length === 0) ? (
+              <>
+                <View
+                  style={[
+                    styles.cardContainer,
+                    styles.skeletonCard,
+                    { backgroundColor: isDark ? "#1E293B" : "#F1F5F9" },
+                  ]}>
+                  <View style={styles.cardOverlayContent}>
                     <View
                       style={[
-                        StyleSheet.absoluteFillObject,
-                        { backgroundColor: "#1E293B" },
+                        styles.skeletonBadge,
+                        { backgroundColor: isDark ? "#334155" : "#E2E8F0" },
                       ]}
                     />
-                  )}
-
-                  {/* 2. Dynamic Remote Image Layer: Overlays smoothly when available from API */}
-                  {store.apiRemoteImg && !failedImages[store.id] ? (
-                    <FastImage
-                      source={{
-                        uri: store.apiRemoteImg,
-                        priority: FastImage.priority.high,
-                        cache: FastImage.cacheControl.immutable,
-                      }}
-                      style={StyleSheet.absoluteFillObject}
-                      resizeMode={FastImage.resizeMode.cover}
-                      onError={() => {
-                        setFailedImages(prev => ({
-                          ...prev,
-                          [store.id]: true,
-                        }));
-                      }}
-                    />
-                  ) : null}
-
-                  {/* Subtle Gradient Scrim for contrast */}
-                  <Svg
-                    style={StyleSheet.absoluteFillObject}
-                    width="100%"
-                    height="100%">
-                    <Defs>
-                      <SvgGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-                        <Stop offset="0%" stopColor="#000000" stopOpacity="0.28" />
-                        <Stop offset="35%" stopColor="#000000" stopOpacity="0.08" />
-                        <Stop offset="100%" stopColor="#000000" stopOpacity="0.0" />
-                      </SvgGradient>
-                    </Defs>
-                    <Rect
-                      width="100%"
-                      height="100%"
-                      rx={20}
-                      ry={20}
-                      fill={`url(#${gradId})`}
-                    />
-                  </Svg>
-
-                  {/* Card Content Overlay: Only Marketplace Name */}
-                  <View style={styles.cardOverlayContent}>
-                    {/* Marketplace Name Badge */}
-                    <View style={styles.storeBadgePill}>
-                      <Text style={styles.storeBadgeText} numberOfLines={1}>
-                        {store.name}
-                      </Text>
-                    </View>
                   </View>
-                </TouchableOpacity>
-              );
-            })}
+                </View>
+                <View
+                  style={[
+                    styles.cardContainer,
+                    styles.skeletonCard,
+                    { backgroundColor: isDark ? "#1E293B" : "#F1F5F9" },
+                  ]}>
+                  <View style={styles.cardOverlayContent}>
+                    <View
+                      style={[
+                        styles.skeletonBadge,
+                        { backgroundColor: isDark ? "#334155" : "#E2E8F0" },
+                      ]}
+                    />
+                  </View>
+                </View>
+                <View
+                  style={[
+                    styles.cardContainer,
+                    styles.skeletonCard,
+                    { backgroundColor: isDark ? "#1E293B" : "#F1F5F9" },
+                  ]}>
+                  <View style={styles.cardOverlayContent}>
+                    <View
+                      style={[
+                        styles.skeletonBadge,
+                        { backgroundColor: isDark ? "#334155" : "#E2E8F0" },
+                      ]}
+                    />
+                  </View>
+                </View>
+              </>
+            ) : (
+              displayStores.map((store, index) => (
+                <StoreCardItem
+                  key={store.id || index}
+                  store={store}
+                  onPress={handleStorePress}
+                />
+              ))
+            )}
           </View>
 
           {/* 5. Middle Sliders from API (if provided) */}
@@ -717,5 +803,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 6,
     elevation: 2,
+  },
+  skeletonCard: {
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.04)",
+    opacity: 0.85,
+  },
+  skeletonBadge: {
+    width: 110,
+    height: 28,
+    borderRadius: 20,
   },
 });

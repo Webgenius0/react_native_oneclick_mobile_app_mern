@@ -5,6 +5,7 @@ import { useUserStore } from '../store/useUserStore';
 import * as RootNavigation from '../services/RootNavigation';
 import ai from './ai';
 import { getFcmToken } from './notification';
+import { i18n } from '../translate/i18n';
 
 export const isGuestUser = async (userParam = null) => {
   try {
@@ -27,6 +28,30 @@ export const isGuestUser = async (userParam = null) => {
   } catch (e) {
     return true;
   }
+};
+
+export const loginGuestUser = async () => {
+  try {
+    const activeDil = (await storageGet('language')) || i18n?.locale || 'en';
+    const res = await ai.post('login', {
+      email: 'HG1000',
+      kod: 'HG1000',
+      password: '123',
+      sifre: '123',
+      dil: activeDil,
+    });
+
+    if (res?.data && res.data.error === false && res.data.s) {
+      const guestUser = res.data.s;
+      await setUser(guestUser);
+      await storageSet('is_guest', '1');
+      await storageSet('has_seen_onboarding', '1');
+      return guestUser;
+    }
+  } catch (err) {
+    console.log('loginGuestUser error:', err?.message || err);
+  }
+  return null;
 };
 
 export const getToken = async () => {
