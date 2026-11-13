@@ -4,6 +4,8 @@ import NotificationButton from "./NotificationButton";
 import { EmContext } from "../contexts/EmContext";
 import { fetchAllNotifications } from "../helpers/notificationV2";
 import { IS_DEV } from "../helpers/common";
+import { resolveAvatarUrl } from "../helpers/auth";
+import ProfileIcon from "../assets/svg/profile1.svg";
 
 const { width } = Dimensions.get("window");
 const logoRatio = 315 / 68;
@@ -24,6 +26,8 @@ export default function AuthHeader(props) {
   }
 
   const { ctx, setCtx } = useContext(EmContext);
+  const [avatarError, setAvatarError] = React.useState(false);
+  const userAvatarUri = resolveAvatarUrl(ctx?.user);
   const notifInterval = true;
   const notifTimeout = IS_DEV ? 1000 * 10 * 60 : 1000 * 60 * 3;
 
@@ -37,6 +41,7 @@ export default function AuthHeader(props) {
         clearInterval(intervalId);
       };
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const logoMaxHeight = 36;
@@ -88,11 +93,16 @@ export default function AuthHeader(props) {
             activeOpacity={0.8}
             onPress={() => navigation.navigate("Profile")}
             style={styles.profileAvatarBtn}>
-            <Image
-              source={require("../assets/img/account/default_avatar.png")}
-              style={styles.profileAvatarImg}
-              resizeMode="cover"
-            />
+            {userAvatarUri && !avatarError ? (
+              <Image
+                source={{ uri: userAvatarUri }}
+                onError={() => setAvatarError(true)}
+                style={styles.profileAvatarImg}
+                resizeMode="cover"
+              />
+            ) : (
+              <ProfileIcon width={22} height={22} fill="#F67922" />
+            )}
           </TouchableOpacity>
         ) : (
           <View style={styles.placeholderBox} />

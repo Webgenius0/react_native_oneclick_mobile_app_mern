@@ -8,8 +8,42 @@ import * as RootNavigation from '../services/RootNavigation';
 import ai from './ai';
 import { getFcmToken } from './notification';
 import { i18n } from '../translate/i18n';
+import { DATA_URL, BASE_URL } from '../../config';
 
 let isLoggingOut = false;
+
+export const resolveAvatarUrl = user => {
+  if (!user || typeof user !== 'object') {
+    return null;
+  }
+  const raw =
+    user.avatar_url ||
+    user.avatar ||
+    user.photo ||
+    user.image ||
+    user.profile_photo_url ||
+    user.resim;
+
+  if (!raw || typeof raw !== 'string') {
+    return null;
+  }
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed === 'null' || trimmed === 'undefined') {
+    return null;
+  }
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed.replace(/^http:\/\//i, 'https://');
+  }
+  const origin = (BASE_URL || 'https://1click.thesyndicates.team').replace(/\/api\/?$/, '');
+  if (trimmed.startsWith('/')) {
+    return `${origin}${trimmed}`;
+  }
+  if (trimmed.startsWith('avatar-')) {
+    return `${origin}/data/uploads/avatar/${trimmed}`;
+  }
+  const dataPrefix = DATA_URL || `${origin}/data/`;
+  return `${dataPrefix.replace(/\/+$/, '')}/${trimmed.replace(/^\/+/, '')}`;
+};
 
 export const isGuestUser = async (userParam = null) => {
   try {

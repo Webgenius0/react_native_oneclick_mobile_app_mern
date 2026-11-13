@@ -20,7 +20,7 @@ import { availableLanguages, i18n, tr } from '../translate/i18n';
 import { storageDelete, storageGet, storageSet } from '../helpers/storage';
 import { getFcmToken, fcmUpdate } from '../helpers/notification';
 import * as RootNavigation from '../services/RootNavigation';
-import { logoutUser, setUser } from '../helpers/auth';
+import { logoutUser, setUser, resolveAvatarUrl } from '../helpers/auth';
 
 // SVG Icons matching Figma design
 import ProfileIcon from '../assets/svg/profile1.svg';
@@ -57,6 +57,7 @@ export default function Account({ navigation }) {
   const [langModalVisible, setLangModalVisible] = useState(false);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
 
   const handleLogout = () => {
     if (loggingOut) {
@@ -247,6 +248,7 @@ export default function Account({ navigation }) {
     (state.s?.kod && state.s.kod !== 'GUEST' && state.s.kod !== 'HG1000'
       ? `ID: ${state.s.kod}`
       : '');
+  const userAvatarUri = resolveAvatarUrl(state.s || ctx?.user);
 
   return (
     <SafeAreaView
@@ -429,7 +431,16 @@ export default function Account({ navigation }) {
               ]}>
               <View style={styles.avatarRing}>
                 <View style={styles.avatarInner}>
-                  <ProfileIcon width={44} height={44} fill="#F67922" />
+                  {userAvatarUri && !avatarError ? (
+                    <Image
+                      source={{ uri: userAvatarUri }}
+                      onError={() => setAvatarError(true)}
+                      style={styles.avatarImage}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <ProfileIcon width={44} height={44} fill="#F67922" />
+                  )}
                 </View>
               </View>
 
@@ -869,6 +880,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(246, 121, 34, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
   },
   userNameTitle: {
     fontSize: 18,

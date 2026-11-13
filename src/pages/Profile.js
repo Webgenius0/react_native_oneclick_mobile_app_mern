@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  Image,
   Platform,
   RefreshControl,
   SafeAreaView,
@@ -22,7 +23,7 @@ import { availableLanguages, i18n, tr } from '../translate/i18n';
 import { storageGet, storageSet } from '../helpers/storage';
 import { getFcmToken, fcmUpdate } from '../helpers/notification';
 import AppHeader from '../components/common/AppHeader';
-import { logoutUser } from '../helpers/auth';
+import { logoutUser, resolveAvatarUrl } from '../helpers/auth';
 
 import ProfileIcon from '../assets/svg/profile1.svg';
 import BagIcon from '../assets/svg/bag.svg';
@@ -52,6 +53,7 @@ export default function Profile({ navigation }) {
   const [adres, setAdres] = useState(initialUser?.adres || initialUser?.sehir || '');
   const [refreshing, setRefreshing] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
 
   const isDark = ctx?.isDark;
   const pageBg = isDark ? '#111827' : '#F8FAFC';
@@ -104,7 +106,11 @@ export default function Profile({ navigation }) {
       const c = await ai.get('profile');
       let userData = currentUser || {};
       if (c?.data && c.data.error === false && c.data.s) {
-        userData = c.data.s;
+        userData = {
+          ...c.data.s,
+          avatar: c.data.s.avatar || c.data.avatar || currentUser?.avatar,
+          avatar_url: c.data.s.avatar_url || c.data.avatar_url || currentUser?.avatar_url,
+        };
         await storageSet('user', userData);
         if (setCtx) {
           setCtx(prev => ({ ...prev, user: userData }));
@@ -211,6 +217,7 @@ export default function Profile({ navigation }) {
 
   const displayName = state.s.ad || state.s.name || tr('User') || 'User';
   const displayEmail = email || state.s?.email || state.s?.eposta || '';
+  const userAvatarUri = resolveAvatarUrl(state.s || ctx?.user);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: cardBg }]}>
@@ -257,7 +264,16 @@ export default function Profile({ navigation }) {
                 { backgroundColor: cardBg, borderColor: borderColor },
               ]}>
               <View style={styles.topAvatarCircle}>
-                <ProfileIcon fill="#F67922" width={48} height={48} />
+                {userAvatarUri && !avatarError ? (
+                  <Image
+                    source={{ uri: userAvatarUri }}
+                    onError={() => setAvatarError(true)}
+                    style={styles.topAvatarImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <ProfileIcon width={48} height={48} fill="#F67922" />
+                )}
               </View>
               <Text style={[styles.userNameText, { color: textColor }]}>
                 {displayName}
@@ -519,6 +535,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
+    overflow: 'hidden',
+  },
+  topAvatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
   },
   userNameText: {
     fontSize: 19,

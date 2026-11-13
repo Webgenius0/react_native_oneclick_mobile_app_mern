@@ -20,7 +20,11 @@ import { EmContext } from '../contexts/EmContext';
 import ai from '../helpers/ai';
 import { tr } from '../translate/i18n';
 import { storageGet, storageSet } from '../helpers/storage';
+import { setUser, resolveAvatarUrl } from '../helpers/auth';
 import AppHeader from '../components/common/AppHeader';
+import DocumentPicker from 'react-native-document-picker';
+import Svg, { Path } from 'react-native-svg';
+import ProfileIcon from '../assets/svg/profile1.svg';
 
 const { width } = Dimensions.get('window');
 
@@ -37,6 +41,8 @@ export default function PersonalInformation({ navigation }) {
   const [isEditing, setIsEditing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
+  const [selectedAvatar, setSelectedAvatar] = useState(null);
 
   // Form state
   const [fullName, setFullName] = useState(initialUser.ad || initialUser.name || '');
@@ -63,7 +69,11 @@ export default function PersonalInformation({ navigation }) {
 
       let userData = currentUser || {};
       if (c?.data && c.data.error === false && c.data.s) {
-        userData = c.data.s;
+        userData = {
+          ...c.data.s,
+          avatar: c.data.s.avatar || c.data.avatar || currentUser?.avatar,
+          avatar_url: c.data.s.avatar_url || c.data.avatar_url || currentUser?.avatar_url,
+        };
         await storageSet('user', userData);
         if (setCtx) {
           setCtx(prev => ({ ...prev, user: userData }));
@@ -101,31 +111,95 @@ export default function PersonalInformation({ navigation }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctx?.token]);
 
+  const selectAvatar = async () => {
+    try {
+      const res = await DocumentPicker.pick({
+        type: [DocumentPicker.types.images],
+        allowMultiSelection: false,
+      });
+
+      if (res && res[0]) {
+        const file = res[0];
+        setSelectedAvatar(file);
+        setAvatarError(false);
+        setIsEditing(true);
+      }
+    } catch (err) {
+      if (!DocumentPicker.isCancel(err)) {
+        console.log('DocumentPicker Error:', err);
+      }
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
-      const payload = {
-        name: fullName,
-        ad: fullName,
-        phone: phoneNumber,
-        tel: phoneNumber,
-        email: emailAddress,
-        eposta: emailAddress,
-        adres: city,
-        sehir: city,
-      };
+      let res = null;
 
-      const res = await ai.post('profile-update', payload);
+      if (selectedAvatar) {
+        const formData = new FormData();
+        formData.append('name', fullName);
+        formData.append('ad', fullName);
+        formData.append('phone', phoneNumber);
+        formData.append('tel', phoneNumber);
+        formData.append('email', emailAddress);
+        formData.append('eposta', emailAddress);
+        formData.append('adres', city);
+        formData.append('sehir', city);
+
+        formData.append('avatar', {
+          uri: selectedAvatar.uri,
+          type: selectedAvatar.type || 'image/jpeg',
+          name: selectedAvatar.name || 'avatar.jpg',
+        });
+
+        res = await ai.post('profile-update', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+      } else {
+        const payload = {
+          name: fullName,
+          ad: fullName,
+          phone: phoneNumber,
+          tel: phoneNumber,
+          email: emailAddress,
+          eposta: emailAddress,
+          adres: city,
+          sehir: city,
+        };
+
+        res = await ai.post('profile-update', payload);
+      }
+
       if (res?.data && res.data.error === false) {
         Alert.alert(
           tr('Success') || 'Success',
           tr('Personal information updated successfully') ||
             'Personal information updated successfully',
         );
+
+        const serverData = res.data.s || {};
+        const newAvatar = res.data.avatar || serverData.avatar || (state.s || {}).avatar;
+        const newAvatarUrl =
+          res.data.avatar_url || serverData.avatar_url || (state.s || {}).avatar_url;
+
         const updatedUser = {
           ...(state.s || {}),
-          ...payload,
+          ...serverData,
+          name: fullName,
+          ad: fullName,
+          tel: phoneNumber,
+          email: emailAddress,
+          eposta: emailAddress,
+          adres: city,
+          sehir: city,
+          ...(newAvatar ? { avatar: newAvatar } : {}),
+          ...(newAvatarUrl ? { avatar_url: newAvatarUrl } : {}),
         };
+
+        await setUser(updatedUser);
         await storageSet('user', updatedUser);
         if (setCtx) {
           setCtx(prev => ({
@@ -133,6 +207,11 @@ export default function PersonalInformation({ navigation }) {
             user: updatedUser,
           }));
         }
+        setState(prev => ({
+          ...prev,
+          s: updatedUser,
+        }));
+        setSelectedAvatar(null);
         setIsEditing(false);
       } else {
         Alert.alert(
@@ -160,6 +239,8 @@ export default function PersonalInformation({ navigation }) {
     setPhoneNumber(s.tel || '');
     setEmailAddress(s.email || s.eposta || '');
     setCity(s.sehir || s.adres || '');
+    setSelectedAvatar(null);
+    setAvatarError(false);
     setIsEditing(false);
   };
 
@@ -169,6 +250,8 @@ export default function PersonalInformation({ navigation }) {
   const subTextColor = isDark ? '#9CA3AF' : '#64748B';
   const borderColor = isDark ? '#374151' : '#E5E7EB';
   const inputBg = isDark ? '#1F2937' : '#FFFFFF';
+  const userAvatarUri = resolveAvatarUrl(state.s || ctx?.user);
+  const displayAvatarUri = selectedAvatar?.uri || userAvatarUri;
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: pageBg }]}>
@@ -213,16 +296,56 @@ export default function PersonalInformation({ navigation }) {
             <View style={styles.formWrap}>
               {/* Profile Photo Section matching Figma */}
               <View style={styles.avatarSection}>
-                <View style={styles.avatarWrap}>
-                  <Image
-                    source={require('../assets/img/account/default_avatar.png')}
-                    style={styles.avatarImage}
-                    resizeMode="contain"
-                  />
+                <View style={styles.avatarContainer}>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={selectAvatar}
+                    style={styles.avatarWrap}>
+                    {displayAvatarUri && !avatarError ? (
+                      <Image
+                        source={{ uri: displayAvatarUri }}
+                        onError={() => setAvatarError(true)}
+                        style={styles.avatarImage}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={styles.avatarIconPlaceholder}>
+                        <ProfileIcon width={56} height={56} fill="#F67922" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+
+                  {/* Camera / Edit Badge */}
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={selectAvatar}
+                    style={styles.avatarEditBadge}>
+                    <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                      <Path
+                        d="M12 15a3 3 0 100-6 3 3 0 000 6z"
+                        fill="#FFFFFF"
+                      />
+                      <Path
+                        d="M20 7h-3.17l-1.24-1.35A2 2 0 0014.12 5H9.88a2 2 0 00-1.47.65L7.17 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2zm-8 11a5 5 0 110-10 5 5 0 010 10z"
+                        fill="#FFFFFF"
+                      />
+                    </Svg>
+                  </TouchableOpacity>
                 </View>
-                <Text style={[styles.avatarLabel, { color: subTextColor }]}>
-                  {tr('Profile photo') || 'Profile photo'}
-                </Text>
+
+                <TouchableOpacity activeOpacity={0.7} onPress={selectAvatar}>
+                  <Text
+                    style={[
+                      styles.avatarLabel,
+                      { color: selectedAvatar ? '#F67922' : subTextColor },
+                    ]}>
+                    {selectedAvatar
+                      ? (tr('New photo chosen (tap to change)') || 'New photo chosen (tap to change)')
+                      : isEditing
+                      ? (tr('Change photo') || 'Change photo')
+                      : (tr('Profile photo') || 'Profile photo')}
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               {/* Field 1: Full Name */}
@@ -390,6 +513,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 18,
   },
+  avatarContainer: {
+    position: 'relative',
+    width: 110,
+    height: 110,
+  },
   avatarWrap: {
     width: 110,
     height: 110,
@@ -397,6 +525,34 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(246, 121, 34, 0.12)',
+    borderWidth: 2,
+    borderColor: '#F67922',
+  },
+  avatarIconPlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(246, 121, 34, 0.12)',
+  },
+  avatarEditBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F67922',
+    borderWidth: 2.5,
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
   },
   avatarImage: {
     width: '100%',
