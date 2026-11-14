@@ -17,6 +17,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Image,
+  Linking,
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -51,6 +52,17 @@ const resolveImageUrl = img => {
     return `https://1click.thesyndicates.team${trimmed}`;
   }
   return `https://1click.thesyndicates.team/data/${trimmed}`;
+};
+
+// Helper to safely format click URLs for navigation or external browser
+const formatClickUrl = url => {
+  if (!url || typeof url !== "string") return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed)) {
+    return trimmed;
+  }
+  return `https://${trimmed}`;
 };
 
 // Default fallback store definitions used when API banners are loading or offline
@@ -222,7 +234,7 @@ export default function BannerList({ route, navigation }) {
             }));
             setInitialLoading(false);
           }
-        } catch (_) {}
+        } catch (_) { }
       }
 
       // Ensure guest session has real database token if currently missing or set to dummy 'GUEST'
@@ -235,7 +247,7 @@ export default function BannerList({ route, navigation }) {
             await loginGuestUser();
           }
         }
-      } catch (_) {}
+      } catch (_) { }
 
       // 2. Fetch fresh data from backend
       let res = await ai.post(
@@ -272,7 +284,7 @@ export default function BannerList({ route, navigation }) {
         setInitialLoading(false);
         try {
           await storageSet("cached_home_data", res.data);
-        } catch (_) {}
+        } catch (_) { }
       }
     } catch (error) {
       console.log("BannerList fetchData note:", error?.message);
@@ -305,6 +317,18 @@ export default function BannerList({ route, navigation }) {
           item.img;
         const img = resolveImageUrl(rawImg);
         if (img) {
+          const rawLink = item.link || item.url;
+          const hasLink = Boolean(
+            (item.has_link === true ||
+              item.has_link === "true" ||
+              item.has_link === 1 ||
+              (item.has_link === undefined && Boolean(rawLink))) &&
+            rawLink &&
+            typeof rawLink === "string" &&
+            rawLink.trim().length > 0
+          );
+          const linkUrl = hasLink ? formatClickUrl(rawLink) : null;
+
           slides.push({
             id: item.id ? `api-slider-${item.id}` : `api-slider-${index}`,
             title:
@@ -314,7 +338,8 @@ export default function BannerList({ route, navigation }) {
               item.title ||
               item.ad ||
               "Special Deals",
-            url: (item.link || item.url || "").trim() || "https://www.amazon.ae",
+            url: linkUrl,
+            hasLink: Boolean(hasLink && linkUrl),
             remoteImage: img,
             isFigmaHero: false,
           });
@@ -323,14 +348,16 @@ export default function BannerList({ route, navigation }) {
     }
 
     // Always include the Figma Hero slide
-    slides.push({
-      id: "hero-app-pedestals",
-      title: "App.",
-      subtitle: "Everything you need",
-      tags: "Amazon • SHEIN • iHerb • YesStyle",
-      isFigmaHero: true,
-      image: HERO_PEDESTALS_IMG,
-    });
+    // slides.push({
+    //   id: "hero-app-pedestals",
+    //   title: "App.",
+    //   subtitle: "Everything you need",
+    //   tags: "Amazon • SHEIN • iHerb • YesStyle",
+    //   isFigmaHero: true,
+    //   image: HERO_PEDESTALS_IMG,
+    //   hasLink: false,
+    //   url: null,
+    // });
 
     return slides;
   }, [state.sliders, ctxDil]);
@@ -365,6 +392,42 @@ export default function BannerList({ route, navigation }) {
       setActiveSlideIndex(pageIndex);
     }
   };
+
+  const handleSlidePress = useCallback(
+    async slide => {
+      if (!slide?.hasLink || !slide?.url) return;
+      const targetUrl = formatClickUrl(slide.url);
+      if (!targetUrl) return;
+
+      const isExternalScheme =
+        targetUrl.includes("youtube.com") ||
+        targetUrl.includes("youtu.be") ||
+        targetUrl.includes("wa.me") ||
+        targetUrl.includes("whatsapp.com") ||
+        targetUrl.startsWith("whatsapp://") ||
+        targetUrl.startsWith("mailto:") ||
+        targetUrl.startsWith("tel:") ||
+        targetUrl.startsWith("intent:");
+
+      if (isExternalScheme) {
+        try {
+          const supported = await Linking.canOpenURL(targetUrl);
+          if (supported) {
+            await Linking.openURL(targetUrl);
+            return;
+          }
+        } catch (err) {
+          console.log("Could not open external URL via Linking:", err?.message);
+        }
+      }
+
+      navigation.navigate("Webview", {
+        ad: slide.title || "Store",
+        url: targetUrl,
+      });
+    },
+    [navigation]
+  );
 
   const handleStorePress = store => {
     const targetUrl = store.url || "https://www.amazon.ae";
@@ -483,7 +546,11 @@ export default function BannerList({ route, navigation }) {
                 <View
                   key={slide.id}
                   style={{ width: activeWidth, paddingHorizontal: 16 }}>
-                  <View style={[styles.heroCard, { height: heroBannerHeight }]}>
+                  <TouchableOpacity
+                    activeOpacity={slide.hasLink ? 0.9 : 1}
+                    disabled={!slide.hasLink}
+                    onPress={() => handleSlidePress(slide)}
+                    style={[styles.heroCard, { height: heroBannerHeight }]}>
                     {slide.isFigmaHero ? (
                       <View style={styles.heroBannerWrap}>
                         <Image
@@ -523,7 +590,7 @@ export default function BannerList({ route, navigation }) {
                         resizeMode="cover"
                       />
                     )}
-                  </View>
+                  </TouchableOpacity>
                 </View>
               ))}
             </ScrollView>
