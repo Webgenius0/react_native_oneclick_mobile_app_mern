@@ -51,6 +51,9 @@ export const useSheinPriceStore = create(
               }
             });
 
+            if (rates.shein === undefined) rates.shein = 10;
+            if (rates.lifepharmacy === undefined) rates.lifepharmacy = 10;
+
             const sheinItem = marketplaces.find(
               m => String(m.marketplace || '').toLowerCase() === 'shein',
             );
@@ -111,6 +114,9 @@ export const useSheinPriceStore = create(
                 }
               });
 
+              if (rates.shein === undefined) rates.shein = 10;
+              if (rates.lifepharmacy === undefined) rates.lifepharmacy = 10;
+
               const sheinItem = marketplaces.find(
                 m => String(m.marketplace || '').toLowerCase() === 'shein',
               );
@@ -167,6 +173,9 @@ export const useSheinPriceStore = create(
         });
         if (matched && Number(matched.percent) > 0) {
           return Number(matched.percent);
+        }
+        if (cleanSlug.includes('shein') || cleanSlug.includes('lifepharmacy')) {
+          return 10;
         }
         return 0;
       },

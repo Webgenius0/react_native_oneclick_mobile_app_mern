@@ -649,6 +649,24 @@ export const getMetaTagPriceAndCurrency = page_url => {
           '.product-price',
           '.pdp-price',
 
+          // Life Pharmacy
+          '[class*="special-price" i]',
+          '[class*="offer-price" i]',
+          '[class*="offerPrice" i]',
+          '[class*="regular-price" i]',
+          '[class*="product-price" i]',
+          '[data-testid*="price" i]',
+          '[data-cy*="price" i]',
+
+          // Life Pharmacy
+          '[class*="special-price" i]',
+          '[class*="offer-price" i]',
+          '[class*="offerPrice" i]',
+          '[class*="regular-price" i]',
+          '[class*="product-price" i]',
+          '[data-testid*="price" i]',
+          '[data-cy*="price" i]',
+
           // AliExpress / Carrefour / iHerb / YesStyle price selectors
           '[class*="currentPriceText"]',
           '[class*="price--currentPriceText"]',
@@ -730,6 +748,38 @@ export const getMetaTagPriceAndCurrency = page_url => {
             }
           }
           if (price) break;
+        }
+
+        // 1b. Check Life Pharmacy Nuxt 3 data & body text scanner
+        if (!price && (href.indexOf('lifepharmacy.com') > -1 || (document.title && document.title.toLowerCase().indexOf('life pharmacy') > -1))) {
+          try {
+            var nuxtScript = document.getElementById('__NUXT_DATA__');
+            if (nuxtScript && nuxtScript.textContent) {
+              var nd = JSON.parse(nuxtScript.textContent);
+              if (Array.isArray(nd)) {
+                for (var ndi = 0; ndi < nd.length; ndi++) {
+                  var itemNd = nd[ndi];
+                  if (itemNd && typeof itemNd === 'object') {
+                    var nPrice = itemNd.offer_price || itemNd.sale_price || itemNd.price || itemNd.regular_price;
+                    if (nPrice && (typeof nPrice === 'number' || (typeof nPrice === 'string' && /^[0-9]+(?:\.[0-9]+)?$/.test(nPrice)))) {
+                      price = String(nPrice).trim();
+                      if (!currency) currency = 'AED';
+                      break;
+                    }
+                  }
+                }
+              }
+            }
+            if (!price && document.body) {
+              var lpBody = document.body.innerText || '';
+              var aedMatch = lpBody.match(/(?:AED|د\.?إ|د\.?ا|درهم|Dhs?\.?)\s*([0-9]+(?:[.,][0-9]{1,2})?)/i) ||
+                             lpBody.match(/([0-9]+(?:[.,][0-9]{1,2})?)\s*(?:AED|د\.?إ|د\.?ا|درهم|Dhs?\.?)/i);
+              if (aedMatch && aedMatch[1]) {
+                price = aedMatch[1].trim();
+                currency = 'AED';
+              }
+            }
+          } catch(_eLp) {}
         }
 
         // 2a. Check Trendyol application state (if DOM extraction hasn't found price yet)
@@ -1020,7 +1070,7 @@ export const getMetaTagPriceAndCurrency = page_url => {
           var href = window.location.href || '';
           if (href.indexOf('trendyol.com') > -1 || href.indexOf('hepsiburada.com') > -1 || href.indexOf('.tr') > -1) {
             currency = 'TL';
-          } else if (href.indexOf('amazon.ae') > -1 || href.indexOf('noon.com') > -1) {
+          } else if (href.indexOf('amazon.ae') > -1 || href.indexOf('noon.com') > -1 || href.indexOf('lifepharmacy.com') > -1) {
             currency = 'AED';
           } else if (href.indexOf('amazon.sa') > -1) {
             currency = 'SAR';
@@ -2630,7 +2680,16 @@ export const getProductSnapshotBridge = page_url => {
           '[class*="salePrice"]',
           '.product-price-container',
           '.product-price',
-          '.pdp-price'
+          '.pdp-price',
+
+          // Life Pharmacy
+          '[class*="special-price" i]',
+          '[class*="offer-price" i]',
+          '[class*="offerPrice" i]',
+          '[class*="regular-price" i]',
+          '[class*="product-price" i]',
+          '[data-testid*="price" i]',
+          '[data-cy*="price" i]'
         ];
 
         for (var s = 0; s < candidatePriceSelectors.length; s++) {
@@ -2680,6 +2739,38 @@ export const getProductSnapshotBridge = page_url => {
             }
           }
           if (snapshot.price) break;
+        }
+
+        // 3a-life. Check Life Pharmacy Nuxt 3 data & body text scanner
+        if (!snapshot.price && ((window.location && window.location.href && window.location.href.indexOf('lifepharmacy.com') > -1) || (document.title && document.title.toLowerCase().indexOf('life pharmacy') > -1))) {
+          try {
+            var nuxtScriptSnap = document.getElementById('__NUXT_DATA__');
+            if (nuxtScriptSnap && nuxtScriptSnap.textContent) {
+              var ndSnap = JSON.parse(nuxtScriptSnap.textContent);
+              if (Array.isArray(ndSnap)) {
+                for (var ndsi = 0; ndsi < ndSnap.length; ndsi++) {
+                  var itemNdSnap = ndSnap[ndsi];
+                  if (itemNdSnap && typeof itemNdSnap === 'object') {
+                    var nPriceSnap = itemNdSnap.offer_price || itemNdSnap.sale_price || itemNdSnap.price || itemNdSnap.regular_price;
+                    if (nPriceSnap && (typeof nPriceSnap === 'number' || (typeof nPriceSnap === 'string' && /^[0-9]+(?:\.[0-9]+)?$/.test(nPriceSnap)))) {
+                      snapshot.price = String(nPriceSnap).trim();
+                      if (!snapshot.currency) snapshot.currency = 'AED';
+                      break;
+                    }
+                  }
+                }
+              }
+            }
+            if (!snapshot.price && document.body) {
+              var lpBodySnap = document.body.innerText || '';
+              var aedMatchSnap = lpBodySnap.match(/(?:AED|د\.?إ|د\.?ا|درهم|Dhs?\.?)\s*([0-9]+(?:[.,][0-9]{1,2})?)/i) ||
+                                 lpBodySnap.match(/([0-9]+(?:[.,][0-9]{1,2})?)\s*(?:AED|د\.?إ|د\.?ا|درهم|Dhs?\.?)/i);
+              if (aedMatchSnap && aedMatchSnap[1]) {
+                snapshot.price = aedMatchSnap[1].trim();
+                snapshot.currency = 'AED';
+              }
+            }
+          } catch(_eLpSnap) {}
         }
 
         // 3b. Trendyol App State (fallback)

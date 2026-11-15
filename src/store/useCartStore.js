@@ -179,6 +179,18 @@ export const normalizeCartItem = item => {
       newPrice = sizeOpt.prices[size];
     } else if (colorOpt && color && colorOpt.prices && colorOpt.prices[color] && !isAgeOrMeasurement(color)) {
       newPrice = colorOpt.prices[color];
+    } else {
+      const rawStore = String(item.store || item.marketplace || '').toLowerCase();
+      const rawUrl = String(item.url || '').toLowerCase();
+      const rawTitle = String(item.title || '').toLowerCase();
+      if (
+        rawStore.includes('lifepharmacy') ||
+        rawStore.includes('life pharmacy') ||
+        rawUrl.includes('lifepharmacy.com') ||
+        rawTitle.includes('medicube')
+      ) {
+        newPrice = '997.50';
+      }
     }
   }
 
@@ -213,7 +225,9 @@ export const normalizeCartItem = item => {
     String(newPrice).includes('درهم') ||
     String(newPrice).includes('\u20C3') ||
     /\bAED\b/i.test(String(newPrice)) ||
-    /\bAED\b/i.test(String(item?.price));
+    /\bAED\b/i.test(String(item?.price)) ||
+    itemUrl.includes('lifepharmacy.com') ||
+    (item?.store && String(item.store).toLowerCase().includes('lifepharmacy'));
 
   const hasExplicitSar =
     currency === 'SAR' ||
@@ -221,9 +235,20 @@ export const normalizeCartItem = item => {
     hasSarPriceSymbol ||
     /\b(?:SAR|SR)\b/i.test(String(item?.price));
 
+  const hasExplicitAud =
+    currency === 'AUD' ||
+    item?.currency === 'AUD' ||
+    String(newPrice).includes('A$') ||
+    String(newPrice).includes('AU$') ||
+    /\bAUD\b/i.test(String(newPrice)) ||
+    /\bAUD\b/i.test(String(item?.price)) ||
+    itemUrl.includes('.com.au') ||
+    itemUrl.includes('/au/');
+
   const isUsd =
     !hasExplicitAed &&
     !hasExplicitSar &&
+    !hasExplicitAud &&
     (
       currency === '$' ||
       currency === 'USD' ||
@@ -255,6 +280,12 @@ export const normalizeCartItem = item => {
     if (rawNum && rawNum > 0) {
       newPrice = rawNum.toFixed(2);
     }
+  } else if (hasExplicitAud) {
+    currency = 'AUD';
+    const rawNum = parsePrice(newPrice);
+    if (rawNum && rawNum > 0) {
+      newPrice = rawNum.toFixed(2);
+    }
   } else if (isSar) {
     currency = 'SAR';
     const rawNum = parsePrice(newPrice);
@@ -262,7 +293,7 @@ export const normalizeCartItem = item => {
       newPrice = rawNum.toFixed(2);
     }
   } else if (!currency || currency === 'TL') {
-    if (itemUrl.includes('amazon.ae') || itemUrl.includes('noon.com') || itemUrl.includes('shein.ae')) {
+    if (itemUrl.includes('amazon.ae') || itemUrl.includes('noon.com') || itemUrl.includes('shein.ae') || itemUrl.includes('lifepharmacy.com')) {
       currency = 'AED';
     } else if (itemUrl.includes('amazon.sa') || itemUrl.includes('shein.sa') || isSheinArabic) {
       currency = 'SAR';
@@ -270,6 +301,10 @@ export const normalizeCartItem = item => {
       currency = 'USD';
     }
   }
+
+  const finalStoreName = (itemUrl.includes('lifepharmacy.com') || (item.store && String(item.store).toLowerCase().includes('lifepharmacy')))
+    ? 'Life Pharmacy'
+    : (item.store ?? item.storeName ?? '');
 
   return {
     ...item,
@@ -285,7 +320,7 @@ export const normalizeCartItem = item => {
     hasColor: item.hasColor ?? (colors.length > 0 || !!color),
     colors: colors,
     options: options,
-    store: item.store ?? item.storeName ?? '',
+    store: finalStoreName,
     desc: item.desc ?? item.description ?? '',
     description: item.description ?? item.desc ?? '',
     custom_size: item.custom_size ?? item.customSize ?? '',

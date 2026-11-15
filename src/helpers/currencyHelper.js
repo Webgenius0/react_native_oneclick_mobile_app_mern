@@ -11,6 +11,7 @@ export const DEFAULT_RATES = {
   EUR: 1.08,
   GBP: 1.28,
   SAR: 0.266667,
+  AUD: 0.65,
 };
 
 export const DEFAULT_INVERSE_RATES = {
@@ -21,6 +22,7 @@ export const DEFAULT_INVERSE_RATES = {
   EUR: 0.9259,
   GBP: 0.7813,
   SAR: 3.75,
+  AUD: 1.54,
 };
 
 /**
@@ -62,6 +64,9 @@ export const normalizeCurrency = (rawCurrency, rawPrice = '') => {
     c.includes('RIAL')
   ) {
     return 'SAR';
+  }
+  if (c === 'AUD' || c === 'A$' || c === 'AU$' || c.includes('AUD')) {
+    return 'AUD';
   }
   if (c === 'USD' || c.includes('$') || c.includes('DOLLAR')) {
     return 'USD';
@@ -111,6 +116,9 @@ export const normalizeCurrency = (rawCurrency, rawPrice = '') => {
     p.includes('RIAL')
   ) {
     return 'SAR';
+  }
+  if (p.includes('A$') || p.includes('AU$') || /\bAUD\b/.test(p)) {
+    return 'AUD';
   }
   if (p.includes('$') || p.includes('USD')) {
     return 'USD';
@@ -233,7 +241,7 @@ export const calculateConvertedPrice = (
     return parseFloat(price.toFixed(2));
   }
 
-  const isWeaker = ['SAR', 'AED', 'UAE', 'TRY', 'QAR', 'EGP', 'INR', 'PKR'].includes(currency);
+  const isWeaker = ['SAR', 'AED', 'UAE', 'TRY', 'QAR', 'EGP', 'INR', 'PKR', 'AUD'].includes(currency);
 
   // 1. Check dynamic rates (Multiplier: Price_in_USD = Local_Price * rates[CURRENCY])
   const rateVal = Number(rates?.[currency]);
@@ -305,6 +313,7 @@ export const detectItemCurrency = (item = {}, fallbackCurrency = 'USD') => {
     if (norm === 'SAR') return 'SAR';
     if (norm === 'AED' || norm === 'UAE') return 'AED';
     if (norm === 'USD' || norm === '$') return 'USD';
+    if (norm === 'AUD') return 'AUD';
     if (norm === 'EUR') return 'EUR';
     if (norm === 'GBP') return 'GBP';
     if (norm === 'TRY') return 'TRY';
@@ -324,6 +333,7 @@ export const detectItemCurrency = (item = {}, fallbackCurrency = 'USD') => {
       p.includes('ريال')
     ) return 'SAR';
     if (/\b(?:AED|DHS|DH|DIRHAM)\b/i.test(p) || p.includes('د.إ') || p.includes('درهم') || p.includes('\u20C3')) return 'AED';
+    if (/\b(?:AUD)\b/i.test(p) || p.includes('A$') || p.includes('AU$')) return 'AUD';
     if (p.includes('$') || /\bUSD\b/i.test(p)) return 'USD';
     if (p.includes('€') || /\bEUR\b/i.test(p)) return 'EUR';
     if (p.includes('£') || /\bGBP\b/i.test(p)) return 'GBP';
@@ -331,8 +341,18 @@ export const detectItemCurrency = (item = {}, fallbackCurrency = 'USD') => {
   }
 
   // 3. Domain and store-based detection
-  if (url.includes('shein.ae') || url.includes('amazon.ae') || url.includes('noon.com')) {
+  if (
+    url.includes('shein.ae') ||
+    url.includes('amazon.ae') ||
+    url.includes('noon.com') ||
+    url.includes('lifepharmacy.com') ||
+    store.includes('lifepharmacy') ||
+    store.includes('life pharmacy')
+  ) {
     return 'AED';
+  }
+  if (url.includes('.com.au') || url.includes('/au/')) {
+    return 'AUD';
   }
   if (
     url.includes('shein.sa') ||
@@ -427,6 +447,18 @@ export const getReceivedCurrencyInfo = (item = {}) => {
       display: rawCurr.includes('د.إ') || rawPrice.includes('د.إ') ? 'د.إ' : (rawCurr.includes('\u20C3') || rawPrice.includes('\u20C3') ? '\u20C3' : 'AED'),
       isUsd: false,
     };
+  }
+
+  // 2b. If AUD symbol or text is present
+  if (
+    rawCurr.includes('A$') ||
+    rawPrice.includes('A$') ||
+    rawCurr.includes('AU$') ||
+    rawPrice.includes('AU$') ||
+    rawCurrUpper === 'AUD' ||
+    /\bAUD\b/.test(rawPriceUpper)
+  ) {
+    return { code: 'AUD', display: 'A$', isUsd: false };
   }
 
   // 3. If explicit 'USD' or '$' symbol is present

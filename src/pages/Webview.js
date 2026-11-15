@@ -1939,7 +1939,16 @@ export default function Webview({ route, navigation }) {
               '.price-tag',
               '[class*="itemPrice"]',
               '[class*="price-now"]',
-              '[class*="now-price"]'
+              '[class*="now-price"]',
+
+              // Life Pharmacy
+              '[class*="special-price" i]',
+              '[class*="offer-price" i]',
+              '[class*="offerPrice" i]',
+              '[class*="regular-price" i]',
+              '[class*="product-price" i]',
+              '[data-testid*="price" i]',
+              '[data-cy*="price" i]'
             ];
 
             for (var s = 0; s < candidatePriceSelectors.length; s++) {
@@ -2001,6 +2010,38 @@ export default function Webview({ route, navigation }) {
                 }
               }
               if (price) break;
+            }
+
+            // Check Life Pharmacy Nuxt 3 data & body text scanner
+            if (!price && ((window.location && window.location.href && window.location.href.indexOf('lifepharmacy.com') > -1) || (document.title && document.title.toLowerCase().indexOf('life pharmacy') > -1))) {
+              try {
+                var nuxtScriptAdd = document.getElementById('__NUXT_DATA__');
+                if (nuxtScriptAdd && nuxtScriptAdd.textContent) {
+                  var ndAdd = JSON.parse(nuxtScriptAdd.textContent);
+                  if (Array.isArray(ndAdd)) {
+                    for (var ndai = 0; ndai < ndAdd.length; ndai++) {
+                      var itemNdAdd = ndAdd[ndai];
+                      if (itemNdAdd && typeof itemNdAdd === 'object') {
+                        var nPriceAdd = itemNdAdd.offer_price || itemNdAdd.sale_price || itemNdAdd.price || itemNdAdd.regular_price;
+                        if (nPriceAdd && (typeof nPriceAdd === 'number' || (typeof nPriceAdd === 'string' && /^[0-9]+(?:\.[0-9]+)?$/.test(nPriceAdd)))) {
+                          price = String(nPriceAdd).trim();
+                          if (!currency) currency = 'AED';
+                          break;
+                        }
+                      }
+                    }
+                  }
+                }
+                if (!price && document.body) {
+                  var lpBodyAdd = document.body.innerText || '';
+                  var aedMatchAdd = lpBodyAdd.match(/(?:AED|د\.?إ|د\.?ا|درهم|Dhs?\.?)\s*([0-9]+(?:[.,][0-9]{1,2})?)/i) ||
+                                    lpBodyAdd.match(/([0-9]+(?:[.,][0-9]{1,2})?)\s*(?:AED|د\.?إ|د\.?ا|درهم|Dhs?\.?)/i);
+                  if (aedMatchAdd && aedMatchAdd[1]) {
+                    price = aedMatchAdd[1].trim();
+                    currency = 'AED';
+                  }
+                }
+              } catch(_eLpAdd) {}
             }
 
             // For Shein: Client-side cookie, runtime gbCommonInfo, and localStorage are the absolute ground truth!
@@ -2264,7 +2305,7 @@ export default function Webview({ route, navigation }) {
               var href = window.location.href || '';
               if (href.indexOf('trendyol.com') > -1 || href.indexOf('hepsiburada.com') > -1 || href.indexOf('.tr') > -1) {
                 currency = 'TL';
-              } else if (href.indexOf('amazon.ae') > -1 || href.indexOf('noon.com') > -1) {
+              } else if (href.indexOf('amazon.ae') > -1 || href.indexOf('noon.com') > -1 || href.indexOf('lifepharmacy.com') > -1) {
                 currency = 'AED';
               } else if (href.indexOf('amazon.sa') > -1) {
                 currency = 'SAR';
@@ -3089,7 +3130,8 @@ export default function Webview({ route, navigation }) {
       const isIherb = currentUrlRef.current.includes('iherb.com');
       const isYesStyle = currentUrlRef.current.includes('yesstyle.com');
       const isSheinUs = isShein && (currentUrlRef.current.includes('us.shein.com') || currentUrlRef.current.includes('/us/'));
-      const isUaeUrl = currentUrlRef.current.includes('amazon.ae') || currentUrlRef.current.includes('noon.com') || currentUrlRef.current.includes('shein.ae');
+      const isUaeUrl = currentUrlRef.current.includes('amazon.ae') || currentUrlRef.current.includes('noon.com') || currentUrlRef.current.includes('shein.ae') || currentUrlRef.current.includes('lifepharmacy.com');
+      const isLifePharmacy = currentUrlRef.current.includes('lifepharmacy.com') || (finalStore && finalStore.toLowerCase().includes('life pharmacy'));
       const isSaUrl = currentUrlRef.current.includes('amazon.sa');
       const fallbackCurrency = (isAmazonUsUrl || isAliExpress || isIherb || isYesStyle || isSheinUs)
         ? 'USD'
@@ -3153,11 +3195,14 @@ export default function Webview({ route, navigation }) {
           finalCurrency = storedSheinCur || 'SAR';
         }
       } else {
-        if (priceHasDollar && !priceHasSar && !priceHasAed) {
+        const isAudPrice = rawPriceOnly.includes('A$') || rawPriceOnly.includes('AU$') || /(?:^|[^a-zA-Z])AUD(?:[^a-zA-Z]|$)/i.test(rawPriceOnly);
+        if (priceHasDollar && !priceHasSar && !priceHasAed && !isAudPrice) {
           finalCurrency = 'USD';
+        } else if (isAudPrice || rawCurrency === 'AUD') {
+          finalCurrency = 'AUD';
         } else if (priceHasSar) {
           finalCurrency = 'SAR';
-        } else if (priceHasAed) {
+        } else if (priceHasAed || isLifePharmacy) {
           finalCurrency = 'AED';
         } else if (rawCurrency === 'AED') {
           finalCurrency = 'AED';

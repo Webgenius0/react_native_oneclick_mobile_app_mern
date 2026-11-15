@@ -30,6 +30,11 @@ export const getStoreNameFromUrl = url => {
     return 'Shein';
   }
 
+  // Life Pharmacy
+  if (cleanUrl.includes('lifepharmacy.com') || cleanUrl.includes('lifepharmacy')) {
+    return 'Life Pharmacy';
+  }
+
   // Hepsiburada
   if (cleanUrl.includes('hepsiburada.com')) {
     return 'Hepsiburada';
@@ -168,6 +173,10 @@ export const isProductUrl = url => {
 
     if (host.includes('shein.')) {
       return /-p-\d+\.html/i.test(path) || path.includes('/goods-p-') || path.includes('/item/');
+    }
+
+    if (host.includes('lifepharmacy.')) {
+      return path.includes('/product/') || path.includes('/products/');
     }
 
     if (host.includes('hepsiburada.')) {
@@ -340,7 +349,7 @@ export const cleanProductTitle = (rawTitle, url = '') => {
 
     // 3. Remove store prefixes (e.g. "Amazon.com: ", "Amazon.com.tr : ", "Trendyol: ", "Hepsiburada: ")
     title = title.replace(
-      /^(?:Amazon(?:\.[a-z.]+)?|Trendyol|Hepsiburada(?:\.com)?|Shein|Zara|Noon|AliExpress|eBay|Walmart(?:\.com)?|Nike(?:\.com)?|Apple|Asos|Mango|H&M)\s*[:|–—-]\s*/gi,
+      /^(?:Amazon(?:\.[a-z.]+)?|Trendyol|Hepsiburada(?:\.com)?|Shein|Life Pharmacy|Zara|Noon|AliExpress|eBay|Walmart(?:\.com)?|Nike(?:\.com)?|Apple|Asos|Mango|H&M)\s*[:|–—-]\s*/gi,
       '',
     );
 
@@ -567,7 +576,7 @@ export const calculateMarketplacePrice = (basePrice, item, marketplaces) => {
     return isNaN(num) ? 0 : num;
   };
 
-  const matched = findMarketplaceForItem(item, activeMarketplaces);
+  let matched = findMarketplaceForItem(item, activeMarketplaces);
 
   let percent = 0;
   if (matched && matched.percent !== undefined && matched.percent !== null) {
@@ -596,6 +605,28 @@ export const calculateMarketplacePrice = (basePrice, item, marketplaces) => {
         }
       }
     } catch (_) {}
+
+    // Shein and Life Pharmacy always have 10% commission default if unconfigured or 0
+    if (percent === 0) {
+      const rawStore = String(item?.store || item?.marketplace || '').toLowerCase();
+      const rawUrl = String(item?.url || item?.link || '').toLowerCase();
+      const isLife =
+        rawStore.includes('lifepharmacy') ||
+        rawStore.includes('life pharmacy') ||
+        rawUrl.includes('lifepharmacy');
+      const isShein = rawStore.includes('shein') || rawUrl.includes('shein');
+
+      if (isLife || isShein) {
+        percent = 10;
+        if (!matched) {
+          matched = {
+            marketplace: isLife ? 'lifepharmacy' : 'shein',
+            name: isLife ? 'Life Pharmacy' : 'SHEIN',
+            percent: 10,
+          };
+        }
+      }
+    }
   }
 
   // If commission is 0 or not configured, NO commission is added to product
