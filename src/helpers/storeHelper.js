@@ -172,7 +172,17 @@ export const isProductUrl = url => {
     }
 
     if (host.includes('shein.')) {
-      return /-p-\d+\.html/i.test(path) || path.includes('/goods-p-') || path.includes('/item/');
+      return (
+        /-p-\d+/i.test(path) ||
+        path.includes('/goods-p-') ||
+        path.includes('/goods/') ||
+        path.includes('/item/') ||
+        path.includes('/product/') ||
+        path.includes('/products/') ||
+        path.includes('/pd/') ||
+        /-g-\d+/i.test(path) ||
+        /[?&](?:goods_id|product_id|goods_sn)=\d+/i.test(cleanUrl)
+      );
     }
 
     if (host.includes('lifepharmacy.')) {

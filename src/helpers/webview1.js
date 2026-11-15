@@ -3095,34 +3095,67 @@ export const getProductSnapshotBridge = page_url => {
           }
           var shDataSnap = window.productIntroData || window.gbProductIntroData;
           if (shDataSnap && shDataSnap.detail) {
-            if (shDataSnap.detail.is_on_sale === 0) isSoldOut = true;
-            if (shDataSnap.detail.currentSku && shDataSnap.detail.currentSku.stock === 0) isSoldOut = true;
+            if (shDataSnap.detail.is_on_sale === 0) {
+              isSoldOut = true;
+            } else if (Array.isArray(shDataSnap.detail.sku_list) && shDataSnap.detail.sku_list.length > 0) {
+              var anySkuStockSnap = shDataSnap.detail.sku_list.some(function(sku) {
+                return sku && (sku.stock === undefined || Number(sku.stock) > 0);
+              });
+              if (!anySkuStockSnap) isSoldOut = true;
+            } else if (shDataSnap.detail.currentSku && shDataSnap.detail.currentSku.stock === 0 && !shDataSnap.detail.sku_list) {
+              isSoldOut = true;
+            }
           }
-          if (window.gbCommonInfo && window.gbCommonInfo.contextForSSR && window.gbCommonInfo.contextForSSR.detail) {
+          if (!isSoldOut && window.gbCommonInfo && window.gbCommonInfo.contextForSSR && window.gbCommonInfo.contextForSSR.detail) {
             var ssrDetSnap = window.gbCommonInfo.contextForSSR.detail;
-            if (ssrDetSnap.is_on_sale === 0) isSoldOut = true;
-            if (ssrDetSnap.currentSku && ssrDetSnap.currentSku.stock === 0) isSoldOut = true;
+            if (ssrDetSnap.is_on_sale === 0) {
+              isSoldOut = true;
+            } else if (Array.isArray(ssrDetSnap.sku_list) && ssrDetSnap.sku_list.length > 0) {
+              var anySsrStockSnap = ssrDetSnap.sku_list.some(function(sku) {
+                return sku && (sku.stock === undefined || Number(sku.stock) > 0);
+              });
+              if (!anySsrStockSnap) isSoldOut = true;
+            }
           }
           if (!isSoldOut) {
-            var soCandidates = document.querySelectorAll(
-              'button, [role="button"], input[type="button"], input[type="submit"], .she-btn-black, .she-btn-gray, .bsc-sold-out, .goods-soldout, .sold-out-tag, .product-intro__sold-out, [class*="soldout" i], [class*="sold-out" i], [class*="out-of-stock" i], [class*="outOfStock" i], [class*="add-to-bag"], [class*="addToBag"], [class*="add-to-cart"], [class*="addToCart"]'
+            var mainActionBtnSnap = document.querySelector(
+              '.she-btn-black, .she-btn-gray, #add-to-cart-button, [class*="btn-add-cart"], [class*="btn-add-to-bag"], [class*="btn-addToBag"], .product-intro__sold-out, .goods-soldout, .bsc-sold-out'
             );
-            var soPhrases = [
-              'sold out', 'out of stock', 'remind me',
-              'نفدت الكمية', 'غير متوفر',
-              'tükendi', 'stokta yok'
-            ];
-            for (var si = 0; si < soCandidates.length; si++) {
-              var soEl = soCandidates[si];
-              var soText = (soEl.innerText || soEl.textContent || soEl.value || soEl.getAttribute('aria-label') || '').trim().toLowerCase();
-              if (!soText) continue;
-              for (var spi = 0; spi < soPhrases.length; spi++) {
-                if (soText === soPhrases[spi] || soText.indexOf(soPhrases[spi]) > -1) {
+            if (mainActionBtnSnap) {
+              var mainBtnTextSnap = (mainActionBtnSnap.innerText || mainActionBtnSnap.textContent || '').trim().toLowerCase();
+              if (
+                mainBtnTextSnap.indexOf('sold out') > -1 ||
+                mainBtnTextSnap.indexOf('out of stock') > -1 ||
+                mainBtnTextSnap.indexOf('tükendi') > -1 ||
+                mainBtnTextSnap.indexOf('stokta yok') > -1 ||
+                mainBtnTextSnap.indexOf('نفدت الكمية') > -1 ||
+                mainBtnTextSnap.indexOf('غير متوفر') > -1
+              ) {
+                isSoldOut = true;
+              }
+            }
+          }
+          if (!isSoldOut) {
+            var soSelectorsSnap = ['.goods-soldout', '.product-intro__sold-out', '[data-status="sold_out"]'];
+            for (var siSnap = 0; siSnap < soSelectorsSnap.length; siSnap++) {
+              var soElSnap = document.querySelector(soSelectorsSnap[siSnap]);
+              if (soElSnap) {
+                if (soElSnap.closest && soElSnap.closest('[class*="size"], [class*="sku"], [class*="attr"], [class*="val-item"], [class*="swatch"]')) {
+                  continue;
+                }
+                var sTextSnap = (soElSnap.innerText || soElSnap.textContent || '').trim().toLowerCase();
+                if (sTextSnap && (
+                  sTextSnap.indexOf('sold out') > -1 ||
+                  sTextSnap.indexOf('out of stock') > -1 ||
+                  sTextSnap.indexOf('نفدت الكمية') > -1 ||
+                  sTextSnap.indexOf('غير متوفر') > -1 ||
+                  sTextSnap.indexOf('tükendi') > -1 ||
+                  sTextSnap.indexOf('stokta yok') > -1
+                )) {
                   isSoldOut = true;
                   break;
                 }
               }
-              if (isSoldOut) break;
             }
           }
           snapshot.isSoldOut = isSoldOut;
@@ -3226,9 +3259,17 @@ export const checkProductPageBridge = page_url => {
         '[class*="buyNow"]',
         '.she-btn-black',
         '.she-btn-gray',
+        '[class*="she-btn"]',
         '[class*="btn-add-to-bag"]',
         '[class*="btn-add-cart"]',
         '[class*="btn-addToBag"]',
+        '[class*="goods-detail-footer"] button',
+        '[class*="goods-detail-footer"]',
+        '[class*="bottom-bar"] button',
+        '[class*="bottom-act"]',
+        '[class*="footer-btn"]',
+        '[class*="add-cart"]',
+        '[class*="add-bag"]',
         'form[action*="/cart/add"] button[type="submit"]',
         'form[action*="/cart/add"] input[type="submit"]',
         'button[name="add"]',
@@ -3240,7 +3281,7 @@ export const checkProductPageBridge = page_url => {
         var els = document.querySelectorAll(candidateSelectors[i]);
         for (var j = 0; j < els.length; j++) {
           var btn = els[j];
-          if (!isElementVisible(btn)) continue;
+          if (!isElementVisible(btn, true)) continue;
           var btnText = (btn.innerText || btn.textContent || btn.value || btn.getAttribute('aria-label') || '').toLowerCase();
           if (
             btnText.indexOf('tükendi') > -1 ||
@@ -3280,32 +3321,25 @@ export const checkProductPageBridge = page_url => {
         'sepete ekle', 'hemen al', 'şimdi al', 'simdi al', 'satın al', 'satin al', 'sepete at', 'torbaya ekle',
         'أضف إلى عربة التسوق', 'أضف إلى السلة', 'اشتري الآن', 'شراء الآن', 'إضافة إلى السلة', 'أضف إلى الحقيبة', 'اضف الى السلة'
       ];
-      var invalidPhrases = [
-        'tükendi', 'stokta yok', 'sold out', 'out of stock', 'remind me',
-        'نفدت الكمية', 'غير متوفر',
-        'view cart', 'go to cart', 'sepeti görüntüle', 'sepete git',
-        'sepetim', 'cart', 'basket', 'checkout', 'odeme', 'ödeme'
-      ];
 
       for (var k = 0; k < genericCandidates.length; k++) {
         var gBtn = genericCandidates[k];
-        if (!isElementVisible(gBtn)) continue;
+        if (!isElementVisible(gBtn, true)) continue;
 
         var text = (gBtn.innerText || gBtn.textContent || gBtn.value || gBtn.getAttribute('aria-label') || '').trim().toLowerCase();
         if (!text || text.length > 50) continue;
 
-        var isInvalid = false;
-        for (var inv = 0; inv < invalidPhrases.length; inv++) {
-          if (text === invalidPhrases[inv] || text.indexOf(invalidPhrases[inv]) > -1) {
-            isInvalid = true;
-            break;
-          }
-        }
-        if (isInvalid) continue;
-
         for (var v = 0; v < validPhrases.length; v++) {
           if (text.indexOf(validPhrases[v]) > -1) {
-            return true;
+            if (
+              text.indexOf('sold out') === -1 &&
+              text.indexOf('out of stock') === -1 &&
+              text.indexOf('tükendi') === -1 &&
+              text.indexOf('stokta yok') === -1 &&
+              text.indexOf('remind me') === -1
+            ) {
+              return true;
+            }
           }
         }
       }
@@ -3315,6 +3349,9 @@ export const checkProductPageBridge = page_url => {
 
     var checkIsSoldOut = function() {
       try {
+        if (hasActiveCartOrBuyButton()) {
+          return false;
+        }
         if (window.goodsInfo) {
           if (window.goodsInfo.is_on_sale === 0 || window.goodsInfo.stock === 0 || window.goodsInfo.stock_num === 0) {
             return true;
@@ -3323,12 +3360,42 @@ export const checkProductPageBridge = page_url => {
         var shData = window.productIntroData || window.gbProductIntroData;
         if (shData && shData.detail) {
           if (shData.detail.is_on_sale === 0) return true;
-          if (shData.detail.currentSku && shData.detail.currentSku.stock === 0) return true;
+          if (Array.isArray(shData.detail.sku_list) && shData.detail.sku_list.length > 0) {
+            var anySkuStock = shData.detail.sku_list.some(function(sku) {
+              return sku && (sku.stock === undefined || Number(sku.stock) > 0);
+            });
+            if (!anySkuStock) return true;
+          } else if (shData.detail.currentSku && shData.detail.currentSku.stock === 0 && !shData.detail.sku_list) {
+            return true;
+          }
         }
         if (window.gbCommonInfo && window.gbCommonInfo.contextForSSR && window.gbCommonInfo.contextForSSR.detail) {
           var ssrDet = window.gbCommonInfo.contextForSSR.detail;
           if (ssrDet.is_on_sale === 0) return true;
-          if (ssrDet.currentSku && ssrDet.currentSku.stock === 0) return true;
+          if (Array.isArray(ssrDet.sku_list) && ssrDet.sku_list.length > 0) {
+            var anySsrStock = ssrDet.sku_list.some(function(sku) {
+              return sku && (sku.stock === undefined || Number(sku.stock) > 0);
+            });
+            if (!anySsrStock) return true;
+          }
+        }
+
+        // Only check primary add-to-cart or product-level banner
+        var mainActionBtn = document.querySelector(
+          '.she-btn-black, .she-btn-gray, #add-to-cart-button, [class*="btn-add-cart"], [class*="btn-add-to-bag"], [class*="btn-addToBag"], .product-intro__sold-out, .goods-soldout, .bsc-sold-out'
+        );
+        if (mainActionBtn && isElementVisible(mainActionBtn, true)) {
+          var mainBtnText = (mainActionBtn.innerText || mainActionBtn.textContent || '').trim().toLowerCase();
+          if (
+            mainBtnText.indexOf('sold out') > -1 ||
+            mainBtnText.indexOf('out of stock') > -1 ||
+            mainBtnText.indexOf('tükendi') > -1 ||
+            mainBtnText.indexOf('stokta yok') > -1 ||
+            mainBtnText.indexOf('نفدت الكمية') > -1 ||
+            mainBtnText.indexOf('غير متوفر') > -1
+          ) {
+            return true;
+          }
         }
 
         var soldOutSelectors = [
@@ -3340,7 +3407,6 @@ export const checkProductPageBridge = page_url => {
           '[class*="sold-out" i]',
           '[class*="out-of-stock" i]',
           '[class*="outOfStock" i]',
-          '[data-sold-out="true"]',
           '[data-status="sold_out"]'
         ];
         for (var s = 0; s < soldOutSelectors.length; s++) {
@@ -3348,6 +3414,9 @@ export const checkProductPageBridge = page_url => {
           for (var se = 0; se < soEls.length; se++) {
             var soEl = soEls[se];
             if (isElementVisible(soEl, true)) {
+              if (soEl.closest && soEl.closest('[class*="size"], [class*="sku"], [class*="attr"], [class*="val-item"], [class*="swatch"]')) {
+                continue;
+              }
               var sText = (soEl.innerText || soEl.textContent || '').trim().toLowerCase();
               if (sText && (
                 sText.indexOf('sold out') > -1 ||
@@ -3379,6 +3448,9 @@ export const checkProductPageBridge = page_url => {
         for (var b = 0; b < btnCandidates.length; b++) {
           var btnItem = btnCandidates[b];
           if (!isElementVisible(btnItem, true)) continue;
+          if (btnItem.closest && btnItem.closest('[class*="size"], [class*="sku"], [class*="attr"], [class*="val-item"], [class*="swatch"]')) {
+            continue;
+          }
           var bText = (btnItem.innerText || btnItem.textContent || btnItem.value || btnItem.getAttribute('aria-label') || '').trim().toLowerCase();
           if (!bText) continue;
           for (var p = 0; p < soldOutPhrases.length; p++) {
@@ -3484,9 +3556,9 @@ export const checkProductPageBridge = page_url => {
         var hasBuyButton = false;
 
         if (isSingleProduct) {
-          isSoldOut = checkIsSoldOut();
-          if (!isSoldOut) {
-            hasBuyButton = hasActiveCartOrBuyButton();
+          hasBuyButton = hasActiveCartOrBuyButton();
+          if (!hasBuyButton) {
+            isSoldOut = checkIsSoldOut();
           }
         }
 

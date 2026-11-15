@@ -544,6 +544,129 @@ describe('Product Page & Add to Cart Detection Bridge', () => {
     expect(lastMsg.data.isProduct).toBe(false);
     expect(lastMsg.data.isSoldOut).toBe(true);
   });
+
+  test('Scenario 16: Shein shoes with out-of-stock size chip (Remind Me) but active Add to Cart bottom button -> isProduct: true, isSoldOut: false', () => {
+    mockWindow.location.href = 'https://m.shein.com/item-p-100188201.html';
+    mockWindow.location.pathname = '/item-p-100188201.html';
+
+    const remindMeSizeChip = {
+      innerText: 'Remind Me',
+      disabled: false,
+      getAttribute: () => null,
+      getBoundingClientRect: () => ({ width: 60, height: 30 }),
+      offsetWidth: 60,
+      offsetHeight: 30,
+      style: { display: 'block', visibility: 'visible', opacity: '1' },
+      closest: (sel) => (sel.includes('size') ? {} : null),
+    };
+
+    const mainAddToCartBtn = {
+      innerText: '~3% OFF! Add to Cart',
+      disabled: false,
+      getAttribute: () => null,
+      getBoundingClientRect: () => ({ width: 280, height: 48 }),
+      offsetWidth: 280,
+      offsetHeight: 48,
+      style: { display: 'block', visibility: 'visible', opacity: '1' },
+      closest: () => null,
+    };
+
+    const mockDocument = {
+      querySelectorAll: (selector) => {
+        if (selector.includes('.she-btn-black') || selector.includes('[class*="she-btn"]') || selector.includes('button, input[type="button"]')) {
+          return [mainAddToCartBtn, remindMeSizeChip];
+        }
+        if (selector.includes('button')) {
+          return [mainAddToCartBtn, remindMeSizeChip];
+        }
+        return [];
+      },
+      querySelector: () => null,
+      body: {},
+    };
+
+    runBridgeInContext(mockWindow, mockDocument);
+
+    expect(postedMessages.length).toBeGreaterThan(0);
+    const lastMsg = postedMessages[postedMessages.length - 1];
+    expect(lastMsg.type).toBe('isProductPage');
+    expect(lastMsg.data.isProduct).toBe(true);
+    expect(lastMsg.data.isSoldOut).toBe(false);
+  });
+
+  test('Scenario 17: Shein product where sku_list has available sizes (some stock: 0, some stock: 10) -> isProduct: true, isSoldOut: false', () => {
+    mockWindow.location.href = 'https://m.shein.com/item-p-100188201.html';
+    mockWindow.location.pathname = '/item-p-100188201.html';
+    mockWindow.productIntroData = {
+      detail: {
+        is_on_sale: 1,
+        currentSku: { sku_id: 1, stock: 0 }, // default SKU out of stock
+        sku_list: [
+          { sku_id: 1, stock: 0 },
+          { sku_id: 2, stock: 8 },
+        ],
+      },
+    };
+
+    const mainAddToCartBtn = {
+      innerText: '5% OFF Final 6h! Add to Cart',
+      disabled: false,
+      getAttribute: () => null,
+      getBoundingClientRect: () => ({ width: 280, height: 48 }),
+      offsetWidth: 280,
+      offsetHeight: 48,
+      style: { display: 'block', visibility: 'visible', opacity: '1' },
+      closest: () => null,
+    };
+
+    const mockDocument = {
+      querySelectorAll: (selector) => {
+        if (selector.includes('button')) {
+          return [mainAddToCartBtn];
+        }
+        return [];
+      },
+      querySelector: () => null,
+      body: {},
+    };
+
+    runBridgeInContext(mockWindow, mockDocument);
+
+    expect(postedMessages.length).toBeGreaterThan(0);
+    const lastMsg = postedMessages[postedMessages.length - 1];
+    expect(lastMsg.type).toBe('isProductPage');
+    expect(lastMsg.data.isProduct).toBe(true);
+    expect(lastMsg.data.isSoldOut).toBe(false);
+  });
+
+  test('Scenario 18: Shein product where ALL skus in sku_list have stock: 0 -> isProduct: false, isSoldOut: true', () => {
+    mockWindow.location.href = 'https://m.shein.com/item-p-100188201.html';
+    mockWindow.location.pathname = '/item-p-100188201.html';
+    mockWindow.productIntroData = {
+      detail: {
+        is_on_sale: 1,
+        currentSku: { sku_id: 1, stock: 0 },
+        sku_list: [
+          { sku_id: 1, stock: 0 },
+          { sku_id: 2, stock: 0 },
+        ],
+      },
+    };
+
+    const mockDocument = {
+      querySelectorAll: () => [],
+      querySelector: () => null,
+      body: {},
+    };
+
+    runBridgeInContext(mockWindow, mockDocument);
+
+    expect(postedMessages.length).toBeGreaterThan(0);
+    const lastMsg = postedMessages[postedMessages.length - 1];
+    expect(lastMsg.type).toBe('isProductPage');
+    expect(lastMsg.data.isProduct).toBe(false);
+    expect(lastMsg.data.isSoldOut).toBe(true);
+  });
 });
 
 describe('URL Comparison & Stale Message Prevention', () => {
@@ -599,6 +722,14 @@ describe('URL Comparison & Stale Message Prevention', () => {
     expect(storeIsProductUrl('https://www.yesstyle.com/en/beauty-of-joseon/info.html/pid.1119058223')).toBe(true);
     expect(storeIsProductUrl('https://www.iherb.com/c/supplements')).toBe(false);
     expect(storeIsProductUrl('https://www.yesstyle.com/en/women.html')).toBe(false);
+
+    // Shein URL patterns
+    expect(storeIsProductUrl('https://us.shein.com/pd/123456')).toBe(true);
+    expect(storeIsProductUrl('https://m.shein.com/goods/123456')).toBe(true);
+    expect(storeIsProductUrl('https://shein.com/product/123456')).toBe(true);
+    expect(storeIsProductUrl('https://shein.com/goods-p-123456')).toBe(true);
+    expect(storeIsProductUrl('https://shein.com/item?goods_id=123456')).toBe(true);
+    expect(storeIsProductUrl('https://shein.com/women-clothing-c-2033.html')).toBe(false);
   });
 });
 
