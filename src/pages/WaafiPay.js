@@ -23,6 +23,7 @@ import { getUserAgent, round } from '../helpers/common';
 import { useCartStore } from '../store/useCartStore';
 import { useUserStore } from '../store/useUserStore';
 import AppHeader from '../components/common/AppHeader';
+import PaymentSuccessModal from '../components/common/PaymentSuccessModal';
 import { EmContext } from '../contexts/EmContext';
 
 export default function WaafiPay({ navigation, route }) {
@@ -49,10 +50,31 @@ export default function WaafiPay({ navigation, route }) {
   const [tutar, setTutar] = useState(route?.params?.tutar || 0);
   const [siparis_ids, setSiparis_ids] = useState(normalizedOrderIds);
   const [submitting, setSubmitting] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const handleCancel = () => {
     setSubmitting(false);
     navigation.goBack();
+  };
+
+  const handleViewOrders = () => {
+    setShowSuccessModal(false);
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{ name: 'AuthAfter', params: { screen: 'Orders' } }],
+      }),
+    );
+  };
+
+  const handleContinueShopping = () => {
+    setShowSuccessModal(false);
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{ name: 'AuthAfter', params: { screen: 'Home' } }],
+      }),
+    );
   };
 
   const handlePay = async () => {
@@ -192,22 +214,10 @@ export default function WaafiPay({ navigation, route }) {
       }
 
       if (r?.data?.error === false) {
+        setSubmitting(false);
         useCartStore.getState().clearCart();
-        const successMsg =
-          localizeApiMessage(r?.data?.msg || r?.data?.responseMsg, 'Payment Successful') ||
-          tr('Payment Successful') ||
-          'Payment Successful';
-        Toast.show({
-          type: 'success',
-          text1: tr('Payment Successful') || 'Payment Successful',
-          text2: successMsg,
-        });
-        navigation.dispatch(
-          CommonActions.reset({
-            index: 0,
-            routes: [{ name: 'AuthAfter', params: { screen: 'Orders' } }],
-          }),
-        );
+        setShowSuccessModal(true);
+        return;
       } else {
         const rawMsg =
           r?.data?.responseMsg ||
@@ -396,6 +406,17 @@ export default function WaafiPay({ navigation, route }) {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Payment Success Modal */}
+      <PaymentSuccessModal
+        visible={showSuccessModal}
+        amount={tutar}
+        currency="USD"
+        paymentMethod="WaafiPay"
+        phoneNumber={accountNumber}
+        onViewOrders={handleViewOrders}
+        onContinueShopping={handleContinueShopping}
+      />
     </SafeAreaView>
   );
 }
