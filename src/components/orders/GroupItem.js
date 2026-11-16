@@ -47,11 +47,27 @@ const GroupItem = React.memo(function GroupItem({
   let badgeColor = '#D97706';
   let isTrackable = s.can_track !== undefined ? Boolean(s.can_track) : true;
 
-  if (s.app_badge_color) {
+  if (statusNum === 6) {
+    statusText = 'Delivered';
+    badgeBg = '#DCFCE7';
+    badgeColor = '#16A34A';
+    isTrackable = false;
+  } else if (statusNum === 18) {
+    statusText = 'Confirmed';
+    badgeBg = '#FEF3C7';
+    badgeColor = '#D97706';
+    isTrackable = true;
+  } else if ([7, 8, 9, 10, 12, 13, 17].includes(statusNum)) {
+    statusText = 'Canceled';
+    badgeBg = '#FEE2E2';
+    badgeColor = '#DC2626';
+    isTrackable = false;
+  } else if (s.app_badge_color) {
     switch (s.app_badge_color.toLowerCase()) {
       case 'green':
         badgeBg = '#DCFCE7';
         badgeColor = '#16A34A';
+        isTrackable = false;
         break;
       case 'blue':
         badgeBg = '#EFF6FF';
@@ -60,6 +76,7 @@ const GroupItem = React.memo(function GroupItem({
       case 'red':
         badgeBg = '#FEE2E2';
         badgeColor = '#DC2626';
+        isTrackable = false;
         break;
       case 'orange':
       default:
@@ -69,21 +86,11 @@ const GroupItem = React.memo(function GroupItem({
     }
   } else {
     // Fallback to numeric status mapping
-    if ([6].includes(statusNum)) {
-      statusText = 'Delivered';
-      badgeBg = '#DCFCE7';
-      badgeColor = '#16A34A';
-      isTrackable = false;
-    } else if ([2, 3, 4, 5, 11].includes(statusNum)) {
+    if ([2, 3, 4, 5, 11].includes(statusNum)) {
       statusText = 'In Progress';
       badgeBg = '#EFF6FF';
       badgeColor = '#2563EB';
       isTrackable = true;
-    } else if ([7, 8, 9, 10, 12, 13, 17].includes(statusNum)) {
-      statusText = 'Canceled';
-      badgeBg = '#FEE2E2';
-      badgeColor = '#DC2626';
-      isTrackable = false;
     } else {
       statusText = 'Pending';
       badgeBg = '#FEF3C7';

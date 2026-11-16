@@ -1,6 +1,7 @@
 import {
   FILTER_TABS,
   getOrderStatusCategory,
+  normalizeOrderRecord,
   matchesOrderSearch,
   filterOrdersByTabAndSearch,
 } from '../src/helpers/orderStatus';
@@ -130,6 +131,105 @@ describe('Order Status Categorization & Tab Filtering', () => {
       const pajamaResult = filterOrdersByTabAndSearch(mockOrders, 'delivered', 'Pajama');
       expect(pajamaResult).toHaveLength(1);
       expect(pajamaResult[0].id).toBe('208');
+    });
+  });
+
+  describe('normalizeOrderRecord (Healing Server Response Discrepancies)', () => {
+    it('heals Delivered group with buggy backend app_status: in_progress and blue badge (Group 78)', () => {
+      const buggyGroup78 = {
+        id: 78,
+        durum: 6,
+        durum_text: 'Teslim Edildi',
+        app_status: 'in_progress',
+        app_status_text: 'In Progress',
+        app_badge_color: 'blue',
+        can_track: true,
+        orders: [
+          {
+            id: 339,
+            durum: 6,
+            link: 'https://m.shein.com/ar-en/SHEIN-ChillGRL-Young-Girl-s-Casual-Cowgirl-Straight-Leg-Jeans-p-191301899.html',
+            ad: null,
+            marketplace: '',
+          },
+        ],
+      };
+
+      const normalized = normalizeOrderRecord(buggyGroup78);
+      expect(normalized.app_status).toBe('delivered');
+      expect(normalized.app_status_text).toBe('Delivered');
+      expect(normalized.app_badge_color).toBe('green');
+      expect(normalized.can_track).toBe(false);
+      expect(getOrderStatusCategory(normalized)).toBe('delivered');
+
+      // Sub-order checks
+      expect(normalized.orders[0].marketplace).toBe('Shein');
+      expect(normalized.marketplace).toBe('Shein');
+      expect(normalized.orders[0].ad).toContain('Cowgirl');
+    });
+
+    it('heals Confirmed group with buggy backend app_status: in_progress and blue badge (Group 80)', () => {
+      const buggyGroup80 = {
+        id: 80,
+        durum: 18,
+        durum_text: 'Müşteri Ödedi',
+        app_status: 'in_progress',
+        app_status_text: 'In Progress',
+        app_badge_color: 'blue',
+        can_track: true,
+        orders: [
+          {
+            id: 342,
+            durum: 18,
+            link: 'https://m.shein.com/ar-en/This-3-Piecesmen-s-Fashion-Jewelry-Set-Is-Perfect-p-49109017.html',
+            ad: null,
+            marketplace: '',
+          },
+        ],
+      };
+
+      const normalized = normalizeOrderRecord(buggyGroup80);
+      expect(normalized.app_status).toBe('confirmed');
+      expect(normalized.app_status_text).toBe('Confirmed');
+      expect(normalized.app_badge_color).toBe('orange');
+      expect(normalized.can_track).toBe(true);
+      expect(getOrderStatusCategory(normalized)).toBe('confirmed');
+      expect(normalized.orders[0].marketplace).toBe('Shein');
+      expect(normalized.orders[0].ad).toContain('Jewelry');
+    });
+
+    it('heals Pending group (durum 16) and rounds floating-point price calculation (Group 81)', () => {
+      const buggyGroup81 = {
+        id: 81,
+        durum: 16,
+        durum_text: 'Müşteri Onayladı',
+        app_status: 'in_progress',
+        app_status_text: 'In Progress',
+        app_badge_color: 'blue',
+        urun_tutar_usd: 20.839999999999996,
+        total_usd: 20.839999999999996,
+        orders: [
+          {
+            id: 345,
+            durum: 16,
+            link: 'https://m.shein.com/ar-en/120pcs-Almond-Shaped-Pink-French-White-Wearable-Nail-Tips-p-44222879.html',
+            ad: null,
+            marketplace: '',
+            fiyat_usd: 2.53,
+          },
+        ],
+      };
+
+      const normalized = normalizeOrderRecord(buggyGroup81);
+      expect(normalized.app_status).toBe('pending');
+      expect(normalized.app_status_text).toBe('Pending');
+      expect(normalized.app_badge_color).toBe('orange');
+      expect(normalized.urun_tutar_usd).toBe(20.84);
+      expect(normalized.total_usd).toBe(20.84);
+      expect(normalized.total_formatted).toBe('$20.84');
+      expect(getOrderStatusCategory(normalized)).toBe('pending');
+      expect(normalized.orders[0].marketplace).toBe('Shein');
+      expect(normalized.orders[0].ad).toContain('Nail');
     });
   });
 });

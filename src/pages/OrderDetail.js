@@ -22,6 +22,7 @@ import { cleanProductTitle, getStoreName } from '../helpers/storeHelper';
 import { supportPhone } from '../../config';
 import WhatsAppIcon from '../assets/svg/whatsapp.svg';
 import { useOrderStore } from '../store/useOrderStore';
+import { normalizeOrderRecord } from '../helpers/orderStatus';
 
 const parsePrice = val => {
   if (val == null) return 0;
@@ -37,30 +38,30 @@ export default function OrderDetail({ route, navigation }) {
 
   // 1. Initial State: prioritize route params, then check central order store cache
   const initialOrderData = useMemo(() => {
-    if (route.params?.s) return route.params.s;
-    const targetId = route.params?.id || route.params?.grupID;
-    if (!targetId) return null;
-
-    try {
-      const storeState = useOrderStore.getState();
-      const allOrders = [
-        ...(storeState.tabs?.all?.orders || []),
-        ...(storeState.tabs?.pending?.orders || []),
-        ...(storeState.tabs?.in_progress?.orders || []),
-        ...(storeState.tabs?.delivered?.orders || []),
-        ...(storeState.tabs?.cancelled?.orders || []),
-        ...(storeState.searchCache?.orders || []),
-      ];
-      return (
-        allOrders.find(
-          o =>
-            String(o.id) === String(targetId) ||
-            String(o.order_number) === String(targetId),
-        ) || null
-      );
-    } catch (_) {
-      return null;
+    let rawItem = route.params?.s;
+    if (!rawItem) {
+      const targetId = route.params?.id || route.params?.grupID;
+      if (targetId) {
+        try {
+          const storeState = useOrderStore.getState();
+          const allOrders = [
+            ...(storeState.tabs?.all?.orders || []),
+            ...(storeState.tabs?.pending?.orders || []),
+            ...(storeState.tabs?.in_progress?.orders || []),
+            ...(storeState.tabs?.delivered?.orders || []),
+            ...(storeState.tabs?.cancelled?.orders || []),
+            ...(storeState.searchCache?.orders || []),
+          ];
+          rawItem =
+            allOrders.find(
+              o =>
+                String(o.id) === String(targetId) ||
+                String(o.order_number) === String(targetId),
+            ) || null;
+        } catch (_) {}
+      }
     }
+    return rawItem ? normalizeOrderRecord(rawItem) : null;
   }, [route.params?.s, route.params?.id, route.params?.grupID]);
 
   const [order, setOrder] = useState(initialOrderData);
@@ -123,22 +124,23 @@ export default function OrderDetail({ route, navigation }) {
             raw.s ||
             raw;
           if (orderData) {
+            const normalizedData = normalizeOrderRecord(orderData);
             setOrder(prev => ({
               ...(prev || {}),
-              ...orderData,
-              order_number: raw.order_number || orderData.order_number,
-              order_date: raw.order_date || orderData.order_date,
-              status_banner: raw.status_banner || orderData.status_banner,
-              ordered_items: raw.ordered_items || orderData.ordered_items,
-              price_summary: raw.price_summary || orderData.price_summary,
-              customer_tracking: raw.customer_tracking || orderData.customer_tracking,
+              ...normalizedData,
+              order_number: raw.order_number || normalizedData.order_number,
+              order_date: raw.order_date || normalizedData.order_date,
+              status_banner: raw.status_banner || normalizedData.status_banner,
+              ordered_items: raw.ordered_items || normalizedData.ordered_items,
+              price_summary: raw.price_summary || normalizedData.price_summary,
+              customer_tracking: raw.customer_tracking || normalizedData.customer_tracking,
               payment_information:
-                orderData.payment_information ||
+                normalizedData.payment_information ||
                 raw.payment_information ||
                 raw.payment_info ||
                 prev?.payment_information,
               payment_info:
-                orderData.payment_info ||
+                normalizedData.payment_info ||
                 raw.payment_info ||
                 raw.payment_information ||
                 prev?.payment_info,
@@ -232,9 +234,13 @@ export default function OrderDetail({ route, navigation }) {
     statusTitle = 'Canceled';
     statusDesc = 'This order has been canceled.';
     statusBadgeColor = '#DC2626';
-  } else if ([1, 14, 15, 16, 18, 19, 21].includes(statusNum)) {
+  } else if (statusNum === 18) {
+    statusTitle = 'Confirmed';
+    statusDesc = 'Your order has been confirmed and is being prepared.';
+    statusBadgeColor = '#D97706';
+  } else if ([1, 14, 15, 16, 19, 21].includes(statusNum)) {
     statusTitle = 'Pending';
-    statusDesc = 'Your order is confirmed and being prepared.';
+    statusDesc = 'Your order is pending confirmation.';
     statusBadgeColor = '#D97706';
   }
 

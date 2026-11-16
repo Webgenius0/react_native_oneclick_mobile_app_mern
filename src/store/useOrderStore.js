@@ -5,6 +5,7 @@ import {
   FILTER_TABS,
   matchesOrderSearch,
   getOrderStatusCategory,
+  normalizeOrderRecord,
 } from '../helpers/orderStatus';
 
 const CACHE_ORDERS_KEY = 'cached_orders_master';
@@ -98,6 +99,7 @@ export const useOrderStore = create((set, get) => ({
         (await storageGet(CACHE_ORDERS_KEY)) ||
         (await storageGet(LEGACY_CACHE_KEY));
       if (Array.isArray(cached) && cached.length > 0) {
+        const normalizedCached = cached.map(normalizeOrderRecord);
         set(state => {
           // Only hydrate if tab is currently empty
           if (state.tabs.all.orders.length > 0) return state;
@@ -106,8 +108,8 @@ export const useOrderStore = create((set, get) => ({
               ...state.tabs,
               all: {
                 ...state.tabs.all,
-                orders: cached,
-                totalOrders: cached.length,
+                orders: normalizedCached,
+                totalOrders: normalizedCached.length,
               },
             },
           };
@@ -229,7 +231,18 @@ export const useOrderStore = create((set, get) => ({
         }
 
         if (res?.data && res.data.error === false) {
-          let rawList = res.data.ss || res.data.grups || [];
+          const incomingOrders =
+            Array.isArray(res.data.orders) && res.data.orders.length > 0
+              ? res.data.orders
+              : Array.isArray(res.data.unified_orders) && res.data.unified_orders.length > 0
+              ? res.data.unified_orders
+              : Array.isArray(res.data.grups) && res.data.grups.length > 0
+              ? res.data.grups
+              : Array.isArray(res.data.ss)
+              ? res.data.ss
+              : [];
+
+          let rawList = incomingOrders.map(normalizeOrderRecord);
           const resPage = Number(res.data.page) || pageNum;
           const resTotalPages = Number(res.data.total_pages) || 1;
           const resTotalOrders =
