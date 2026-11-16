@@ -273,7 +273,7 @@ export const getFallbackTitleFromUrl = (url, fallback = '') => {
       const slug = seg
         .replace(/\.(html?|php|asp)$/i, '')
         .replace(/-p-?\d+.*$/i, '')
-        .replace(/-p0*[0-9a-z]{6,}.*$/i, '');
+        .replace(/-p0*\d[0-9a-z]{5,}.*$/i, '');
 
       // Skip empty, tiny, routing, domain, or tracking parameters (e.g. ref=mh_s9_acsd_al_cv2_3_t)
       if (
