@@ -1351,7 +1351,12 @@ export default function Webview({ route, navigation }) {
                 .replace(/&lt;/gi, '<')
                 .replace(/&gt;/gi, '>')
                 .replace(/&nbsp;/gi, ' ');
-              str = str.replace(/^(?:Amazon(?:\\.[a-z.]+)?|Trendyol|Hepsiburada(?:\\.com)?|Shein|Zara|Noon|AliExpress|eBay|Walmart(?:\\.com)?|Nike(?:\\.com)?|Apple|Asos|Mango|H&M)\\s*[:|–—\\-]\\s*/gi, '');
+              str = str.replace(/^(?:Amazon(?:\\.[a-z.]+)?|Trendyol|Hepsiburada(?:\\.com)?|Shein|Life Pharmacy|Zara|Noon|AliExpress|eBay|Walmart(?:\\.com)?|Nike(?:\\.com)?|Apple|Asos|Mango|H&M)\\s*[:|–—\\-]\\s*/gi, '');
+              str = str.replace(/^Buy\\s+(?=[A-Za-z0-9])/i, '');
+              str = str
+                .replace(/\\s*\\|\\s*Life\\s*Pharmacy.*$/gi, '')
+                .replace(/\\s*-\\s*Life\\s*Pharmacy.*$/gi, '')
+                .replace(/\\s+online\\s+at\\s+best\\s+price(?:\\s+in\\s+the\\s+UAE)?.*$/gi, '');
               str = str.replace(/^(?:Visit the\\s+[^\\n\\r]+?\\s+Store|Brand:\\s*[^:\\n\\r]+?)\\s+/gi, '');
               str = str
                 .replace(/\\s*Fiyatı,?\\s*Yorumları\\s*-\\s*Trendyol.*$/gi, '')
@@ -1785,11 +1790,11 @@ export default function Webview({ route, navigation }) {
 
             var parsePriceAndCurrency = function(rawText) {
               if (!rawText || typeof rawText !== 'string') return { price: '', currency: '' };
-              var t = rawText.replace(/[ \t\r\n]+/g, ' ').trim();
+              var t = rawText.replace(/[ \t\r\n\u00A0]+/g, ' ').trim();
               // Convert Arabic-Indic digits ٠-٩ to 0-9
               t = t.replace(/[٠-٩]/g, function(d) { return String.fromCharCode(d.charCodeAt(0) - 1632 + 48); });
               var detectedCurr = '';
-              if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:AED|د\.?إ|د\.?ا|درهم)(?:$|[^a-zA-Z\u0600-\u06FF])|\u20C3/i.test(t)) detectedCurr = 'AED';
+              if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:AED|د\.?إ|د\.?ا|درهم)(?:$|[^a-zA-Z\u0600-\u06FF])|\u20C3|[Ð\u00D0]/i.test(t)) detectedCurr = 'AED';
               else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:SAR|SR|ر\.?س|ريال)(?:$|[^a-zA-Z\u0600-\u06FF])|[﷼\uFDFC\u20C1⃁]/i.test(t)) detectedCurr = 'SAR';
               else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:KWD|د\.?ك)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'KWD';
               else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:QAR|ر\.?ق)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'QAR';
@@ -1799,6 +1804,11 @@ export default function Webview({ route, navigation }) {
               else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:USD|US\$)(?:$|[^a-zA-Z\u0600-\u06FF])|\$/i.test(t)) detectedCurr = 'USD';
               else if (/(?:^|[^a-zA-Z\u0600-\u06FF])EUR(?:$|[^a-zA-Z\u0600-\u06FF])|€/i.test(t)) detectedCurr = 'EUR';
               else if (/(?:^|[^a-zA-Z\u0600-\u06FF])GBP(?:$|[^a-zA-Z\u0600-\u06FF])|£/i.test(t)) detectedCurr = 'GBP';
+
+              // Support Life Pharmacy "D 18.23" format and "dirham"
+              if (!detectedCurr && (/^D\s+[0-9]/i.test(t) || /\bdirham\b/i.test(t))) {
+                detectedCurr = 'AED';
+              }
 
               // Strip discount percentages e.g. '-30%', '%25', '30% off', 'Save 20%'
               t = t.replace(/[-–]?[ \t]*[0-9]+(?:\.[0-9]+)?[ \t]*%[ \t]*(?:off|indirim|discount|saving|savings)?/gi, '');
@@ -1942,6 +1952,11 @@ export default function Webview({ route, navigation }) {
               '[class*="now-price"]',
 
               // Life Pharmacy
+              '.dirham.text-lg',
+              '.dirham.font-bold:not(.line-through):not([class*="line-through"])',
+              'p.dirham:not(.line-through):not([class*="line-through"])',
+              'p[class*="dirham"]:not(.line-through):not([class*="line-through"])',
+              '[class*="dirham"]:not(.line-through):not([class*="line-through"])',
               '[class*="special-price" i]',
               '[class*="offer-price" i]',
               '[class*="offerPrice" i]',
@@ -2012,29 +2027,98 @@ export default function Webview({ route, navigation }) {
               if (price) break;
             }
 
-            // Check Life Pharmacy Nuxt 3 data & body text scanner
+            // Check Life Pharmacy DOM, JSON-LD, Nuxt 3 data & body text scanner
             if (!price && ((window.location && window.location.href && window.location.href.indexOf('lifepharmacy.com') > -1) || (document.title && document.title.toLowerCase().indexOf('life pharmacy') > -1))) {
               try {
-                var nuxtScriptAdd = document.getElementById('__NUXT_DATA__');
-                if (nuxtScriptAdd && nuxtScriptAdd.textContent) {
-                  var ndAdd = JSON.parse(nuxtScriptAdd.textContent);
-                  if (Array.isArray(ndAdd)) {
-                    for (var ndai = 0; ndai < ndAdd.length; ndai++) {
-                      var itemNdAdd = ndAdd[ndai];
-                      if (itemNdAdd && typeof itemNdAdd === 'object') {
-                        var nPriceAdd = itemNdAdd.offer_price || itemNdAdd.sale_price || itemNdAdd.price || itemNdAdd.regular_price;
-                        if (nPriceAdd && (typeof nPriceAdd === 'number' || (typeof nPriceAdd === 'string' && /^[0-9]+(?:\.[0-9]+)?$/.test(nPriceAdd)))) {
-                          price = String(nPriceAdd).trim();
-                          if (!currency) currency = 'AED';
-                          break;
+                // 1. Direct DOM check for Life Pharmacy dirham price
+                var lpDirhamEls = document.querySelectorAll('p[class*="dirham"]:not(.line-through):not([class*="line-through"]), [class*="dirham"]:not(.line-through):not([class*="line-through"])');
+                for (var lpdi = 0; lpdi < lpDirhamEls.length; lpdi++) {
+                  var lpEl = lpDirhamEls[lpdi];
+                  if (isStruckOrOldPriceElement(lpEl)) continue;
+                  var lpClean = getCleanElementPriceText(lpEl);
+                  var lpP = parsePriceAndCurrency(lpClean);
+                  if (lpP.price) {
+                    price = lpP.price;
+                    currency = 'AED';
+                    break;
+                  }
+                }
+
+                // 2. JSON-LD Product offers check
+                if (!price) {
+                  var lpLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
+                  for (var lpLdi = 0; lpLdi < lpLdScripts.length; lpLdi++) {
+                    try {
+                      var lpLdData = JSON.parse(lpLdScripts[lpLdi].textContent);
+                      var lpGraph = lpLdData && (lpLdData['@graph'] || (Array.isArray(lpLdData) ? lpLdData : [lpLdData]));
+                      if (Array.isArray(lpGraph)) {
+                        var lpProd = lpGraph.find(function(g) {
+                          return g && (g['@type'] === 'Product' || (Array.isArray(g['@type']) && g['@type'].indexOf('Product') > -1));
+                        });
+                        if (lpProd && lpProd.offers) {
+                          var lpOffer = Array.isArray(lpProd.offers) ? lpProd.offers[0] : lpProd.offers;
+                          var lpPriceVal = lpOffer && (lpOffer.price !== undefined ? lpOffer.price : lpOffer.lowPrice);
+                          if (lpPriceVal) {
+                            price = String(lpPriceVal).trim();
+                            currency = 'AED';
+                            break;
+                          }
+                        }
+                      }
+                    } catch(_eLpLd) {}
+                    if (price) break;
+                  }
+                }
+
+                // 3. Nuxt 3 data resolver (resolves serialized graph pointer indexes)
+                if (!price) {
+                  var nuxtScriptAdd = document.getElementById('__NUXT_DATA__');
+                  if (nuxtScriptAdd && nuxtScriptAdd.textContent) {
+                    var ndAdd = JSON.parse(nuxtScriptAdd.textContent);
+                    if (Array.isArray(ndAdd)) {
+                      var resolveNdAdd = function(val) {
+                        if (typeof val === 'number' && ndAdd[val] !== undefined) {
+                          var target = ndAdd[val];
+                          if (typeof target === 'number' || typeof target === 'string') return target;
+                        }
+                        return val;
+                      };
+                      for (var ndai = 0; ndai < ndAdd.length; ndai++) {
+                        var itemNdAdd = ndAdd[ndai];
+                        if (itemNdAdd && typeof itemNdAdd === 'object' && itemNdAdd.sku) {
+                          var rawOp = itemNdAdd.offer_price !== undefined ? itemNdAdd.offer_price : itemNdAdd.regular_price;
+                          if (rawOp !== undefined) {
+                            var resOp = resolveNdAdd(rawOp);
+                            var pOp = parsePriceAndCurrency(String(resOp));
+                            if (pOp.price) {
+                              price = pOp.price;
+                              currency = 'AED';
+                              break;
+                            }
+                          }
                         }
                       }
                     }
                   }
                 }
+
+                // 4. Tabby installment promo URL check: ?price=XX.XX&currency=AED
+                if (!price) {
+                  var tabbyEl = document.querySelector('a[href*="tabby.ai"][href*="price="], iframe[src*="tabby.ai"][src*="price="], [data-tabby-price]');
+                  if (tabbyEl) {
+                    var tbSrc = (tabbyEl.getAttribute('href') || tabbyEl.getAttribute('src') || tabbyEl.getAttribute('data-tabby-price') || '');
+                    var tbM = tbSrc.match(/[?&]price=([0-9]+(?:\.[0-9]+)?)/i) || tbSrc.match(/([0-9]+(?:\.[0-9]+)?)/);
+                    if (tbM && tbM[1]) {
+                      price = tbM[1].trim();
+                      currency = 'AED';
+                    }
+                  }
+                }
+
+                // 5. Body text regex with D, Ð, or AED
                 if (!price && document.body) {
                   var lpBodyAdd = document.body.innerText || '';
-                  var aedMatchAdd = lpBodyAdd.match(/(?:AED|د\.?إ|د\.?ا|درهم|Dhs?\.?)\s*([0-9]+(?:[.,][0-9]{1,2})?)/i) ||
+                  var aedMatchAdd = lpBodyAdd.match(/(?:(?:^|\s)[DÐ]|AED|د\.?إ|د\.?ا|درهم|Dhs?\.?)\s*([0-9]+(?:[.,][0-9]{1,2})?)/i) ||
                                     lpBodyAdd.match(/([0-9]+(?:[.,][0-9]{1,2})?)\s*(?:AED|د\.?إ|د\.?ا|درهم|Dhs?\.?)/i);
                   if (aedMatchAdd && aedMatchAdd[1]) {
                     price = aedMatchAdd[1].trim();
@@ -2042,6 +2126,7 @@ export default function Webview({ route, navigation }) {
                   }
                 }
               } catch(_eLpAdd) {}
+              if (price && !currency) currency = 'AED';
             }
 
             // For Shein: Client-side cookie, runtime gbCommonInfo, and localStorage are the absolute ground truth!

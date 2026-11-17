@@ -523,7 +523,7 @@ export const getMetaTagPriceAndCurrency = page_url => {
           // Convert Arabic-Indic digits ٠-٩ to 0-9
           t = t.replace(/[٠-٩]/g, function(d) { return String.fromCharCode(d.charCodeAt(0) - 1632 + 48); });
           var detectedCurr = '';
-          if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:AED|د\.?إ|د\.?ا|درهم)(?:$|[^a-zA-Z\u0600-\u06FF])|\u20C3/i.test(t)) detectedCurr = 'AED';
+          if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:AED|د\.?إ|د\.?ا|درهم)(?:$|[^a-zA-Z\u0600-\u06FF])|\u20C3|[Ð\u00D0]/i.test(t)) detectedCurr = 'AED';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:SAR|SR|ر\.?س|ريال)(?:$|[^a-zA-Z\u0600-\u06FF])|[﷼\uFDFC\u20C1⃁]/i.test(t)) detectedCurr = 'SAR';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:KWD|د\.?ك)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'KWD';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:QAR|ر\.?ق)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'QAR';
@@ -531,6 +531,11 @@ export const getMetaTagPriceAndCurrency = page_url => {
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:USD|US\$)(?:$|[^a-zA-Z\u0600-\u06FF])|\$/i.test(t)) detectedCurr = 'USD';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])EUR(?:$|[^a-zA-Z\u0600-\u06FF])|€/i.test(t)) detectedCurr = 'EUR';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])GBP(?:$|[^a-zA-Z\u0600-\u06FF])|£/i.test(t)) detectedCurr = 'GBP';
+
+          // Support Life Pharmacy "D 18.23" format and "dirham"
+          if (!detectedCurr && (/^D\s+[0-9]/i.test(t) || /\bdirham\b/i.test(t))) {
+            detectedCurr = 'AED';
+          }
 
           // Strip discount percentages e.g. '-30%', '%25', '30% off', 'Save 20%'
           t = t.replace(/[-–]?[ \t]*[0-9]+(?:\.[0-9]+)?[ \t]*%[ \t]*(?:off|indirim|discount|saving|savings)?/gi, '');
@@ -650,6 +655,11 @@ export const getMetaTagPriceAndCurrency = page_url => {
           '.pdp-price',
 
           // Life Pharmacy
+          '.dirham.text-lg',
+          '.dirham.font-bold:not(.line-through):not([class*="line-through"])',
+          'p.dirham:not(.line-through):not([class*="line-through"])',
+          'p[class*="dirham"]:not(.line-through):not([class*="line-through"])',
+          '[class*="dirham"]:not(.line-through):not([class*="line-through"])',
           '[class*="special-price" i]',
           '[class*="offer-price" i]',
           '[class*="offerPrice" i]',
@@ -659,6 +669,11 @@ export const getMetaTagPriceAndCurrency = page_url => {
           '[data-cy*="price" i]',
 
           // Life Pharmacy
+          '.dirham.text-lg',
+          '.dirham.font-bold:not(.line-through):not([class*="line-through"])',
+          'p.dirham:not(.line-through):not([class*="line-through"])',
+          'p[class*="dirham"]:not(.line-through):not([class*="line-through"])',
+          '[class*="dirham"]:not(.line-through):not([class*="line-through"])',
           '[class*="special-price" i]',
           '[class*="offer-price" i]',
           '[class*="offerPrice" i]',
@@ -686,7 +701,21 @@ export const getMetaTagPriceAndCurrency = page_url => {
           '.price-tag',
           '[class*="itemPrice"]',
           '[class*="price-now"]',
-          '[class*="now-price"]'
+          '[class*="now-price"]',
+
+          // Life Pharmacy
+          '.dirham.text-lg',
+          '.dirham.font-bold:not(.line-through):not([class*="line-through"])',
+          'p.dirham:not(.line-through):not([class*="line-through"])',
+          'p[class*="dirham"]:not(.line-through):not([class*="line-through"])',
+          '[class*="dirham"]:not(.line-through):not([class*="line-through"])',
+          '[class*="special-price" i]',
+          '[class*="offer-price" i]',
+          '[class*="offerPrice" i]',
+          '[class*="regular-price" i]',
+          '[class*="product-price" i]',
+          '[data-testid*="price" i]',
+          '[data-cy*="price" i]'
         ];
 
         var priceEl = null;
@@ -750,29 +779,98 @@ export const getMetaTagPriceAndCurrency = page_url => {
           if (price) break;
         }
 
-        // 1b. Check Life Pharmacy Nuxt 3 data & body text scanner
+        // 1b. Check Life Pharmacy DOM, JSON-LD, Nuxt 3 data & body text scanner
         if (!price && (href.indexOf('lifepharmacy.com') > -1 || (document.title && document.title.toLowerCase().indexOf('life pharmacy') > -1))) {
           try {
-            var nuxtScript = document.getElementById('__NUXT_DATA__');
-            if (nuxtScript && nuxtScript.textContent) {
-              var nd = JSON.parse(nuxtScript.textContent);
-              if (Array.isArray(nd)) {
-                for (var ndi = 0; ndi < nd.length; ndi++) {
-                  var itemNd = nd[ndi];
-                  if (itemNd && typeof itemNd === 'object') {
-                    var nPrice = itemNd.offer_price || itemNd.sale_price || itemNd.price || itemNd.regular_price;
-                    if (nPrice && (typeof nPrice === 'number' || (typeof nPrice === 'string' && /^[0-9]+(?:\.[0-9]+)?$/.test(nPrice)))) {
-                      price = String(nPrice).trim();
-                      if (!currency) currency = 'AED';
-                      break;
+            // 1. Direct DOM check for Life Pharmacy dirham price
+            var lpDirhamEls = document.querySelectorAll('p[class*="dirham"]:not(.line-through):not([class*="line-through"]), [class*="dirham"]:not(.line-through):not([class*="line-through"])');
+            for (var lpdi = 0; lpdi < lpDirhamEls.length; lpdi++) {
+              var lpEl = lpDirhamEls[lpdi];
+              if (isStruckOrOldPriceElement(lpEl)) continue;
+              var lpClean = getCleanElementPriceText(lpEl);
+              var lpP = parsePriceAndCurrency(lpClean);
+              if (lpP.price) {
+                price = lpP.price;
+                currency = 'AED';
+                break;
+              }
+            }
+
+            // 2. JSON-LD Product offers check
+            if (!price) {
+              var lpLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
+              for (var lpLdi = 0; lpLdi < lpLdScripts.length; lpLdi++) {
+                try {
+                  var lpLdData = JSON.parse(lpLdScripts[lpLdi].textContent);
+                  var lpGraph = lpLdData && (lpLdData['@graph'] || (Array.isArray(lpLdData) ? lpLdData : [lpLdData]));
+                  if (Array.isArray(lpGraph)) {
+                    var lpProd = lpGraph.find(function(g) {
+                      return g && (g['@type'] === 'Product' || (Array.isArray(g['@type']) && g['@type'].indexOf('Product') > -1));
+                    });
+                    if (lpProd && lpProd.offers) {
+                      var lpOffer = Array.isArray(lpProd.offers) ? lpProd.offers[0] : lpProd.offers;
+                      var lpPriceVal = lpOffer && (lpOffer.price !== undefined ? lpOffer.price : lpOffer.lowPrice);
+                      if (lpPriceVal) {
+                        price = String(lpPriceVal).trim();
+                        currency = 'AED';
+                        break;
+                      }
+                    }
+                  }
+                } catch(_eLpLd) {}
+                if (price) break;
+              }
+            }
+
+            // 3. Nuxt 3 data scanner with pointer index resolution
+            if (!price) {
+              var nuxtScript = document.getElementById('__NUXT_DATA__');
+              if (nuxtScript && nuxtScript.textContent) {
+                var nd = JSON.parse(nuxtScript.textContent);
+                if (Array.isArray(nd)) {
+                  var resolveNd = function(val) {
+                    if (typeof val === 'number' && nd[val] !== undefined) {
+                      var target = nd[val];
+                      if (typeof target === 'number' || typeof target === 'string') return target;
+                    }
+                    return val;
+                  };
+                  for (var ndi = 0; ndi < nd.length; ndi++) {
+                    var itemNd = nd[ndi];
+                    if (itemNd && typeof itemNd === 'object' && itemNd.sku) {
+                      var rawOp = itemNd.offer_price !== undefined ? itemNd.offer_price : itemNd.regular_price;
+                      if (rawOp !== undefined) {
+                        var resOp = resolveNd(rawOp);
+                        var pOp = parsePriceAndCurrency(String(resOp));
+                        if (pOp.price) {
+                          price = pOp.price;
+                          currency = 'AED';
+                          break;
+                        }
+                      }
                     }
                   }
                 }
               }
             }
+
+            // 4. Tabby installment promo URL check
+            if (!price) {
+              var tabbyEl = document.querySelector('a[href*="tabby.ai"][href*="price="], iframe[src*="tabby.ai"][src*="price="], [data-tabby-price]');
+              if (tabbyEl) {
+                var tbSrc = (tabbyEl.getAttribute('href') || tabbyEl.getAttribute('src') || tabbyEl.getAttribute('data-tabby-price') || '');
+                var tbM = tbSrc.match(/[?&]price=([0-9]+(?:\.[0-9]+)?)/i) || tbSrc.match(/([0-9]+(?:\.[0-9]+)?)/);
+                if (tbM && tbM[1]) {
+                  price = tbM[1].trim();
+                  currency = 'AED';
+                }
+              }
+            }
+
+            // 5. Body text fallback
             if (!price && document.body) {
               var lpBody = document.body.innerText || '';
-              var aedMatch = lpBody.match(/(?:AED|د\.?إ|د\.?ا|درهم|Dhs?\.?)\s*([0-9]+(?:[.,][0-9]{1,2})?)/i) ||
+              var aedMatch = lpBody.match(/(?:(?:^|\s)[DÐ]|AED|د\.?إ|د\.?ا|درهم|Dhs?\.?)\s*([0-9]+(?:[.,][0-9]{1,2})?)/i) ||
                              lpBody.match(/([0-9]+(?:[.,][0-9]{1,2})?)\s*(?:AED|د\.?إ|د\.?ا|درهم|Dhs?\.?)/i);
               if (aedMatch && aedMatch[1]) {
                 price = aedMatch[1].trim();
@@ -780,6 +878,7 @@ export const getMetaTagPriceAndCurrency = page_url => {
               }
             }
           } catch(_eLp) {}
+          if (price && !currency) currency = 'AED';
         }
 
         // 2a. Check Trendyol application state (if DOM extraction hasn't found price yet)
@@ -2563,7 +2662,7 @@ export const getProductSnapshotBridge = page_url => {
           // Convert Arabic-Indic digits ٠-٩ to 0-9
           t = t.replace(/[٠-٩]/g, function(d) { return String.fromCharCode(d.charCodeAt(0) - 1632 + 48); });
           var detectedCurr = '';
-          if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:AED|د\.?إ|د\.?ا|درهم)(?:$|[^a-zA-Z\u0600-\u06FF])|\u20C3/i.test(t)) detectedCurr = 'AED';
+          if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:AED|د\.?إ|د\.?ا|درهم)(?:$|[^a-zA-Z\u0600-\u06FF])|\u20C3|[Ð\u00D0]/i.test(t)) detectedCurr = 'AED';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:SAR|SR|ر\.?س|ريال)(?:$|[^a-zA-Z\u0600-\u06FF])|[﷼\uFDFC\u20C1⃁]/i.test(t)) detectedCurr = 'SAR';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:KWD|د\.?ك)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'KWD';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:QAR|ر\.?ق)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'QAR';
@@ -2571,6 +2670,11 @@ export const getProductSnapshotBridge = page_url => {
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:USD|US\$)(?:$|[^a-zA-Z\u0600-\u06FF])|\$/i.test(t)) detectedCurr = 'USD';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])EUR(?:$|[^a-zA-Z\u0600-\u06FF])|€/i.test(t)) detectedCurr = 'EUR';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])GBP(?:$|[^a-zA-Z\u0600-\u06FF])|£/i.test(t)) detectedCurr = 'GBP';
+
+          // Support Life Pharmacy "D 18.23" format and "dirham"
+          if (!detectedCurr && (/^D\s+[0-9]/i.test(t) || /\bdirham\b/i.test(t))) {
+            detectedCurr = 'AED';
+          }
 
           t = t.replace(/[-–]?[ \t]*[0-9]+(?:\.[0-9]+)?[ \t]*%[ \t]*(?:off|indirim|discount|saving|savings)?/gi, '');
           t = t.replace(/%[ \t]*[0-9]+(?:\.[0-9]+)?/gi, '');
@@ -2683,6 +2787,11 @@ export const getProductSnapshotBridge = page_url => {
           '.pdp-price',
 
           // Life Pharmacy
+          '.dirham.text-lg',
+          '.dirham.font-bold:not(.line-through):not([class*="line-through"])',
+          'p.dirham:not(.line-through):not([class*="line-through"])',
+          'p[class*="dirham"]:not(.line-through):not([class*="line-through"])',
+          '[class*="dirham"]:not(.line-through):not([class*="line-through"])',
           '[class*="special-price" i]',
           '[class*="offer-price" i]',
           '[class*="offerPrice" i]',
@@ -2741,29 +2850,98 @@ export const getProductSnapshotBridge = page_url => {
           if (snapshot.price) break;
         }
 
-        // 3a-life. Check Life Pharmacy Nuxt 3 data & body text scanner
+        // 3a-life. Check Life Pharmacy DOM, JSON-LD, Nuxt 3 data & body text scanner
         if (!snapshot.price && ((window.location && window.location.href && window.location.href.indexOf('lifepharmacy.com') > -1) || (document.title && document.title.toLowerCase().indexOf('life pharmacy') > -1))) {
           try {
-            var nuxtScriptSnap = document.getElementById('__NUXT_DATA__');
-            if (nuxtScriptSnap && nuxtScriptSnap.textContent) {
-              var ndSnap = JSON.parse(nuxtScriptSnap.textContent);
-              if (Array.isArray(ndSnap)) {
-                for (var ndsi = 0; ndsi < ndSnap.length; ndsi++) {
-                  var itemNdSnap = ndSnap[ndsi];
-                  if (itemNdSnap && typeof itemNdSnap === 'object') {
-                    var nPriceSnap = itemNdSnap.offer_price || itemNdSnap.sale_price || itemNdSnap.price || itemNdSnap.regular_price;
-                    if (nPriceSnap && (typeof nPriceSnap === 'number' || (typeof nPriceSnap === 'string' && /^[0-9]+(?:\.[0-9]+)?$/.test(nPriceSnap)))) {
-                      snapshot.price = String(nPriceSnap).trim();
-                      if (!snapshot.currency) snapshot.currency = 'AED';
-                      break;
+            // 1. Direct DOM check for Life Pharmacy dirham price
+            var lpDirhamElsSnap = document.querySelectorAll('p[class*="dirham"]:not(.line-through):not([class*="line-through"]), [class*="dirham"]:not(.line-through):not([class*="line-through"])');
+            for (var lpdsi = 0; lpdsi < lpDirhamElsSnap.length; lpdsi++) {
+              var lpElSnap = lpDirhamElsSnap[lpdsi];
+              if (isStruckOrOldPriceElement(lpElSnap)) continue;
+              var lpCleanSnap = getCleanElementPriceText(lpElSnap);
+              var lpPSnap = parsePriceAndCurrency(lpCleanSnap);
+              if (lpPSnap.price) {
+                snapshot.price = lpPSnap.price;
+                snapshot.currency = 'AED';
+                break;
+              }
+            }
+
+            // 2. JSON-LD Product offers check
+            if (!snapshot.price) {
+              var lpLdScriptsSnap = document.querySelectorAll('script[type="application/ld+json"]');
+              for (var lpLdsi = 0; lpLdsi < lpLdScriptsSnap.length; lpLdsi++) {
+                try {
+                  var lpLdDataSnap = JSON.parse(lpLdScriptsSnap[lpLdsi].textContent);
+                  var lpGraphSnap = lpLdDataSnap && (lpLdDataSnap['@graph'] || (Array.isArray(lpLdDataSnap) ? lpLdDataSnap : [lpLdDataSnap]));
+                  if (Array.isArray(lpGraphSnap)) {
+                    var lpProdSnap = lpGraphSnap.find(function(g) {
+                      return g && (g['@type'] === 'Product' || (Array.isArray(g['@type']) && g['@type'].indexOf('Product') > -1));
+                    });
+                    if (lpProdSnap && lpProdSnap.offers) {
+                      var lpOfferSnap = Array.isArray(lpProdSnap.offers) ? lpProdSnap.offers[0] : lpProdSnap.offers;
+                      var lpPriceValSnap = lpOfferSnap && (lpOfferSnap.price !== undefined ? lpOfferSnap.price : lpOfferSnap.lowPrice);
+                      if (lpPriceValSnap) {
+                        snapshot.price = String(lpPriceValSnap).trim();
+                        snapshot.currency = 'AED';
+                        break;
+                      }
+                    }
+                  }
+                } catch(_eLpLdSnap) {}
+                if (snapshot.price) break;
+              }
+            }
+
+            // 3. Nuxt 3 data scanner with pointer index resolution
+            if (!snapshot.price) {
+              var nuxtScriptSnap = document.getElementById('__NUXT_DATA__');
+              if (nuxtScriptSnap && nuxtScriptSnap.textContent) {
+                var ndSnap = JSON.parse(nuxtScriptSnap.textContent);
+                if (Array.isArray(ndSnap)) {
+                  var resolveNdSnap = function(val) {
+                    if (typeof val === 'number' && ndSnap[val] !== undefined) {
+                      var target = ndSnap[val];
+                      if (typeof target === 'number' || typeof target === 'string') return target;
+                    }
+                    return val;
+                  };
+                  for (var ndsi = 0; ndsi < ndSnap.length; ndsi++) {
+                    var itemNdSnap = ndSnap[ndsi];
+                    if (itemNdSnap && typeof itemNdSnap === 'object' && itemNdSnap.sku) {
+                      var rawOpSnap = itemNdSnap.offer_price !== undefined ? itemNdSnap.offer_price : itemNdSnap.regular_price;
+                      if (rawOpSnap !== undefined) {
+                        var resOpSnap = resolveNdSnap(rawOpSnap);
+                        var pOpSnap = parsePriceAndCurrency(String(resOpSnap));
+                        if (pOpSnap.price) {
+                          snapshot.price = pOpSnap.price;
+                          snapshot.currency = 'AED';
+                          break;
+                        }
+                      }
                     }
                   }
                 }
               }
             }
+
+            // 4. Tabby installment promo URL check
+            if (!snapshot.price) {
+              var tabbyElSnap = document.querySelector('a[href*="tabby.ai"][href*="price="], iframe[src*="tabby.ai"][src*="price="], [data-tabby-price]');
+              if (tabbyElSnap) {
+                var tbSrcSnap = (tabbyElSnap.getAttribute('href') || tabbyElSnap.getAttribute('src') || tabbyElSnap.getAttribute('data-tabby-price') || '');
+                var tbMSnap = tbSrcSnap.match(/[?&]price=([0-9]+(?:\.[0-9]+)?)/i) || tbSrcSnap.match(/([0-9]+(?:\.[0-9]+)?)/);
+                if (tbMSnap && tbMSnap[1]) {
+                  snapshot.price = tbMSnap[1].trim();
+                  snapshot.currency = 'AED';
+                }
+              }
+            }
+
+            // 5. Body text fallback
             if (!snapshot.price && document.body) {
               var lpBodySnap = document.body.innerText || '';
-              var aedMatchSnap = lpBodySnap.match(/(?:AED|د\.?إ|د\.?ا|درهم|Dhs?\.?)\s*([0-9]+(?:[.,][0-9]{1,2})?)/i) ||
+              var aedMatchSnap = lpBodySnap.match(/(?:(?:^|\s)[DÐ]|AED|د\.?إ|د\.?ا|درهم|Dhs?\.?)\s*([0-9]+(?:[.,][0-9]{1,2})?)/i) ||
                                  lpBodySnap.match(/([0-9]+(?:[.,][0-9]{1,2})?)\s*(?:AED|د\.?إ|د\.?ا|درهم|Dhs?\.?)/i);
               if (aedMatchSnap && aedMatchSnap[1]) {
                 snapshot.price = aedMatchSnap[1].trim();
@@ -2771,6 +2949,7 @@ export const getProductSnapshotBridge = page_url => {
               }
             }
           } catch(_eLpSnap) {}
+          if (snapshot.price && !snapshot.currency) snapshot.currency = 'AED';
         }
 
         // 3b. Trendyol App State (fallback)

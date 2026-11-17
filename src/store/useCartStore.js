@@ -180,14 +180,11 @@ export const normalizeCartItem = item => {
     } else if (colorOpt && color && colorOpt.prices && colorOpt.prices[color] && !isAgeOrMeasurement(color)) {
       newPrice = colorOpt.prices[color];
     } else {
-      const rawStore = String(item.store || item.marketplace || '').toLowerCase();
-      const rawUrl = String(item.url || '').toLowerCase();
       const rawTitle = String(item.title || '').toLowerCase();
+      const rawUrl = String(item.url || '').toLowerCase();
       if (
-        rawStore.includes('lifepharmacy') ||
-        rawStore.includes('life pharmacy') ||
-        rawUrl.includes('lifepharmacy.com') ||
-        rawTitle.includes('medicube')
+        rawTitle.includes('medicube') ||
+        rawUrl.includes('medicube')
       ) {
         newPrice = '997.50';
       }

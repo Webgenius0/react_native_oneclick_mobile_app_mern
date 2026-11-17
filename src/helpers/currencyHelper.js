@@ -332,7 +332,16 @@ export const detectItemCurrency = (item = {}, fallbackCurrency = 'USD') => {
       p.includes('ر.س') ||
       p.includes('ريال')
     ) return 'SAR';
-    if (/\b(?:AED|DHS|DH|DIRHAM)\b/i.test(p) || p.includes('د.إ') || p.includes('درهم') || p.includes('\u20C3')) return 'AED';
+    if (
+      /\b(?:AED|DHS|DH|DIRHAM)\b/i.test(p) ||
+      p.includes('د.إ') ||
+      p.includes('د.ا') ||
+      p.includes('درهم') ||
+      p.includes('\u20C3') ||
+      p.includes('Ð') ||
+      p.includes('\u00D0') ||
+      /(?:^|[^a-zA-Z])D\s+[0-9]/i.test(p)
+    ) return 'AED';
     if (/\b(?:AUD)\b/i.test(p) || p.includes('A$') || p.includes('AU$')) return 'AUD';
     if (p.includes('$') || /\bUSD\b/i.test(p)) return 'USD';
     if (p.includes('€') || /\bEUR\b/i.test(p)) return 'EUR';

@@ -362,6 +362,7 @@ export const cleanProductTitle = (rawTitle, url = '') => {
       /^(?:Amazon(?:\.[a-z.]+)?|Trendyol|Hepsiburada(?:\.com)?|Shein|Life Pharmacy|Zara|Noon|AliExpress|eBay|Walmart(?:\.com)?|Nike(?:\.com)?|Apple|Asos|Mango|H&M)\s*[:|–—-]\s*/gi,
       '',
     );
+    title = title.replace(/^Buy\s+(?=[A-Za-z0-9])/i, '');
 
     // 4. Remove Amazon byline / brand prefix if captured (e.g. "Visit the Apple Store", "Brand: Apple")
     title = title.replace(
@@ -408,6 +409,10 @@ export const cleanProductTitle = (rawTitle, url = '') => {
       // Walmart suffixes
       .replace(/\s*-\s*Walmart\.com.*$/gi, '')
       .replace(/\s*\|\s*Walmart.*$/gi, '')
+      // Life Pharmacy suffixes
+      .replace(/\s*\|\s*Life\s+Pharmacy.*$/gi, '')
+      .replace(/\s*-\s*Life\s+Pharmacy.*$/gi, '')
+      .replace(/\s+online\s+at\s+best\s+price(?:\s+in\s+the\s+UAE)?.*$/gi, '')
       // Generic domain suffixes like "| sitename.com" or "- sitename.com"
       .replace(
         /\s*[:|–—-]\s*[a-z0-9-]+\.(?:com|org|net|tr|ae|sa|co\.uk|de|fr|es|it|ru|cn)(?:\.[a-z]+)?\s*$/gi,

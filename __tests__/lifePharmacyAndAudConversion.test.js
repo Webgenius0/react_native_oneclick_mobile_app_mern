@@ -163,5 +163,64 @@ describe('Life Pharmacy & AUD Currency / Marketplace Commission Tests', () => {
       const usd = calculateConvertedPrice(mp.finalPrice, normalized.currency, DEFAULT_RATES, DEFAULT_INVERSE_RATES);
       expect(usd).toBe(342.89);
     });
+
+    it('preserves exact Shiseido Fino price (18.23 AED) and does not default to 997.50', () => {
+      const shiseidoItem = {
+        title: 'Shiseido Fino Premium Touch Mask, Deep Repair Treatment for Dry, Damaged, and Over-Processed Hair - 230g',
+        url: 'https://www.lifepharmacy.com/product/shiseido-fino-premium-touch-hair-mask-230g',
+        price: '18.23',
+        currency: 'AED',
+        store: 'Life Pharmacy',
+      };
+
+      const normalized = normalizeCartItem(shiseidoItem);
+      expect(normalized.price).toBe('18.23');
+      expect(normalized.currency).toBe('AED');
+      expect(normalized.store).toBe('Life Pharmacy');
+
+      const basePrice = parsePrice(normalized.price);
+      expect(basePrice).toBe(18.23);
+
+      const mp = calculateMarketplacePrice(basePrice, normalized, mockMarketplaces);
+      // 18.23 + 10% (1.823) = 20.053 -> 20.05
+      expect(mp.percent).toBe(10);
+      expect(mp.finalPrice).toBe(20.05);
+
+      const usd = calculateConvertedPrice(mp.finalPrice, normalized.currency, DEFAULT_RATES, DEFAULT_INVERSE_RATES);
+      // 20.05 * 0.3125 = 6.27
+      expect(usd).toBe(6.27);
+    });
+
+    it('preserves exact Dymatize Iso 100 price (502.95 AED)', () => {
+      const dymatizeItem = {
+        title: 'Dymatize Iso 100 5 lb Cookies & Cream',
+        url: 'https://www.lifepharmacy.com/product/dymatize-iso-100-5-lb-cookies-cream',
+        price: '502.95',
+        currency: 'AED',
+        store: 'Life Pharmacy',
+      };
+
+      const normalized = normalizeCartItem(dymatizeItem);
+      expect(normalized.price).toBe('502.95');
+      expect(normalized.currency).toBe('AED');
+
+      const basePrice = parsePrice(normalized.price);
+      expect(basePrice).toBe(502.95);
+    });
+
+    it('cleans Life Pharmacy titles by removing Buy prefix and Life Pharmacy suffix', () => {
+      const rawTitle = 'Buy Shiseido Fino Premium Touch Mask, Deep Repair Treatment for Dry, Damaged, and Over-Processed Hair - 230g online at best price in the UAE | Life Pharmacy';
+      const cleaned = cleanProductTitle(rawTitle, 'https://www.lifepharmacy.com/product/shiseido-fino-premium-touch-hair-mask-230g');
+      expect(cleaned).toBe('Shiseido Fino Premium Touch Mask, Deep Repair Treatment for Dry, Damaged, and Over-Processed Hair - 230g');
+    });
+
+    it('correctly parses Life Pharmacy dirham price text formats', () => {
+      expect(parsePrice('D 18.23')).toBe(18.23);
+      expect(parsePrice('D\u00A018.23')).toBe(18.23);
+      expect(parsePrice('Ð 18.23')).toBe(18.23);
+      expect(parsePrice('D 502.95')).toBe(502.95);
+      expect(detectItemCurrency({ price: 'D 18.23', url: 'https://www.lifepharmacy.com' })).toBe('AED');
+      expect(detectItemCurrency({ price: 'Ð 18.23', url: 'https://www.lifepharmacy.com' })).toBe('AED');
+    });
   });
 });
