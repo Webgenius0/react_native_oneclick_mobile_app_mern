@@ -270,12 +270,16 @@ export default function ReviewOrder({ navigation, route }) {
 
       console.log('Order creation response:', res?.data);
 
+      // Only treat as success when backend explicitly confirms no error.
+      // Do NOT use presence of grupID/order_id/order_ids alone — the backend can
+      // return those fields alongside error:true in some edge cases.
       const isSuccess =
         res?.data?.error === false ||
-        res?.data?.success === true ||
-        Boolean(res?.data?.grupID) ||
-        Boolean(res?.data?.order_id) ||
-        Boolean(res?.data?.order_ids);
+        (res?.data?.error !== true && res?.data?.success === true) ||
+        (res?.data?.error !== true &&
+          (Boolean(res?.data?.grupID) ||
+           Boolean(res?.data?.order_id) ||
+           Boolean(res?.data?.order_ids)));
 
       if (isSuccess) {
         resGrupID =

@@ -114,44 +114,74 @@ export default function EDahab({ navigation, route }) {
 
       if (isCancelledRef.current) break;
 
+      let resData = null;
       try {
         const pollRes = await ai.post('payment-edahab', {
           ...basePayload,
           odemeID: currentOdemeId,
           invoiceId: currentInvoiceId,
         });
-
-        const resData = pollRes?.data;
-        console.log('eDahab pollRes:', resData);
-
-        if (resData?.error === false) {
-          setPolling(false);
-          setSubmitting(false);
-          useCartStore.getState().clearCart();
-          setShowSuccessModal(true);
-          return;
-        }
-
-        if (resData?.pending === true) {
+        resData = pollRes?.data;
+      } catch (pollErr) {
+        // If the server responded with a non-2xx status, the data is still in
+        // err.response.data — check it for a success/failure signal before
+        // treating this as a transient network error.
+        const errBody = pollErr?.response?.data;
+        if (errBody !== undefined && errBody !== null) {
+          resData = errBody;
+          console.warn('eDahab poll non-2xx response body:', JSON.stringify(resData));
+        } else {
+          console.warn('eDahab polling network notice:', pollErr?.message || pollErr);
+          // Genuine network error — keep polling; don't treat as failure.
           continue;
         }
+      }
 
+      console.log('eDahab pollRes:', resData);
+
+      // ── Success ──────────────────────────────────────────────────────────
+      // Accept error === false OR the presence of tahsilatID (eDahab's
+      // unique payment-receipt field that only appears on confirmed payment).
+      const isConfirmed =
+        resData?.error === false ||
+        (resData?.error !== true && Boolean(resData?.tahsilatID));
+
+      if (isConfirmed) {
         setPolling(false);
         setSubmitting(false);
-        const errorMsg = localizeApiMessage(
-          resData?.msg || resData?.detail,
-          'Payment could not be completed.',
-        );
-        Toast.show({
-          type: 'error',
-          text1: tr('Payment Failed') || 'Payment Failed',
-          text2: errorMsg,
-          text2Style: { fontSize: 14, color: '#000', width: '100%' },
-        });
+        useCartStore.getState().clearCart();
+        setShowSuccessModal(true);
         return;
-      } catch (pollErr) {
-        console.warn('eDahab polling network notice:', pollErr?.message || pollErr);
       }
+
+      // ── Still pending ─────────────────────────────────────────────────────
+      // Keep polling for: pending:true, or "preparing" messages that are not
+      // yet a definitive rejection.
+      const rawMsg = resData?.msg || resData?.detail || '';
+      const isPreparing =
+        rawMsg.toLowerCase().includes('preparing') ||
+        rawMsg.toLowerCase().includes('hazırlanıyor') ||
+        rawMsg.toLowerCase().includes('hazirlanıyor') ||
+        rawMsg.toLowerCase().includes('do not retry');
+
+      if (resData?.pending === true || isPreparing) {
+        continue;
+      }
+
+      // ── Definitive failure ────────────────────────────────────────────────
+      setPolling(false);
+      setSubmitting(false);
+      const errorMsg = localizeApiMessage(
+        rawMsg,
+        'Payment could not be completed.',
+      );
+      Toast.show({
+        type: 'error',
+        text1: tr('Payment Failed') || 'Payment Failed',
+        text2: errorMsg,
+        text2Style: { fontSize: 14, color: '#000', width: '100%' },
+      });
+      return;
     }
 
     if (!isCancelledRef.current) {
@@ -275,7 +305,7 @@ export default function EDahab({ navigation, route }) {
                   effectiveFixed = parseFloat(edMethod.komisyonFixed) || 0;
                 }
               }
-            } catch (_) {}
+            } catch (_) { }
 
             let freshKom = 0;
             if (effectivePct > 0) {
@@ -307,6 +337,8 @@ export default function EDahab({ navigation, route }) {
         }
       }
 
+      // IMPORTANT: Only show success when backend explicitly confirms error === false.
+      // Never treat a missing/truthy error flag as success.
       if (resData?.error === false) {
         setSubmitting(false);
         setPolling(false);
@@ -315,10 +347,14 @@ export default function EDahab({ navigation, route }) {
         return;
       }
 
+      // Payment did NOT succeed. Log the failure response for debugging.
+      console.warn('eDahab payment not successful. Response:', JSON.stringify(resData));
+
       const issuedOdemeID = resData?.odemeID;
       const issuedInvoiceId = resData?.invoiceId || invoiceId;
 
       if (resData?.pending === true && issuedOdemeID) {
+        // Invoice issued and pending user approval on phone — start polling.
         setOdemeID(issuedOdemeID);
         if (issuedInvoiceId) {
           setInvoiceId(issuedInvoiceId);
@@ -327,6 +363,7 @@ export default function EDahab({ navigation, route }) {
         setCountdown(60);
         await runPollingLoop(issuedOdemeID, issuedInvoiceId, basePayload);
       } else {
+        // Payment definitively failed — show error, leave order as unpaid (durum=16).
         setSubmitting(false);
         const rawMsg =
           resData?.responseMsg ||
@@ -422,7 +459,7 @@ export default function EDahab({ navigation, route }) {
                 E-Dahab Mobile Money
               </Text>
               <Text style={[styles.brandSub, { color: subTextColor }]}>
-                Telesom Mobile Wallet
+
               </Text>
             </View>
           </View>

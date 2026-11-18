@@ -213,12 +213,16 @@ export default function WaafiPay({ navigation, route }) {
         }
       }
 
+      // IMPORTANT: Only show success when backend explicitly confirms error === false.
+      // Never treat a missing/truthy error flag as success.
       if (r?.data?.error === false) {
         setSubmitting(false);
         useCartStore.getState().clearCart();
         setShowSuccessModal(true);
         return;
       } else {
+        // Payment definitively failed — log and show error. Order stays unpaid (durum=16).
+        console.warn('WaafiPay payment not successful. Response:', JSON.stringify(r?.data));
         const rawMsg =
           r?.data?.responseMsg ||
           r?.data?.r?.message ||

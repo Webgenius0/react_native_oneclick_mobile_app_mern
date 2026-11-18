@@ -117,10 +117,10 @@ export default function PaymentStart({ navigation, route }) {
               if (targetOrderIds.includes(String(item.id))) {
                 calculatedSum += parseFloat(
                   item.tutar_usd ??
-                    item.tutar ??
-                    item.price_usd ??
-                    item.fiyat_usd ??
-                    0,
+                  item.tutar ??
+                  item.price_usd ??
+                  item.fiyat_usd ??
+                  0,
                 ) || 0;
               }
             });
@@ -170,7 +170,7 @@ export default function PaymentStart({ navigation, route }) {
   if (selectedMethodObj) {
     komisyonYuzde =
       selectedMethodObj.komisyonYuzde !== undefined &&
-      selectedMethodObj.komisyonYuzde !== null
+        selectedMethodObj.komisyonYuzde !== null
         ? parseFloat(selectedMethodObj.komisyonYuzde) || 0
         : (selectedMethodId === 'waafipay' ? 1 : 0);
     komisyonFixed = parseFloat(selectedMethodObj.komisyonFixed) || 0;
@@ -364,7 +364,7 @@ export default function PaymentStart({ navigation, route }) {
                 E-Dahab Mobile Money
               </Text>
               <Text style={[styles.cardExpiry, { color: subTextColor }]}>
-                Telesom Mobile Wallet
+
               </Text>
             </View>
           </View>
