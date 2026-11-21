@@ -355,8 +355,12 @@ export const detectItemCurrency = (item = {}, fallbackCurrency = 'USD') => {
     url.includes('amazon.ae') ||
     url.includes('noon.com') ||
     url.includes('lifepharmacy.com') ||
+    url.includes('carrefouruae.com') ||
+    url.includes('carrefour') ||
+    url.includes('ae.iherb.com') ||
     store.includes('lifepharmacy') ||
-    store.includes('life pharmacy')
+    store.includes('life pharmacy') ||
+    store.includes('carrefour')
   ) {
     return 'AED';
   }
@@ -367,6 +371,7 @@ export const detectItemCurrency = (item = {}, fallbackCurrency = 'USD') => {
     url.includes('shein.sa') ||
     url.includes('shein.com.sa') ||
     url.includes('amazon.sa') ||
+    url.includes('sa.iherb.com') ||
     url.includes('shein.com/ar') ||
     url.includes('shein.com/sa') ||
     url.includes('/ar-en/') ||
@@ -393,6 +398,8 @@ export const detectItemCurrency = (item = {}, fallbackCurrency = 'USD') => {
   if (
     url.includes('us.shein.com') ||
     url.includes('amazon.com') ||
+    url.includes('iherb.com') ||
+    store.includes('iherb') ||
     url.includes('.com/us') ||
     url.includes('/us/')
   ) {

@@ -224,12 +224,17 @@ export const normalizeCartItem = item => {
     /\bAED\b/i.test(String(newPrice)) ||
     /\bAED\b/i.test(String(item?.price)) ||
     itemUrl.includes('lifepharmacy.com') ||
-    (item?.store && String(item.store).toLowerCase().includes('lifepharmacy'));
+    itemUrl.includes('carrefouruae.com') ||
+    itemUrl.includes('carrefour') ||
+    itemUrl.includes('ae.iherb.com') ||
+    (item?.store && String(item.store).toLowerCase().includes('lifepharmacy')) ||
+    (item?.store && String(item.store).toLowerCase().includes('carrefour'));
 
   const hasExplicitSar =
     currency === 'SAR' ||
     item?.currency === 'SAR' ||
     hasSarPriceSymbol ||
+    itemUrl.includes('sa.iherb.com') ||
     /\b(?:SAR|SR)\b/i.test(String(item?.price));
 
   const hasExplicitAud =
@@ -252,7 +257,9 @@ export const normalizeCartItem = item => {
       item?.currency === '$' ||
       item?.currency === 'USD' ||
       String(newPrice).includes('$') ||
-      /\bUSD\b/i.test(String(newPrice))
+      /\bUSD\b/i.test(String(newPrice)) ||
+      (itemUrl.includes('iherb.com') && !itemUrl.includes('ae.iherb.com') && !itemUrl.includes('sa.iherb.com')) ||
+      (item?.store && String(item.store).toLowerCase().includes('iherb'))
     );
 
   const isAed = !isUsd && hasExplicitAed;
@@ -290,11 +297,11 @@ export const normalizeCartItem = item => {
       newPrice = rawNum.toFixed(2);
     }
   } else if (!currency || currency === 'TL') {
-    if (itemUrl.includes('amazon.ae') || itemUrl.includes('noon.com') || itemUrl.includes('shein.ae') || itemUrl.includes('lifepharmacy.com')) {
+    if (itemUrl.includes('amazon.ae') || itemUrl.includes('noon.com') || itemUrl.includes('shein.ae') || itemUrl.includes('lifepharmacy.com') || itemUrl.includes('carrefouruae.com') || itemUrl.includes('carrefour') || itemUrl.includes('ae.iherb.com')) {
       currency = 'AED';
-    } else if (itemUrl.includes('amazon.sa') || itemUrl.includes('shein.sa') || isSheinArabic) {
+    } else if (itemUrl.includes('amazon.sa') || itemUrl.includes('shein.sa') || itemUrl.includes('sa.iherb.com') || isSheinArabic) {
       currency = 'SAR';
-    } else if (itemUrl.includes('amazon.com') || isShein) {
+    } else if (itemUrl.includes('amazon.com') || itemUrl.includes('iherb.com') || (item?.store && String(item.store).toLowerCase().includes('iherb')) || isShein) {
       currency = 'USD';
     }
   }

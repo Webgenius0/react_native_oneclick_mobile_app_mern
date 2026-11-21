@@ -494,8 +494,8 @@ export const findMarketplaceForItem = (item, marketplaces) => {
     Array.isArray(marketplaces)
       ? marketplaces
       : (typeof useSheinPriceStore?.getState === 'function'
-          ? useSheinPriceStore.getState()?.marketplaces
-          : []) || [];
+        ? useSheinPriceStore.getState()?.marketplaces
+        : []) || [];
 
   if (!Array.isArray(activeMarketplaces) || activeMarketplaces.length === 0) {
     return null;
@@ -579,8 +579,8 @@ export const calculateMarketplacePrice = (basePrice, item, marketplaces) => {
     isExplicitList
       ? marketplaces
       : (typeof useSheinPriceStore?.getState === 'function'
-          ? useSheinPriceStore.getState()?.marketplaces
-          : []) || [];
+        ? useSheinPriceStore.getState()?.marketplaces
+        : []) || [];
 
   const parsePercent = val => {
     if (val === null || val === undefined || val === '') return 0;
@@ -619,7 +619,7 @@ export const calculateMarketplacePrice = (basePrice, item, marketplaces) => {
           percent = p;
         }
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // Shein and Life Pharmacy always have 10% commission default if unconfigured or 0
     if (percent === 0) {

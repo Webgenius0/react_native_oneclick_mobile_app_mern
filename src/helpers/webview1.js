@@ -475,10 +475,25 @@ export const getMetaTagPriceAndCurrency = page_url => {
       try {
         var price = '';
         var currency = '';
+        var rawPriceText = '';
+        var href = (window.location && window.location.href) || '';
+        var host = (window.location && window.location.hostname) || '';
+        var docTitle = (document.title || '').toLowerCase();
+        var isIherbSite = (host.indexOf('iherb.com') > -1) || (href.indexOf('iherb.com') > -1) || (docTitle.indexOf('iherb') > -1);
+        var isCarrefourSite = (host.indexOf('carrefour') > -1) || (href.indexOf('carrefour') > -1) || (docTitle.indexOf('carrefour') > -1);
+        var isLifePharmacySite = (host.indexOf('lifepharmacy.com') > -1) || (href.indexOf('lifepharmacy.com') > -1) || (docTitle.indexOf('life pharmacy') > -1);
 
         var isStruckOrOldPriceElement = function(el) {
           if (!el) return false;
           try {
+            if (el.closest && (el.closest('.original-price-wrapper.show') || el.closest('#product-price') || (el.classList && el.classList.contains('list-price')) || el.closest('#price') || el.closest('.price-inner'))) {
+              var directCls = String(el.className || '');
+              if (!/(^|[\s.;-])(bsc-strikethrough-price|line-through|crossed|del-price)($|[\s.;-])/i.test(directCls) &&
+                  el.tagName !== 'DEL' && el.tagName !== 'S' && el.tagName !== 'STRIKE' &&
+                  (!el.getAttribute || el.getAttribute('data-a-strike') !== 'true')) {
+                return false;
+              }
+            }
             if (el.tagName === 'DEL' || el.tagName === 'S' || el.tagName === 'STRIKE') return true;
             if (el.getAttribute && el.getAttribute('data-a-strike') === 'true') return true;
             var cls = String(el.className || '');
@@ -498,6 +513,10 @@ export const getMetaTagPriceAndCurrency = page_url => {
           if (el.getAttribute && el.getAttribute('content') && /^[0-9]/.test(el.getAttribute('content'))) {
             return el.getAttribute('content');
           }
+          var visibleText = (el.innerText || '').trim();
+          if (visibleText && /[0-9]/.test(visibleText)) {
+            return visibleText;
+          }
           try {
             var clone = el.cloneNode(true);
             var oldNodes = clone.querySelectorAll(
@@ -506,9 +525,14 @@ export const getMetaTagPriceAndCurrency = page_url => {
               '[class*="original-price"], [class*="originalPrice"], [class*="orig-price"], ' +
               '[class*="old-price"], [class*="oldPrice"], [class*="oldprice"], ' +
               '[class*="was-price"], [class*="wasPrice"], [class*="price-was"], ' +
+              '[class*="productPrice__del"], [class*="product-price__del"], ' +
               '[class*="strike"], [class*="line-through"], [class*="crossed"]'
             );
             for (var oi = 0; oi < oldNodes.length; oi++) {
+              var onCls = String(oldNodes[oi].className || '');
+              if (onCls.indexOf('show') > -1 || (oldNodes[oi].querySelector && oldNodes[oi].querySelector('.show')) || onCls.indexOf('list-price') > -1) {
+                continue;
+              }
               oldNodes[oi].remove();
             }
             return clone.textContent || clone.innerText || '';
@@ -519,7 +543,7 @@ export const getMetaTagPriceAndCurrency = page_url => {
 
         var parsePriceAndCurrency = function(rawText) {
           if (!rawText || typeof rawText !== 'string') return { price: '', currency: '' };
-          var t = rawText.replace(/\s+/g, ' ').trim();
+          var t = rawText.replace(/[ \t\r\n\u00A0]+/g, ' ').trim();
           // Convert Arabic-Indic digits ٠-٩ to 0-9
           t = t.replace(/[٠-٩]/g, function(d) { return String.fromCharCode(d.charCodeAt(0) - 1632 + 48); });
           var detectedCurr = '';
@@ -527,6 +551,8 @@ export const getMetaTagPriceAndCurrency = page_url => {
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:SAR|SR|ر\.?س|ريال)(?:$|[^a-zA-Z\u0600-\u06FF])|[﷼\uFDFC\u20C1⃁]/i.test(t)) detectedCurr = 'SAR';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:KWD|د\.?ك)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'KWD';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:QAR|ر\.?ق)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'QAR';
+          else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:BHD|د\.?ب)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'BHD';
+          else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:OMR|ر\.?ع)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'OMR';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:TL|TRY)(?:$|[^a-zA-Z\u0600-\u06FF])|₺/i.test(t)) detectedCurr = 'TL';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:USD|US\$)(?:$|[^a-zA-Z\u0600-\u06FF])|\$/i.test(t)) detectedCurr = 'USD';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])EUR(?:$|[^a-zA-Z\u0600-\u06FF])|€/i.test(t)) detectedCurr = 'EUR';
@@ -543,6 +569,9 @@ export const getMetaTagPriceAndCurrency = page_url => {
           t = t.replace(/(?:save|off|indirim)[ \t]+[0-9]+(?:\.[0-9]+)?%?/gi, '');
           t = t.replace(/(?:save|tasarruf|indirim|saving|savings)\s*[$€£₺]?\s*[0-9]+(?:[.,][0-9]{1,2})?/gi, '');
 
+          // Normalize split decimals e.g. "24 .50" or "24 ,50"
+          t = t.replace(/([0-9]+)\s*[.,]\s*([0-9]{2})\b/, '$1.$2');
+
           // Match price numbers:
           var matches = t.match(/([0-9]{1,3}(?:[., ][0-9]{3})+(?:[.,][0-9]{1,2})(?![0-9])|[0-9]{1,3}(?:[., ][0-9]{3})+(?![0-9])|[0-9]+(?:[.,][0-9]{1,2})(?![0-9])|[0-9]+)/g);
           if (!matches || matches.length === 0) return { price: '', currency: detectedCurr };
@@ -552,237 +581,237 @@ export const getMetaTagPriceAndCurrency = page_url => {
           return { price: cleanPrice, currency: detectedCurr };
         };
 
-        // 1. Prioritized DOM Discount / Current Price extraction (gives live on-screen discounted prices)
-        var candidatePriceSelectors = [
-          // Shein Mobile & Desktop Live Discount / Selling Prices (Prioritize exact bsc-main-price element)
-          '.bsc-main-price',
-          '[class*="bsc-main-price"]',
-          '.bsc-price__content',
-          '.floor-price',
-          '[class*="floor-price"]',
-          '[class*="floorPrice"]',
-          '.product-intro__head-price-text',
-          '.product-intro__head-price',
-          '.product-intro__price-new',
-          '.product-intro__price',
-          '[class*="product-intro__head-price"]',
-          '[class*="product-intro__price"]',
-          '.productPrice',
-          '[class*="productPrice__main"]',
-          '[class*="productPrice"]',
-          '[class*="product-price" i]',
-          '[class*="productprice" i]',
-          '[class*="productPriceContainer"]',
-          '[class*="selling-price" i]',
-          '[class*="sellingPrice" i]',
-          '[class*="real-price" i]',
-          '[class*="realPrice" i]',
-          '[class*="shein-price" i]',
-          '[class*="goods-price" i]',
-          '[class*="goodsPrice" i]',
-          '[class*="goods-detail-price" i]',
-          '[class*="goodsDetailPrice" i]',
-          '[data-price]',
-          '[data-sku-price]',
-          '[aria-label*="price" i]',
-          '[aria-label*="Price" i]',
-          '[itemprop="price"]',
-          'span[itemprop="price"]',
+        // ==========================================
+        // Dedicated Store Extractors (Run FIRST)
+        // ==========================================
 
-          // Trendyol Discount / Campaign Prices
-          'span.prc-dsc',
-          '.prc-dsc',
-          '.prc-box-dsc',
-          '.product-price-container .prc-dsc',
-          '.basket-discount-price',
-          '.campaign-price',
-          '.badge-basket-discount',
-          '.discounted-price',
-
-          // Amazon PriceToPay / Deal / BuyBox / Non-struck Prices
-          '#corePriceDisplay_mobile_feature_div .priceToPay .a-offscreen',
-          '#corePrice_mobile_feature_div .priceToPay .a-offscreen',
-          '#apex_mobile_feature_div .priceToPay .a-offscreen',
-          '.priceToPay .a-offscreen',
-          '#corePriceDisplay_desktop_feature_div .priceToPay .a-offscreen',
-          '#corePrice_desktop .priceToPay .a-offscreen',
-          '.apexPriceToPay .a-offscreen',
-          '#priceblock_dealprice',
-          '#priceblock_saleprice',
-          '#price_inside_buybox',
-          '#corePriceDisplay_mobile_feature_div .a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
-          '#corePrice_mobile_feature_div .a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
-          '#apex_mobile_feature_div .a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
-          '.a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
-          '.reinventPricePriceToPayMargin .a-offscreen',
-
-          // Additional Shein / General Selectors
-          '[class*="from-price"]',
-          '[class*="goods-detail-price"]',
-          '[class*="discount-price"]',
-          '[class*="sale-price"]',
-          '[class*="current-price"]',
-          '[class*="currentPrice"]',
-          '[class*="now-price"]',
-          '[class*="priceNow"]',
-          '[class*="normal-price"]',
-          '.goods-detail-price .discount-price',
-          '.product-price-info .discount-price',
-          '.goods-detail-price .price',
-          '.goods-price',
-          '[data-test-id*="price"]',
-
-          // Hepsiburada / Noon Current Prices
-          '[data-test-id="price-current-price"]',
-          '[data-test-id="price-discount-price"]',
-          '[data-qa="div-price-now"]',
-          '.priceNow',
-          '#offering-price',
-
-          // Generic E-Commerce / Shopify / WooCommerce Sale Prices
-          'ins .amount',
-          'ins [class*="price"]',
-          '.price-item--sale',
-          '.special-price',
-          '.sale-price',
-          '.discount-price',
-          '.discounted-price',
-          '[class*="discountPrice"]',
-          '[class*="discountedPrice"]',
-          '[class*="salePrice"]',
-          '.product-price-container',
-          '.product-price',
-          '.pdp-price',
-
-          // Life Pharmacy
-          '.dirham.text-lg',
-          '.dirham.font-bold:not(.line-through):not([class*="line-through"])',
-          'p.dirham:not(.line-through):not([class*="line-through"])',
-          'p[class*="dirham"]:not(.line-through):not([class*="line-through"])',
-          '[class*="dirham"]:not(.line-through):not([class*="line-through"])',
-          '[class*="special-price" i]',
-          '[class*="offer-price" i]',
-          '[class*="offerPrice" i]',
-          '[class*="regular-price" i]',
-          '[class*="product-price" i]',
-          '[data-testid*="price" i]',
-          '[data-cy*="price" i]',
-
-          // Life Pharmacy
-          '.dirham.text-lg',
-          '.dirham.font-bold:not(.line-through):not([class*="line-through"])',
-          'p.dirham:not(.line-through):not([class*="line-through"])',
-          'p[class*="dirham"]:not(.line-through):not([class*="line-through"])',
-          '[class*="dirham"]:not(.line-through):not([class*="line-through"])',
-          '[class*="special-price" i]',
-          '[class*="offer-price" i]',
-          '[class*="offerPrice" i]',
-          '[class*="regular-price" i]',
-          '[class*="product-price" i]',
-          '[data-testid*="price" i]',
-          '[data-cy*="price" i]',
-
-          // AliExpress / Carrefour / iHerb / YesStyle price selectors
-          '[class*="currentPriceText"]',
-          '[class*="price--currentPriceText"]',
-          '[class*="price--current"]',
-          '[class*="product-price-current"]',
-          '[class*="product-price-value"]',
-          '.uniform-banner-box-price',
-          '[class*="uniform-banner-box-price"]',
-          '.price-current',
-          '.es--wrap-- [class*="price"]',
-          '[class*="snow-price"]',
-          '[data-pl="product-price"]',
-          '.product-price-value',
-          '#our-price',
-          '.our-price',
-          '.item-price',
-          '.price-tag',
-          '[class*="itemPrice"]',
-          '[class*="price-now"]',
-          '[class*="now-price"]',
-
-          // Life Pharmacy
-          '.dirham.text-lg',
-          '.dirham.font-bold:not(.line-through):not([class*="line-through"])',
-          'p.dirham:not(.line-through):not([class*="line-through"])',
-          'p[class*="dirham"]:not(.line-through):not([class*="line-through"])',
-          '[class*="dirham"]:not(.line-through):not([class*="line-through"])',
-          '[class*="special-price" i]',
-          '[class*="offer-price" i]',
-          '[class*="offerPrice" i]',
-          '[class*="regular-price" i]',
-          '[class*="product-price" i]',
-          '[data-testid*="price" i]',
-          '[data-cy*="price" i]'
-        ];
-
-        var priceEl = null;
-        for (var s = 0; s < candidatePriceSelectors.length; s++) {
-          var elList = document.querySelectorAll(candidatePriceSelectors[s]);
-          for (var ei = 0; ei < elList.length; ei++) {
-            var currEl = elList[ei];
-            if (isStruckOrOldPriceElement(currEl)) continue;
-            var raw = getCleanElementPriceText(currEl);
-            if (raw && /[0-9]/.test(raw)) {
-              var parsed = parsePriceAndCurrency(raw);
-              if (parsed.price) {
-                price = parsed.price;
-                if (parsed.currency && !currency) currency = parsed.currency;
-                priceEl = currEl;
-
-                // Inspect Shein data-price-size="other" or currency span directly inside currEl
-                if (!currency && currEl.querySelector) {
-                  var curChild = currEl.querySelector('[data-price-size="other"], [class*="price-symbol"], [class*="currency"]');
-                  if (curChild) {
-                    var ct = (curChild.textContent || '').trim().toUpperCase();
-                    if (ct === 'SR' || ct === 'SAR' || ct.indexOf('SR') > -1 || ct.indexOf('SAR') > -1 || /[﷼\uFDFC\u20C1⃁]|ر\.?س|ريال/.test(ct)) {
-                      currency = 'SAR';
-                    } else if (ct === 'AED' || ct.indexOf('AED') > -1 || /د\.?إ|د\.?ا|درهم|\u20C3/.test(ct)) {
-                      currency = 'AED';
-                    } else if (ct === '$' || ct === 'USD') {
-                      currency = 'USD';
-                    }
-                  }
+        // 1. Dedicated iHerb extractor (Runs FIRST for iHerb to capture active visible price with innerText)
+        if (isIherbSite && !price) {
+          try {
+            // 1a. Primary: visible on-page price using innerText (respects hide/show variant toggling)
+            var ihShowEl = document.querySelector('.original-price-wrapper.show .list-price') ||
+                           document.querySelector('.original-price-wrapper.show') ||
+                           document.querySelector('#product-price .list-price') ||
+                           document.querySelector('#product-price') ||
+                           document.querySelector('.list-price') ||
+                           document.querySelector('#price .price-inner') ||
+                           document.querySelector('#price') ||
+                           document.querySelector('.price-inner') ||
+                           document.querySelector('.purchase-option-one-time .list-price');
+            if (ihShowEl) {
+              var ihShowText = (ihShowEl.innerText || ihShowEl.textContent || '').trim();
+              if (ihShowText) {
+                var ihShowP = parsePriceAndCurrency(ihShowText);
+                if (ihShowP.price) {
+                  price = ihShowP.price;
+                  rawPriceText = ihShowText;
+                  if (ihShowP.currency) currency = ihShowP.currency;
                 }
-
-                // Inspect currEl's ancestors up to 6 levels for currency symbols (AED, SAR, TL, then USD)
-                if (!currency && currEl) {
-                  var pNode = currEl;
-                  for (var pi = 0; pi < 6 && pNode; pi++) {
-                    var pText = pNode.textContent || '';
-                    if (/د\.?إ|د\.?ا|درهم|\u20C3/i.test(pText) || /(?:^|[^a-zA-Z])AED(?:[^a-zA-Z]|$)/i.test(pText)) { currency = 'AED'; break; }
-                    if (/[﷼\uFDFC\u20C1⃁]|ر\.?س|ريال/i.test(pText) || /(?:^|[^a-zA-Z])(?:SAR|SR)(?:[^a-zA-Z]|$)/i.test(pText)) { currency = 'SAR'; break; }
-                    if (/₺|\bTL\b|\bTRY\b/i.test(pText)) { currency = 'TL'; break; }
-                    if (/\$|\bUSD\b/i.test(pText)) { currency = 'USD'; break; }
-                    pNode = pNode.parentElement;
-                  }
-                }
-
-                if (!currency && currEl) {
-                  var containerEl = (currEl.closest && currEl.closest(
-                    '[class*="head-price"], [class*="floor-price"], [class*="product-price"], [class*="productPrice"], [class*="goods-price"], [class*="selling-price"], [class*="goodsPrice"], .product-intro__head-price'
-                  )) || currEl.parentElement;
-                  if (containerEl) {
-                    var containerText = getCleanElementPriceText(containerEl);
-                    var parsedContainer = parsePriceAndCurrency(containerText);
-                    if (parsedContainer.currency) {
-                      currency = parsedContainer.currency;
-                    }
-                  }
-                }
-                break;
               }
             }
-          }
-          if (price) break;
+
+            // 1b. Hidden input model on iHerb: input#share-email-model
+            if (!price) {
+              var ihShareInput = document.querySelector('input#share-email-model');
+              if (ihShareInput) {
+                var ihDiscPrice = ihShareInput.getAttribute('data-discount-price') || ihShareInput.getAttribute('data-list-price');
+                if (ihDiscPrice) {
+                  var ihDiscP = parsePriceAndCurrency(ihDiscPrice);
+                  if (ihDiscP.price) {
+                    price = ihDiscP.price;
+                    rawPriceText = ihDiscPrice;
+                    if (ihDiscP.currency) currency = ihDiscP.currency;
+                  }
+                }
+              }
+            }
+
+            // 1c. Client-side JS globals: window.PRODUCT_DETAILS or window.IHR_DL
+            if (!price) {
+              try {
+                if (window.PRODUCT_DETAILS) {
+                  var pdVal = window.PRODUCT_DETAILS.discountPrice || window.PRODUCT_DETAILS.price || window.PRODUCT_DETAILS.listPrice;
+                  if (pdVal) {
+                    var pdP = parsePriceAndCurrency(String(pdVal));
+                    if (pdP.price) {
+                      price = pdP.price;
+                      rawPriceText = String(pdVal);
+                      if (window.PRODUCT_DETAILS.currency) currency = window.PRODUCT_DETAILS.currency;
+                    }
+                  }
+                }
+                if (!price && window.IHR_DL && window.IHR_DL.product) {
+                  var ihrP = window.IHR_DL.product;
+                  var ihrVal = ihrP.discount_price || ihrP.unit_price || ihrP.price;
+                  if (ihrVal) {
+                    var ihrParsed = parsePriceAndCurrency(String(ihrVal));
+                    if (ihrParsed.price) {
+                      price = ihrParsed.price;
+                      rawPriceText = String(ihrVal);
+                      if (ihrP.currency) currency = ihrP.currency;
+                    }
+                  }
+                }
+              } catch(_ePd) {}
+            }
+
+            // 1d. Next.js __NEXT_DATA__
+            if (!price) {
+              try {
+                var ihNextDataEl = document.getElementById('__NEXT_DATA__');
+                if (ihNextDataEl && ihNextDataEl.textContent) {
+                  var ihNext = JSON.parse(ihNextDataEl.textContent);
+                  var ihProps = ihNext && ihNext.props && ihNext.props.pageProps;
+                  var ihProdData = ihProps && (ihProps.product || ihProps.initialData || ihProps.productData);
+                  if (ihProdData) {
+                    var ihNpVal = ihProdData.discountPrice || ihProdData.price || ihProdData.listPrice;
+                    if (ihNpVal) {
+                      var ihNpP = parsePriceAndCurrency(String(ihNpVal));
+                      if (ihNpP.price) {
+                        price = ihNpP.price;
+                        rawPriceText = String(ihNpVal);
+                        if (ihProdData.currency || ihProdData.priceCurrency) currency = ihProdData.currency || ihProdData.priceCurrency;
+                      }
+                    }
+                  }
+                }
+              } catch(_eNd) {}
+            }
+
+            // 1e. Last resort: OpenGraph / Meta price tags
+            if (!price) {
+              var ihMeta = document.querySelector('meta[property="og:price:amount"], meta[property="product:price:amount"], meta[name="twitter:data1"], meta[itemprop="price"], [itemprop="price"]');
+              if (ihMeta) {
+                var ihMetaContent = ihMeta.getAttribute('content') || ihMeta.content || (ihMeta.innerText || '').trim();
+                if (ihMetaContent) {
+                  var ihMetaP = parsePriceAndCurrency(ihMetaContent);
+                  if (ihMetaP.price) {
+                    price = ihMetaP.price;
+                    rawPriceText = ihMetaContent;
+                  }
+                }
+              }
+            }
+
+            // 1f. Last resort: JSON-LD Product offers
+            if (!price) {
+              var ihLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
+              for (var ihLdi = 0; ihLdi < ihLdScripts.length; ihLdi++) {
+                try {
+                  var ihLdData = JSON.parse(ihLdScripts[ihLdi].textContent);
+                  var ihGraph = ihLdData && (ihLdData['@graph'] || (Array.isArray(ihLdData) ? ihLdData : [ihLdData]));
+                  if (Array.isArray(ihGraph)) {
+                    var ihProd = ihGraph.find(function(g) {
+                      return g && (g['@type'] === 'Product' || (Array.isArray(g['@type']) && g['@type'].indexOf('Product') > -1));
+                    });
+                    if (ihProd && ihProd.offers) {
+                      var ihOffer = Array.isArray(ihProd.offers) ? ihProd.offers[0] : ihProd.offers;
+                      if (ihOffer && ihOffer.offers && Array.isArray(ihOffer.offers)) {
+                        ihOffer = ihOffer.offers[0];
+                      }
+                      var ihPVal = ihOffer && (ihOffer.price !== undefined ? ihOffer.price : (ihOffer.lowPrice !== undefined ? ihOffer.lowPrice : ihOffer.highPrice));
+                      if (ihPVal) {
+                        price = String(ihPVal).trim();
+                        rawPriceText = String(ihPVal);
+                        if (ihOffer.priceCurrency) currency = ihOffer.priceCurrency;
+                        break;
+                      }
+                    }
+                  }
+                } catch(_eIhLd) {}
+                if (price) break;
+              }
+            }
+
+            // Currency detection for iHerb
+            if (price && !currency) {
+              if (host.indexOf('sa.iherb.com') > -1 || href.indexOf('sa.iherb.com') > -1) {
+                currency = 'SAR';
+              } else if (host.indexOf('ae.iherb.com') > -1 || href.indexOf('ae.iherb.com') > -1) {
+                currency = 'AED';
+              } else {
+                currency = 'USD';
+              }
+            }
+          } catch(_eIh) {}
         }
 
-        // 1b. Check Life Pharmacy DOM, JSON-LD, Nuxt 3 data & body text scanner
-        if (!price && (href.indexOf('lifepharmacy.com') > -1 || (document.title && document.title.toLowerCase().indexOf('life pharmacy') > -1))) {
+        // 2. Dedicated Carrefour UAE extractor (Runs FIRST for Carrefour UAE to capture split decimal prices and [data-qa="product-price"])
+        if (isCarrefourSite && !price) {
           try {
-            // 1. Direct DOM check for Life Pharmacy dirham price
+            // 1. Direct Carrefour DOM check
+            var cfPriceEls = document.querySelectorAll('[data-qa="product-price"], [class*="css-"][class*="price" i], [class*="css-"][data-testid*="price" i], [class*="product-price" i], .product-price');
+            for (var cfi = 0; cfi < cfPriceEls.length; cfi++) {
+              var cfEl = cfPriceEls[cfi];
+              if (isStruckOrOldPriceElement(cfEl)) continue;
+              var cfRaw = (cfEl.innerText || cfEl.textContent || '').trim();
+              if (cfRaw && /[0-9]/.test(cfRaw)) {
+                // Normalize split decimals e.g. "24 .50" or "24 ,50"
+                cfRaw = cfRaw.replace(/([0-9]+)\s*[.,]\s*([0-9]{2})\b/, '$1.$2');
+                var cfP = parsePriceAndCurrency(cfRaw);
+                if (cfP.price) {
+                  price = cfP.price;
+                  rawPriceText = cfRaw;
+                  currency = 'AED';
+                  break;
+                }
+              }
+            }
+
+            // 2. Next.js __NEXT_DATA__
+            if (!price) {
+              var cfNextEl = document.getElementById('__NEXT_DATA__');
+              if (cfNextEl && cfNextEl.textContent) {
+                var cfNextData = JSON.parse(cfNextEl.textContent);
+                var cfPProps = cfNextData && cfNextData.props && cfNextData.props.pageProps;
+                var cfProduct = cfPProps && (cfPProps.product || cfPProps.initialProduct || (cfPProps.initialState && cfPProps.initialState.product));
+                if (cfProduct) {
+                  var cfPriceVal = cfProduct.price !== undefined ? cfProduct.price : (cfProduct.finalPrice !== undefined ? cfProduct.finalPrice : cfProduct.salePrice);
+                  if (cfPriceVal !== undefined) {
+                    var cfParsed = parsePriceAndCurrency(String(cfPriceVal));
+                    if (cfParsed.price) {
+                      price = cfParsed.price;
+                      rawPriceText = String(cfPriceVal);
+                      currency = 'AED';
+                    }
+                  }
+                }
+              }
+            }
+
+            // 3. JSON-LD Product offers
+            if (!price) {
+              var cfLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
+              for (var cfLdi = 0; cfLdi < cfLdScripts.length; cfLdi++) {
+                try {
+                  var cfLdData = JSON.parse(cfLdScripts[cfLdi].textContent);
+                  var cfGraph = cfLdData && (cfLdData['@graph'] || (Array.isArray(cfLdData) ? cfLdData : [cfLdData]));
+                  if (Array.isArray(cfGraph)) {
+                    var cfProd = cfGraph.find(function(g) {
+                      return g && (g['@type'] === 'Product' || (Array.isArray(g['@type']) && g['@type'].indexOf('Product') > -1));
+                    });
+                    if (cfProd && cfProd.offers) {
+                      var cfOffer = Array.isArray(cfProd.offers) ? cfProd.offers[0] : cfProd.offers;
+                      var cfPVal = cfOffer && (cfOffer.price !== undefined ? cfOffer.price : cfOffer.lowPrice);
+                      if (cfPVal) {
+                        price = String(cfPVal).trim();
+                        rawPriceText = String(cfPVal);
+                        currency = 'AED';
+                        break;
+                      }
+                    }
+                  }
+                } catch(_eCfLd) {}
+                if (price) break;
+              }
+            }
+          } catch(_eCf) {}
+          if (price && !currency) currency = 'AED';
+        }
+
+        // 3. Dedicated Life Pharmacy extractor
+        if (isLifePharmacySite && !price) {
+          try {
             var lpDirhamEls = document.querySelectorAll('p[class*="dirham"]:not(.line-through):not([class*="line-through"]), [class*="dirham"]:not(.line-through):not([class*="line-through"])');
             for (var lpdi = 0; lpdi < lpDirhamEls.length; lpdi++) {
               var lpEl = lpDirhamEls[lpdi];
@@ -791,12 +820,13 @@ export const getMetaTagPriceAndCurrency = page_url => {
               var lpP = parsePriceAndCurrency(lpClean);
               if (lpP.price) {
                 price = lpP.price;
+                rawPriceText = lpClean;
                 currency = 'AED';
                 break;
               }
             }
 
-            // 2. JSON-LD Product offers check
+            // JSON-LD Product offers check
             if (!price) {
               var lpLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
               for (var lpLdi = 0; lpLdi < lpLdScripts.length; lpLdi++) {
@@ -812,6 +842,7 @@ export const getMetaTagPriceAndCurrency = page_url => {
                       var lpPriceVal = lpOffer && (lpOffer.price !== undefined ? lpOffer.price : lpOffer.lowPrice);
                       if (lpPriceVal) {
                         price = String(lpPriceVal).trim();
+                        rawPriceText = String(lpPriceVal);
                         currency = 'AED';
                         break;
                       }
@@ -822,28 +853,29 @@ export const getMetaTagPriceAndCurrency = page_url => {
               }
             }
 
-            // 3. Nuxt 3 data scanner with pointer index resolution
+            // Nuxt 3 data resolver
             if (!price) {
-              var nuxtScript = document.getElementById('__NUXT_DATA__');
-              if (nuxtScript && nuxtScript.textContent) {
-                var nd = JSON.parse(nuxtScript.textContent);
-                if (Array.isArray(nd)) {
-                  var resolveNd = function(val) {
-                    if (typeof val === 'number' && nd[val] !== undefined) {
-                      var target = nd[val];
+              var nuxtScriptAdd = document.getElementById('__NUXT_DATA__');
+              if (nuxtScriptAdd && nuxtScriptAdd.textContent) {
+                var ndAdd = JSON.parse(nuxtScriptAdd.textContent);
+                if (Array.isArray(ndAdd)) {
+                  var resolveNdAdd = function(val) {
+                    if (typeof val === 'number' && ndAdd[val] !== undefined) {
+                      var target = ndAdd[val];
                       if (typeof target === 'number' || typeof target === 'string') return target;
                     }
                     return val;
                   };
-                  for (var ndi = 0; ndi < nd.length; ndi++) {
-                    var itemNd = nd[ndi];
-                    if (itemNd && typeof itemNd === 'object' && itemNd.sku) {
-                      var rawOp = itemNd.offer_price !== undefined ? itemNd.offer_price : itemNd.regular_price;
+                  for (var ndai = 0; ndai < ndAdd.length; ndai++) {
+                    var itemNdAdd = ndAdd[ndai];
+                    if (itemNdAdd && typeof itemNdAdd === 'object' && itemNdAdd.sku) {
+                      var rawOp = itemNdAdd.offer_price !== undefined ? itemNdAdd.offer_price : itemNdAdd.regular_price;
                       if (rawOp !== undefined) {
-                        var resOp = resolveNd(rawOp);
+                        var resOp = resolveNdAdd(rawOp);
                         var pOp = parsePriceAndCurrency(String(resOp));
                         if (pOp.price) {
                           price = pOp.price;
+                          rawPriceText = String(resOp);
                           currency = 'AED';
                           break;
                         }
@@ -854,7 +886,7 @@ export const getMetaTagPriceAndCurrency = page_url => {
               }
             }
 
-            // 4. Tabby installment promo URL check
+            // Tabby installment promo URL check
             if (!price) {
               var tabbyEl = document.querySelector('a[href*="tabby.ai"][href*="price="], iframe[src*="tabby.ai"][src*="price="], [data-tabby-price]');
               if (tabbyEl) {
@@ -862,351 +894,268 @@ export const getMetaTagPriceAndCurrency = page_url => {
                 var tbM = tbSrc.match(/[?&]price=([0-9]+(?:\.[0-9]+)?)/i) || tbSrc.match(/([0-9]+(?:\.[0-9]+)?)/);
                 if (tbM && tbM[1]) {
                   price = tbM[1].trim();
+                  rawPriceText = tbM[1].trim();
                   currency = 'AED';
                 }
               }
             }
 
-            // 5. Body text fallback
+            // Body text regex with D, Ð, or AED
             if (!price && document.body) {
-              var lpBody = document.body.innerText || '';
-              var aedMatch = lpBody.match(/(?:(?:^|\s)[DÐ]|AED|د\.?إ|د\.?ا|درهم|Dhs?\.?)\s*([0-9]+(?:[.,][0-9]{1,2})?)/i) ||
-                             lpBody.match(/([0-9]+(?:[.,][0-9]{1,2})?)\s*(?:AED|د\.?إ|د\.?ا|درهم|Dhs?\.?)/i);
-              if (aedMatch && aedMatch[1]) {
-                price = aedMatch[1].trim();
+              var lpBodyAdd = document.body.innerText || '';
+              var aedMatchAdd = lpBodyAdd.match(/(?:(?:^|\s)[DÐ]|AED|د\.?إ|د\.?ا|درهم|Dhs?\.?)\s*([0-9]+(?:[.,][0-9]{1,2})?)/i) ||
+                                lpBodyAdd.match(/([0-9]+(?:[.,][0-9]{1,2})?)\s*(?:AED|د\.?إ|د\.?ا|درهم|Dhs?\.?)/i);
+              if (aedMatchAdd && aedMatchAdd[1]) {
+                price = aedMatchAdd[1].trim();
+                rawPriceText = aedMatchAdd[1].trim();
                 currency = 'AED';
               }
             }
-          } catch(_eLp) {}
+          } catch(_eLpAdd) {}
           if (price && !currency) currency = 'AED';
         }
 
-        // 2a. Check Trendyol application state (if DOM extraction hasn't found price yet)
+        // ==========================================
+        // Generic Candidate Selectors (For Other Stores)
+        // ==========================================
         if (!price) {
-          try {
-            if (window.__PRODUCT_DETAIL_APP_INITIAL_STATE__ && window.__PRODUCT_DETAIL_APP_INITIAL_STATE__.product) {
-              var tpProd = window.__PRODUCT_DETAIL_APP_INITIAL_STATE__.product;
-              var selectedVarPrice = null;
-              if (Array.isArray(tpProd.variants)) {
-                var selVar = tpProd.variants.find(function(v) { return v && v.selected; });
-                if (selVar && selVar.price) {
-                  selectedVarPrice = selVar.price;
-                }
-              }
-              var tpPrice = selectedVarPrice || tpProd.price;
-              if (tpPrice) {
-                var dPrice = tpPrice.discountedPrice;
-                var sPrice = tpPrice.sellingPrice;
-                if (dPrice) {
-                  var dVal = typeof dPrice === 'object' ? (dPrice.value || dPrice.text || '') : dPrice;
-                  if (dVal && dVal !== '0' && dVal !== 0) {
-                    price = String(dVal).trim();
-                  }
-                }
-                if (!price && sPrice) {
-                  var sVal = typeof sPrice === 'object' ? (sPrice.value || sPrice.text || '') : sPrice;
-                  if (sVal) price = String(sVal).trim();
-                }
-                if (tpPrice.currency && !currency) currency = String(tpPrice.currency).trim();
-              }
-            }
-          } catch(_eTp) {}
-        }
+          var candidatePriceSelectors = [
+            '.bsc-main-price',
+            '[class*="bsc-main-price"]',
+            '.bsc-price__content',
+            '.floor-price',
+            '[class*="floor-price"]',
+            '[class*="floorPrice"]',
+            '.product-intro__head-price-text',
+            '.product-intro__head-price',
+            '.product-intro__price-new',
+            '.product-intro__price',
+            '[class*="product-intro__head-price"]',
+            '[class*="product-intro__price"]',
+            '.productPrice',
+            '[class*="productPrice__main"]',
+            '[class*="productPrice"]',
+            '[class*="product-price" i]',
+            '[class*="productprice" i]',
+            '[class*="productPriceContainer"]',
+            '[class*="selling-price" i]',
+            '[class*="sellingPrice" i]',
+            '[class*="real-price" i]',
+            '[class*="realPrice" i]',
+            '[class*="shein-price" i]',
+            '[class*="goods-price" i]',
+            '[class*="goodsPrice" i]',
+            '[class*="goods-detail-price" i]',
+            '[class*="goodsDetailPrice" i]',
+            '[data-price]',
+            '[data-sku-price]',
+            '[aria-label*="price" i]',
+            '[aria-label*="Price" i]',
+            '[itemprop="price"]',
+            'span[itemprop="price"]',
 
-        // 2b. Check Shein application state
-        if (!price) {
-          try {
-            if (window.gbCommonInfo) {
-              var ssr = window.gbCommonInfo.contextForSSR;
-              if (ssr) {
-                if (!price && ssr.googleSEO && ssr.googleSEO.goodsDetailSchema && ssr.googleSEO.goodsDetailSchema.offers) {
-                  var shSchema = ssr.googleSEO.goodsDetailSchema;
-                  if (shSchema.offers) {
-                    var off = shSchema.offers;
-                    var pOff = off.price || off.lowPrice || '';
-                    if (pOff) price = String(pOff).trim();
-                    if (!currency && off.priceCurrency) currency = String(off.priceCurrency).trim();
-                  }
-                }
-                if (!price && ssr.detail) {
-                  var dtSsr = ssr.detail;
-                  var spSsr = (dtSsr.currentSku && (dtSsr.currentSku.sku_sale_price || dtSsr.currentSku.salePrice || dtSsr.currentSku.price)) || dtSsr.salePrice || dtSsr.sale_price || dtSsr.retailPrice || dtSsr.originalPrice;
-                  if (spSsr) {
-                    if (typeof spSsr === 'object') {
-                      if (spSsr.amount) price = String(spSsr.amount).trim();
-                      else if (spSsr.usdAmount) price = String(spSsr.usdAmount).trim();
-                      else if (spSsr.amountWithSymbol) {
-                        var pResSsr = parsePriceAndCurrency(spSsr.amountWithSymbol);
-                        if (pResSsr.price) { price = pResSsr.price; if (pResSsr.currency && !currency) currency = pResSsr.currency; }
+            // Trendyol Discount / Campaign Prices
+            'span.prc-dsc',
+            '.prc-dsc',
+            '.prc-box-dsc',
+            '.product-price-container .prc-dsc',
+            '.basket-discount-price',
+            '.campaign-price',
+            '.badge-basket-discount',
+            '.discounted-price',
+
+            // Amazon PriceToPay / Deal / BuyBox / Non-struck Prices
+            '#corePriceDisplay_mobile_feature_div .priceToPay .a-offscreen',
+            '#corePrice_mobile_feature_div .priceToPay .a-offscreen',
+            '#apex_mobile_feature_div .priceToPay .a-offscreen',
+            '.priceToPay .a-offscreen',
+            '#corePriceDisplay_desktop_feature_div .priceToPay .a-offscreen',
+            '#corePrice_desktop .priceToPay .a-offscreen',
+            '.apexPriceToPay .a-offscreen',
+            '#priceblock_dealprice',
+            '#priceblock_saleprice',
+            '#price_inside_buybox',
+            '#corePriceDisplay_mobile_feature_div .a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
+            '#corePrice_mobile_feature_div .a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
+            '#apex_mobile_feature_div .a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
+            '.a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
+            '.reinventPricePriceToPayMargin .a-offscreen',
+
+            // Additional Shein / General Selectors
+            '[class*="from-price"]',
+            '[class*="goods-detail-price"]',
+            '[class*="discount-price"]',
+            '[class*="sale-price"]',
+            '[class*="current-price"]',
+            '[class*="currentPrice"]',
+            '[class*="now-price"]',
+            '[class*="priceNow"]',
+            '[class*="normal-price"]',
+            '.goods-detail-price .discount-price',
+            '.product-price-info .discount-price',
+            '.goods-detail-price .price',
+            '.goods-price',
+            '[data-test-id*="price"]',
+
+            // Hepsiburada / Noon Current Prices
+            '[data-test-id="price-current-price"]',
+            '[data-test-id="price-discount-price"]',
+            '[data-qa="div-price-now"]',
+            '.priceNow',
+            '#offering-price',
+
+            // Generic E-Commerce / Shopify / WooCommerce Sale Prices
+            'ins .amount',
+            'ins [class*="price"]',
+            '.price-item--sale',
+            '.special-price',
+            '.sale-price',
+            '.discount-price',
+            '.discounted-price',
+            '[class*="discountPrice"]',
+            '[class*="discountedPrice"]',
+            '[class*="salePrice"]',
+            '.product-price-container',
+            '.product-price',
+            '.pdp-price',
+
+            // AliExpress / iHerb / YesStyle price selectors
+            '[class*="currentPriceText"]',
+            '[class*="price--currentPriceText"]',
+            '[class*="price--current"]',
+            '[class*="product-price-current"]',
+            '[class*="product-price-value"]',
+            '.uniform-banner-box-price',
+            '[class*="uniform-banner-box-price"]',
+            '.price-current',
+            '.es--wrap-- [class*="price"]',
+            '[class*="snow-price"]',
+            'span[class*="price--"]',
+            'div[class*="price--"]',
+            '[data-pl="product-price"]',
+            '.product-price-value',
+            '#our-price',
+            '.our-price',
+            '.item-price',
+            '.price-tag',
+            '[class*="itemPrice"]',
+            '[class*="price-now"]',
+            '[class*="now-price"]',
+
+            // iHerb price selectors
+            '#product-price',
+            '.list-price',
+            '.original-price-wrapper.show .list-price',
+
+            // Carrefour UAE price selectors
+            '[data-qa="product-price"]',
+            '.product-price',
+            '[class*="css-"][class*="price" i]',
+            '[class*="css-"][data-testid*="price" i]',
+
+            // Life Pharmacy
+            '.dirham.text-lg',
+            '.dirham.font-bold:not(.line-through):not([class*="line-through"])',
+            'p.dirham:not(.line-through):not([class*="line-through"])',
+            'p[class*="dirham"]:not(.line-through):not([class*="line-through"])',
+            '[class*="dirham"]:not(.line-through):not([class*="line-through"])',
+            '[class*="special-price" i]',
+            '[class*="offer-price" i]',
+            '[class*="offerPrice" i]',
+            '[class*="regular-price" i]',
+            '[class*="product-price" i]',
+            '[data-testid*="price" i]',
+            '[data-cy*="price" i]'
+          ];
+
+          for (var s = 0; s < candidatePriceSelectors.length; s++) {
+            var elList = document.querySelectorAll(candidatePriceSelectors[s]);
+            for (var ei = 0; ei < elList.length; ei++) {
+              var currEl = elList[ei];
+              if (isStruckOrOldPriceElement(currEl)) continue;
+              var raw = getCleanElementPriceText(currEl);
+              if (raw && /[0-9]/.test(raw)) {
+                var parsed = parsePriceAndCurrency(raw);
+                if (parsed.price) {
+                  price = parsed.price;
+                  rawPriceText = raw;
+                  if (parsed.currency && !currency) currency = parsed.currency;
+
+                  // Inspect Shein data-price-size="other" or currency span directly inside currEl
+                  if (!currency && currEl.querySelector) {
+                    var curChild = currEl.querySelector('[data-price-size="other"], [class*="price-symbol"], [class*="currency"]');
+                    if (curChild) {
+                      var ct = (curChild.textContent || '').trim().toUpperCase();
+                      if (ct === 'SR' || ct === 'SAR' || ct.indexOf('SR') > -1 || ct.indexOf('SAR') > -1 || /[﷼\uFDFC\u20C1⃁]|ر\.?س|ريال/.test(ct)) {
+                        currency = 'SAR';
+                      } else if (ct === 'AED' || ct.indexOf('AED') > -1 || /د\.?إ|د\.?ا|درهم|\u20C3/.test(ct)) {
+                        currency = 'AED';
+                      } else if (ct === '$' || ct === 'USD') {
+                        currency = 'USD';
                       }
-                      if (spSsr.currency && !currency) currency = String(spSsr.currency).trim();
-                    } else if (typeof spSsr === 'number' || typeof spSsr === 'string') {
-                      var pResSsr2 = parsePriceAndCurrency(String(spSsr));
-                      if (pResSsr2.price) { price = pResSsr2.price; if (pResSsr2.currency && !currency) currency = pResSsr2.currency; }
                     }
                   }
-                }
-              }
-            }
-            var shData = window.productIntroData || window.gbProductIntroData;
-            if (shData && shData.detail) {
-              var dt = shData.detail;
-              var sp = (dt.currentSku && (dt.currentSku.sku_sale_price || dt.currentSku.salePrice || dt.currentSku.price)) || dt.salePrice || dt.sale_price || dt.retailPrice || dt.originalPrice;
-              if (sp) {
-                if (typeof sp === 'object') {
-                  if (sp.amount) price = String(sp.amount).trim();
-                  else if (sp.usdAmount) price = String(sp.usdAmount).trim();
-                  else if (sp.amountWithSymbol) {
-                    var pRes = parsePriceAndCurrency(sp.amountWithSymbol);
-                    if (pRes.price) { price = pRes.price; if (pRes.currency && !currency) currency = pRes.currency; }
-                  }
-                  if (sp.currency && !currency) currency = String(sp.currency).trim();
-                } else if (typeof sp === 'number' || typeof sp === 'string') {
-                  var pRes2 = parsePriceAndCurrency(String(sp));
-                  if (pRes2.price) { price = pRes2.price; if (pRes2.currency && !currency) currency = pRes2.currency; }
-                }
-              }
-            }
-            if (!price && window.goodsInfo) {
-              var gP = window.goodsInfo.sale_price || window.goodsInfo.retail_price;
-              if (gP) {
-                var pRes3 = parsePriceAndCurrency(String(gP));
-                if (pRes3.price) { price = pRes3.price; if (pRes3.currency && !currency) currency = pRes3.currency; }
-              }
-            }
-          } catch(_eSh) {}
-        }
 
-        // 2b-1. OpenGraph / Product Meta Price
-        if (!price) {
-          try {
-            var metaPrice = document.querySelector('meta[property="product:price:amount"], meta[property="og:price:amount"], meta[name="twitter:data1"], [itemprop="price"]');
-            if (metaPrice) {
-              var mpVal = metaPrice.getAttribute('content') || metaPrice.content || metaPrice.textContent || '';
-              var pResMeta = parsePriceAndCurrency(mpVal);
-              if (pResMeta.price) {
-                price = pResMeta.price;
-                var metaCurr = document.querySelector('meta[property="product:price:currency"], meta[property="og:price:currency"], meta[itemprop="priceCurrency"]');
-                if (metaCurr && !currency) {
-                  currency = (metaCurr.getAttribute('content') || metaCurr.content || '').trim();
-                }
-              }
-            }
-          } catch(_eMp) {}
-        }
-
-        // 2b. Check AliExpress application state
-        if (!price) {
-          try {
-            var rp = window.runParams && (window.runParams.data || window.runParams);
-            var initD = window.__INITIAL_DATA__ && (window.__INITIAL_DATA__.data || window.__INITIAL_DATA__);
-            var didaD = window._dida_config_ && window._dida_config_._init_data_ && (window._dida_config_._init_data_.data || window._dida_config_._init_data_);
-            var aliObj = rp || initD || didaD;
-            if (aliObj) {
-              var pc = aliObj.priceComponent || (aliObj.productInfoComponent && aliObj.productInfoComponent.priceComponent) || (aliObj.skuComponent && aliObj.skuComponent.selectedSkuPrice);
-              if (pc) {
-                var rawAli = pc.formatedActivityPrice || pc.formatedPrice || (pc.activityAmount && pc.activityAmount.value) || (pc.origPriceComponent && pc.origPriceComponent.formatedPrice);
-                if (rawAli) {
-                  var pResAli = parsePriceAndCurrency(String(rawAli));
-                  if (pResAli.price) {
-                    price = pResAli.price;
-                    if (pResAli.currency && !currency) currency = pResAli.currency;
-                  }
-                }
-              }
-            }
-          } catch(_eAli) {}
-        }
-
-        // 2c. JSON-LD schema price check (AliExpress, Amazon, Shopify, etc.)
-        if (!price) {
-          var jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
-          for (var jld = 0; jld < jsonLdScripts.length; jld++) {
-            try {
-              var ldData = JSON.parse(jsonLdScripts[jld].textContent);
-              var ldArr = Array.isArray(ldData) ? ldData : [ldData];
-              for (var kld = 0; kld < ldArr.length; kld++) {
-                var item = ldArr[kld];
-                var offers = item && (item.offers || (item['@graph'] && Array.isArray(item['@graph']) && item['@graph'].find(function(g) { return g.offers; }) ? item['@graph'].find(function(g) { return g.offers; }).offers : null));
-                if (offers) {
-                  var offer = Array.isArray(offers) ? offers[0] : offers;
-                  var offPrice = offer && (offer.price || offer.lowPrice || offer.highPrice);
-                  if (offer && offPrice) {
-                    var offPStr = String(offPrice).trim();
-                    if (offPStr && offPStr !== '0') {
-                      price = offPStr;
-                      if (offer.priceCurrency && !currency) currency = String(offer.priceCurrency).trim();
-                      break;
+                  // Inspect currEl's ancestors up to 4 levels for currency symbols (AED, SAR, TL, then USD)
+                  if (!currency && currEl) {
+                    var pNode = currEl;
+                    for (var pi = 0; pi < 4 && pNode; pi++) {
+                      var pText = pNode.textContent || '';
+                      if (/د\.?إ|د\.?ا|درهم|\u20C3/i.test(pText) || /(?:^|[^a-zA-Z])AED(?:[^a-zA-Z]|$)/i.test(pText)) { currency = 'AED'; break; }
+                      if (/[﷼\uFDFC\u20C1⃁]|ر\.?س|ريال/i.test(pText) || /(?:^|[^a-zA-Z])(?:SAR|SR)(?:[^a-zA-Z]|$)/i.test(pText)) { currency = 'SAR'; break; }
+                      if (/₺|\bTL\b|\bTRY\b/i.test(pText)) { currency = 'TL'; break; }
+                      if (/\$|\bUSD\b/i.test(pText)) { currency = 'USD'; break; }
+                      pNode = pNode.parentElement;
                     }
                   }
+
+                  // If currency not detected directly inside currEl, inspect parent / container and siblings
+                  if (!currency && currEl) {
+                    var containerEl = (currEl.closest && currEl.closest(
+                      '[class*="head-price"], [class*="floor-price"], [class*="product-price"], [class*="productPrice"], [class*="goods-price"], [class*="selling-price"], [class*="goodsPrice"], .product-intro__head-price'
+                    )) || currEl.parentElement;
+                    if (containerEl) {
+                      var cText = containerEl.textContent || '';
+                      if (/د\.?إ|د\.?ا|درهم|\u20C3/i.test(cText) || /(?:^|[^a-zA-Z])AED(?:[^a-zA-Z]|$)/i.test(cText)) {
+                        currency = 'AED';
+                      } else if (/[﷼\uFDFC\u20C1⃁]|ر\.?س|ريال/i.test(cText) || /(?:^|[^a-zA-Z])(?:SAR|SR)(?:[^a-zA-Z]|$)/i.test(cText)) {
+                        currency = 'SAR';
+                      } else if (/₺|\bTL\b|\bTRY\b/i.test(cText)) {
+                        currency = 'TL';
+                      } else if (/\$|\bUSD\b/i.test(cText)) {
+                        currency = 'USD';
+                      }
+                    }
+                  }
+                  break;
                 }
               }
-            } catch(_eLd) {}
+            }
             if (price) break;
           }
         }
 
-        // 3. Fallback to Meta tags if no DOM price found
-        if (!price) {
-          var metaPrice = document.querySelector('meta[property="og:price:amount"], meta[property="product:price:amount"], meta[itemprop="price"], meta[name="twitter:data1"], [itemprop="price"]');
-          if (metaPrice) {
-            var rawMeta = metaPrice.getAttribute('content') || metaPrice.getAttribute('value') || metaPrice.textContent || '';
-            if (rawMeta && /\d/.test(rawMeta)) {
-              var parsedMeta = parsePriceAndCurrency(rawMeta);
-              if (parsedMeta.price) price = parsedMeta.price;
-              if (parsedMeta.currency && !currency) currency = parsedMeta.currency;
-            }
-          }
-        }
-        // 3b. Check out-of-stock / currently unavailable
-        if (!price) {
-          var availEl = document.querySelector('#availability, .out-of-stock, [data-testid*="out-of-stock"]');
-          if (availEl && /unavailable|out of stock|tükendi|stokta yok/i.test(availEl.textContent || '')) {
-            price = 'Currently unavailable';
-          }
-        }
-
-        // 4. Extract or infer currency if missing (For Shein: check native cookie and gbCommonInfo FIRST!)
-        var isSheinSite = (window.location && window.location.hostname && window.location.hostname.indexOf('shein.') > -1);
-        if (isSheinSite && !currency) {
-          try {
-            if (document.cookie) {
-              var ckNative = document.cookie.match(/(?:^|;\s*)currency=([A-Za-z]{3})(?:;|$)/i);
-              if (ckNative && ckNative[1]) {
-                var ckuNat = ckNative[1].toUpperCase();
-                if (['USD', 'SAR', 'AED', 'TRY', 'EUR', 'GBP'].indexOf(ckuNat) > -1) currency = ckuNat;
-              }
-              if (!currency) {
-                var ckM = document.cookie.match(/(?:^|;\s*)(?:currency|shein_currency|sitecurrency|local_currency|user_currency)=([A-Za-z]{3})/i);
-                if (ckM && ckM[1]) {
-                  var cku = ckM[1].toUpperCase();
-                  if (['USD', 'SAR', 'AED', 'TRY', 'EUR', 'GBP'].indexOf(cku) > -1) currency = cku;
-                }
-              }
-            }
-            if (!currency && window.gbCommonInfo && window.gbCommonInfo.currency) {
-              var gbC = String(window.gbCommonInfo.currency).toUpperCase().trim();
-              if (['USD', 'SAR', 'AED', 'TRY', 'EUR', 'GBP'].indexOf(gbC) > -1) currency = gbC;
-            }
-            if (!currency && window.localStorage) {
-              var lsCur = window.localStorage.getItem('currency') || window.localStorage.getItem('shein_currency') || window.localStorage.getItem('currency_code');
-              if (lsCur && typeof lsCur === 'string') {
-                lsCur = lsCur.trim().toUpperCase().replace(/[^A-Z]/g, '');
-                if (['USD', 'SAR', 'AED', 'TRY', 'EUR', 'GBP'].indexOf(lsCur) > -1) currency = lsCur;
-              }
-            }
-          } catch(eSheinCk) {}
-        }
-
-        if (!currency) {
-          var targetText = (priceEl ? priceEl.textContent : '') || '';
-          if (priceEl && priceEl.parentElement) {
-            targetText += ' ' + priceEl.parentElement.textContent;
-          }
-          if (!targetText && !isSheinSite && document.body) {
-            targetText = document.body.innerText.slice(0, 3000);
-          }
-          var currMatch = targetText.match(/\b(TL|TRY|AED|SAR|KWD|QAR|USD|EUR|GBP)\b|([₺$€£﷼\uFDFC\u20C1⃁\u20C3]|د\.?إ|د\.?ا|درهم|ر\.?س|ريال)/i);
-          if (currMatch) {
-            var rawMatchedCurr = (currMatch[1] || currMatch[2] || currMatch[0]).trim();
-            if (/د\.?إ|د\.?ا|درهم|\u20C3/i.test(rawMatchedCurr) || rawMatchedCurr.toUpperCase() === 'AED') currency = 'AED';
-            else if (/[﷼\uFDFC\u20C1⃁]|ر\.?س|ريال/i.test(rawMatchedCurr) || rawMatchedCurr.toUpperCase() === 'SAR') currency = 'SAR';
-            else if (rawMatchedCurr === '₺' || rawMatchedCurr.toUpperCase() === 'TL') currency = 'TL';
-            else if (rawMatchedCurr === '$' || rawMatchedCurr.toUpperCase() === 'USD') currency = 'USD';
-            else if (rawMatchedCurr === '€' || rawMatchedCurr.toUpperCase() === 'EUR') currency = 'EUR';
-            else if (rawMatchedCurr === '£' || rawMatchedCurr.toUpperCase() === 'GBP') currency = 'GBP';
-            else currency = rawMatchedCurr.toUpperCase();
-          }
-        }
-
-        if (!currency && document.cookie) {
-          try {
-            var ckNative = document.cookie.match(/(?:^|;\s*)currency=([A-Za-z]{3})(?:;|$)/i);
-            if (ckNative && ckNative[1]) {
-              var ckuNat = ckNative[1].toUpperCase();
-              if (['USD', 'SAR', 'AED', 'TRY', 'EUR', 'GBP'].indexOf(ckuNat) > -1) currency = ckuNat;
-            }
-            if (!currency) {
-              var ckM = document.cookie.match(/(?:^|;\s*)(?:currency|shein_currency|sitecurrency|local_currency|user_currency)=([A-Za-z]{3})/i);
-              if (ckM && ckM[1]) {
-                var cku = ckM[1].toUpperCase();
-                if (['USD', 'SAR', 'AED', 'TRY', 'EUR', 'GBP'].indexOf(cku) > -1) currency = cku;
-              }
-            }
-          } catch(eSheinCk) {}
-        }
-
-        if (!currency && window.gbCommonInfo && window.gbCommonInfo.currency) {
-          try {
-            var gbC = String(window.gbCommonInfo.currency).toUpperCase().trim();
-            if (['USD', 'SAR', 'AED', 'TRY', 'EUR', 'GBP'].indexOf(gbC) > -1) currency = gbC;
-          } catch(eGb) {}
-        }
-
-        if (!currency && window.localStorage) {
-          try {
-            var lsCur = window.localStorage.getItem('currency') || window.localStorage.getItem('shein_currency') || window.localStorage.getItem('currency_code');
-            if (lsCur && typeof lsCur === 'string') {
-              lsCur = lsCur.trim().toUpperCase().replace(/[^A-Z]/g, '');
-              if (['USD', 'SAR', 'AED', 'TRY', 'EUR', 'GBP'].indexOf(lsCur) > -1) currency = lsCur;
-            }
-          } catch(eLs) {}
-        }
-
-        if (!currency) {
-          var isSheinCheck = (href.indexOf('shein.') > -1);
-          var metaCurrency = document.querySelector('meta[property="og:price:currency"], meta[property="product:price:currency"], meta[itemprop="priceCurrency"], meta[name="twitter:label1"]');
-          if (metaCurrency && metaCurrency.content) {
-            var mcVal = metaCurrency.content.trim();
-            // On Shein, SEO meta tags are hardcoded to USD on m.shein.com by server and do NOT reflect user currency!
-            if (!isSheinCheck || mcVal.toUpperCase() !== 'USD') {
-              currency = mcVal;
-            }
-          }
-        }
-
-        if (!currency) {
-          var href = window.location.href || '';
-          if (href.indexOf('trendyol.com') > -1 || href.indexOf('hepsiburada.com') > -1 || href.indexOf('.tr') > -1) {
-            currency = 'TL';
-          } else if (href.indexOf('amazon.ae') > -1 || href.indexOf('noon.com') > -1 || href.indexOf('lifepharmacy.com') > -1) {
-            currency = 'AED';
-          } else if (href.indexOf('amazon.sa') > -1) {
-            currency = 'SAR';
-          } else if (href.indexOf('amazon.de') > -1) {
-            currency = 'EUR';
-          } else if (href.indexOf('amazon.co.uk') > -1) {
-            currency = 'GBP';
-          } else if (href.indexOf('shein.') > -1) {
-            if (href.indexOf('shein.ae') > -1) {
+        if (price) {
+          if (!currency) {
+            if (host.indexOf('sa.iherb.com') > -1 || href.indexOf('sa.iherb.com') > -1) {
+              currency = 'SAR';
+            } else if (host.indexOf('ae.iherb.com') > -1 || href.indexOf('ae.iherb.com') > -1 || isCarrefourSite || isLifePharmacySite) {
               currency = 'AED';
-            } else if (href.indexOf('us.shein.com') > -1 || href.indexOf('/us/') > -1) {
+            } else if (isIherbSite) {
               currency = 'USD';
-            } else if (href.indexOf('/sa/') > -1 || href.indexOf('.sa') > -1) {
-              currency = 'SAR';
-            } else if (href.indexOf('/ar-en/') > -1 || href.indexOf('/ar/') > -1) {
-              currency = 'SAR';
             }
-          } else if (href.indexOf('amazon.com') > -1 || href.indexOf('aliexpress.com') > -1 || href.indexOf('iherb.com') > -1 || href.indexOf('yesstyle.com') > -1) {
-            currency = 'USD';
           }
-        }
-
-        if (currency === '₺') currency = 'TL';
-        if (currency === '$') currency = 'USD';
-        if (currency === '€') currency = 'EUR';
-        if (currency === '£') currency = 'GBP';
-
-        if (price && (forceSend || price !== lastSentPrice || currency !== lastSentCurrency)) {
-          lastSentPrice = price;
-          lastSentCurrency = currency;
-          if (window.ReactNativeWebView && typeof window.ReactNativeWebView.postMessage === 'function') {
-            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'price', data: price }));
-            if (currency) {
-              window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'currency', data: currency }));
-            }
-            if (href.indexOf('shein.') > -1 && currency && /^[A-Z]{3}$/.test(currency) && currency !== 'USD') {
-              window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'shein_currency_selected', currency: currency }));
+          if (forceSend || price !== lastSentPrice || currency !== lastSentCurrency) {
+            lastSentPrice = price;
+            lastSentCurrency = currency;
+            if (window.ReactNativeWebView && typeof window.ReactNativeWebView.postMessage === 'function') {
+              window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'price', data: price }));
+              if (currency) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'currency', data: currency }));
+              }
+              if (href.indexOf('shein.') > -1 && currency && /^[A-Z]{3}$/.test(currency) && currency !== 'USD') {
+                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'shein_currency_selected', currency: currency }));
+              }
             }
           }
         }
@@ -1273,6 +1222,10 @@ export const getProductOptionsBridge = page_url => {
         if (exactJunk[j].indexOf(' ') > -1 && lower.indexOf(exactJunk[j]) === 0) return '';
         if (exactJunk[j].length >= 5 && new RegExp('^' + exactJunk[j] + '\\\\b', 'i').test(lower)) return '';
       }
+
+      // Reject timestamps and delivery time slots (e.g. "30 PM", "5:30 PM", "11:00 AM", "Express Delivery")
+      if (/\\b\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)\\b/i.test(clean) || /^\\d{1,2}\\s*(?:am|pm)$/i.test(clean) || /^(?:am|pm)$/i.test(clean)) return '';
+      if (/\\b(?:today|tomorrow|delivery|express|standard|slot|order within|min(?:utes)?|hrs?|hours?)\\b/i.test(lower)) return '';
 
       if (/^\\d{8,}$/.test(clean)) return '';
 
@@ -2619,15 +2572,30 @@ export const getProductSnapshotBridge = page_url => {
 
       // 3. Price & Currency
       try {
+        var href = (window.location && window.location.href) || '';
+        var host = (window.location && window.location.hostname) || '';
+        var docTitle = (document.title || '').toLowerCase();
+        var isIherbSite = (host.indexOf('iherb.com') > -1) || (href.indexOf('iherb.com') > -1) || (docTitle.indexOf('iherb') > -1);
+        var isCarrefourSite = (host.indexOf('carrefour') > -1) || (href.indexOf('carrefour') > -1) || (docTitle.indexOf('carrefour') > -1);
+        var isLifePharmacySite = (host.indexOf('lifepharmacy.com') > -1) || (href.indexOf('lifepharmacy.com') > -1) || (docTitle.indexOf('life pharmacy') > -1);
+
         var isStruckOrOldPriceElement = function(el) {
           if (!el) return false;
           try {
+            if (el.closest && (el.closest('.original-price-wrapper.show') || el.closest('#product-price') || (el.classList && el.classList.contains('list-price')) || el.closest('#price') || el.closest('.price-inner'))) {
+              var directCls = String(el.className || '');
+              if (!/(^|[\s.;-])(bsc-strikethrough-price|line-through|crossed|del-price)($|[\s.;-])/i.test(directCls) &&
+                  el.tagName !== 'DEL' && el.tagName !== 'S' && el.tagName !== 'STRIKE' &&
+                  (!el.getAttribute || el.getAttribute('data-a-strike') !== 'true')) {
+                return false;
+              }
+            }
             if (el.tagName === 'DEL' || el.tagName === 'S' || el.tagName === 'STRIKE') return true;
             if (el.getAttribute && el.getAttribute('data-a-strike') === 'true') return true;
             var cls = String(el.className || '');
-            if (/(^|[\s.;-])(prc-org|prc-box-org|prc-slg|a-text-price|basisPrice|line-through|crossed)($|[\s.;-])/i.test(cls)) return true;
+            if (/(^|[\s.;-])(bsc-strikethrough-price|prc-org|prc-box-org|prc-slg|a-text-price|basisPrice|line-through|crossed)($|[\s.;-])/i.test(cls)) return true;
             if (/(^|[\s.;-])(original-price|originalPrice|orig-price|old-price|oldPrice|oldprice|was-price|wasPrice|price-was|del-price|head-price-del|market-price|retail-price|productPrice__del|product-price__del)($|[\s.;-])/i.test(cls)) return true;
-            if (el.closest && el.closest('del, s, strike, [data-a-strike="true"], .a-text-price, .basisPrice, .prc-org, .prc-box-org, [class*="original-price"], [class*="old-price"], [class*="was-price"], [class*="head-price-del"], [class*="productPrice__del"], [class*="product-price__del"]')) {
+            if (el.closest && el.closest('del, s, strike, [data-a-strike="true"], .bsc-strikethrough-price, .a-text-price, .basisPrice, .prc-org, .prc-box-org, [class*="original-price"], [class*="old-price"], [class*="was-price"], [class*="head-price-del"], [class*="strikethrough"], [class*="del-price"], [class*="productPrice__del"], [class*="product-price__del"]')) {
               return true;
             }
           } catch(_e) {}
@@ -2637,17 +2605,30 @@ export const getProductSnapshotBridge = page_url => {
         var getCleanElementPriceText = function(el) {
           if (!el) return '';
           if (isStruckOrOldPriceElement(el)) return '';
-          if (el.tagName === 'META') return el.getAttribute('content') || '';
+          if (el.tagName === 'META') return el.getAttribute('content') || el.content || '';
+          if (el.getAttribute && el.getAttribute('content') && /^[0-9]/.test(el.getAttribute('content'))) {
+            return el.getAttribute('content');
+          }
+          var visibleText = (el.innerText || '').trim();
+          if (visibleText && /[0-9]/.test(visibleText)) {
+            return visibleText;
+          }
           try {
             var clone = el.cloneNode(true);
             var oldNodes = clone.querySelectorAll(
-              'del, s, strike, [data-a-strike="true"], .a-text-price, .basisPrice, .prc-org, .prc-box-org, .prc-slg, ' +
+              'del, s, strike, [data-a-strike="true"], .bsc-strikethrough-price, .a-text-price, .basisPrice, .prc-org, .prc-box-org, .prc-slg, ' +
+              '[class*="bsc-strikethrough"], [class*="head-price-del"], [class*="del-price"], [class*="market-price"], [class*="retail-price"], ' +
               '[class*="original-price"], [class*="originalPrice"], [class*="orig-price"], ' +
               '[class*="old-price"], [class*="oldPrice"], [class*="oldprice"], ' +
               '[class*="was-price"], [class*="wasPrice"], [class*="price-was"], ' +
+              '[class*="productPrice__del"], [class*="product-price__del"], ' +
               '[class*="strike"], [class*="line-through"], [class*="crossed"]'
             );
             for (var oi = 0; oi < oldNodes.length; oi++) {
+              var onCls = String(oldNodes[oi].className || '');
+              if (onCls.indexOf('show') > -1 || (oldNodes[oi].querySelector && oldNodes[oi].querySelector('.show')) || onCls.indexOf('list-price') > -1) {
+                continue;
+              }
               oldNodes[oi].remove();
             }
             return clone.textContent || clone.innerText || '';
@@ -2658,7 +2639,7 @@ export const getProductSnapshotBridge = page_url => {
 
         var parsePriceAndCurrency = function(rawText) {
           if (!rawText || typeof rawText !== 'string') return { price: '', currency: '' };
-          var t = rawText.replace(/\s+/g, ' ').trim();
+          var t = rawText.replace(/[ \t\r\n\u00A0]+/g, ' ').trim();
           // Convert Arabic-Indic digits ٠-٩ to 0-9
           t = t.replace(/[٠-٩]/g, function(d) { return String.fromCharCode(d.charCodeAt(0) - 1632 + 48); });
           var detectedCurr = '';
@@ -2666,6 +2647,8 @@ export const getProductSnapshotBridge = page_url => {
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:SAR|SR|ر\.?س|ريال)(?:$|[^a-zA-Z\u0600-\u06FF])|[﷼\uFDFC\u20C1⃁]/i.test(t)) detectedCurr = 'SAR';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:KWD|د\.?ك)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'KWD';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:QAR|ر\.?ق)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'QAR';
+          else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:BHD|د\.?ب)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'BHD';
+          else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:OMR|ر\.?ع)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'OMR';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:TL|TRY)(?:$|[^a-zA-Z\u0600-\u06FF])|₺/i.test(t)) detectedCurr = 'TL';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:USD|US\$)(?:$|[^a-zA-Z\u0600-\u06FF])|\$/i.test(t)) detectedCurr = 'USD';
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])EUR(?:$|[^a-zA-Z\u0600-\u06FF])|€/i.test(t)) detectedCurr = 'EUR';
@@ -2676,224 +2659,285 @@ export const getProductSnapshotBridge = page_url => {
             detectedCurr = 'AED';
           }
 
+          // Strip discount percentages e.g. '-30%', '%25', '30% off', 'Save 20%'
           t = t.replace(/[-–]?[ \t]*[0-9]+(?:\.[0-9]+)?[ \t]*%[ \t]*(?:off|indirim|discount|saving|savings)?/gi, '');
           t = t.replace(/%[ \t]*[0-9]+(?:\.[0-9]+)?/gi, '');
           t = t.replace(/(?:save|off|indirim)[ \t]+[0-9]+(?:\.[0-9]+)?%?/gi, '');
           t = t.replace(/(?:save|tasarruf|indirim|saving|savings)\s*[$€£₺]?\s*[0-9]+(?:[.,][0-9]{1,2})?/gi, '');
 
+          // Normalize split decimals e.g. "24 .50" or "24 ,50"
+          t = t.replace(/([0-9]+)\s*[.,]\s*([0-9]{2})\b/, '$1.$2');
+
+          // Match price numbers:
           var matches = t.match(/([0-9]{1,3}(?:[., ][0-9]{3})+(?:[.,][0-9]{1,2})(?![0-9])|[0-9]{1,3}(?:[., ][0-9]{3})+(?![0-9])|[0-9]+(?:[.,][0-9]{1,2})(?![0-9])|[0-9]+)/g);
           if (!matches || matches.length === 0) return { price: '', currency: detectedCurr };
 
-          // Pick the last/discounted price if multiple prices are present
-          var cleanPrice = matches[matches.length - 1].trim();
+          // In clean element, the first price is the selling/discount price
+          var cleanPrice = matches[0].trim();
           return { price: cleanPrice, currency: detectedCurr };
         };
 
-        // 3a. Prioritized DOM Discount / Current Price extraction
-        var candidatePriceSelectors = [
-          // Trendyol Discount / Campaign Prices
-          'span.prc-dsc',
-          '.prc-dsc',
-          '.prc-box-dsc',
-          '.product-price-container .prc-dsc',
-          '.basket-discount-price',
-          '.campaign-price',
-          '.badge-basket-discount',
-          '.discounted-price',
+        // ==========================================
+        // Dedicated Store Extractors (Run FIRST)
+        // ==========================================
 
-          // Amazon PriceToPay / Deal / BuyBox / Non-struck Prices
-          '#corePriceDisplay_mobile_feature_div .priceToPay .a-offscreen',
-          '#corePrice_mobile_feature_div .priceToPay .a-offscreen',
-          '#apex_mobile_feature_div .priceToPay .a-offscreen',
-          '.priceToPay .a-offscreen',
-          '#corePriceDisplay_desktop_feature_div .priceToPay .a-offscreen',
-          '#corePrice_desktop .priceToPay .a-offscreen',
-          '.apexPriceToPay .a-offscreen',
-          '#priceblock_dealprice',
-          '#priceblock_saleprice',
-          '#price_inside_buybox',
-          '#corePriceDisplay_mobile_feature_div .a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
-          '#corePrice_mobile_feature_div .a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
-          '#apex_mobile_feature_div .a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
-          '.a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
-          '.reinventPricePriceToPayMargin .a-offscreen',
+        // 1. Dedicated iHerb extractor (Runs FIRST for iHerb to capture active visible price with innerText)
+        if (isIherbSite && !snapshot.price) {
+          try {
+            // 1a. Primary: visible on-page price using innerText (respects hide/show variant toggling)
+            var ihShowEl = document.querySelector('.original-price-wrapper.show .list-price') ||
+                           document.querySelector('.original-price-wrapper.show') ||
+                           document.querySelector('#product-price .list-price') ||
+                           document.querySelector('#product-price') ||
+                           document.querySelector('.list-price') ||
+                           document.querySelector('#price .price-inner') ||
+                           document.querySelector('#price') ||
+                           document.querySelector('.price-inner') ||
+                           document.querySelector('.purchase-option-one-time .list-price');
+            if (ihShowEl) {
+              var ihShowText = (ihShowEl.innerText || ihShowEl.textContent || '').trim();
+              if (ihShowText) {
+                var ihShowP = parsePriceAndCurrency(ihShowText);
+                if (ihShowP.price) {
+                  snapshot.price = ihShowP.price;
+                  if (ihShowP.currency) snapshot.currency = ihShowP.currency;
+                }
+              }
+            }
 
-          // Shein Mobile & Desktop Discounted / Current Prices (Prioritize exact bsc-main-price element)
-          '.bsc-main-price',
-          '[class*="bsc-main-price"]',
-          '.bsc-price__content',
-          '.floor-price',
-          '[class*="floor-price"]',
-          '[class*="floorPrice"]',
-          '.product-intro__head-price',
-          '.product-intro__price',
-          '.product-intro__price-new',
-          '[class*="product-intro__head-price"]',
-          '[class*="product-intro__price"]',
-          '.productPrice',
-          '[class*="productPrice__main"]',
-          '[class*="productPrice"]',
-          '[class*="product-price" i]',
-          '[class*="productprice" i]',
-          '[class*="productPriceContainer"]',
-          '[class*="selling-price" i]',
-          '[class*="sellingPrice" i]',
-          '[class*="real-price" i]',
-          '[class*="realPrice" i]',
-          '[class*="shein-price" i]',
-          '[class*="goods-price" i]',
-          '[class*="goodsPrice" i]',
-          '[class*="goods-detail-price" i]',
-          '[class*="goodsDetailPrice" i]',
-          '[data-price]',
-          '[data-sku-price]',
-          '[class*="from-price"]',
-          '[class*="goods-detail-price"]',
-          '[class*="discount-price"]',
-          '[class*="sale-price"]',
-          '[class*="current-price"]',
-          '[class*="currentPrice"]',
-          '[class*="now-price"]',
-          '[class*="priceNow"]',
-          '[class*="normal-price"]',
-          '.goods-detail-price .discount-price',
-          '.product-price-info .discount-price',
-          '.goods-detail-price .price',
-          '.goods-price',
-          '[data-test-id*="price"]',
-          '[aria-label*="Price" i]',
-          '[aria-label*="price" i]',
+            // 1b. Hidden input model on iHerb: input#share-email-model
+            if (!snapshot.price) {
+              var ihShareInput = document.querySelector('input#share-email-model');
+              if (ihShareInput) {
+                var ihDiscPrice = ihShareInput.getAttribute('data-discount-price') || ihShareInput.getAttribute('data-list-price');
+                if (ihDiscPrice) {
+                  var ihDiscP = parsePriceAndCurrency(ihDiscPrice);
+                  if (ihDiscP.price) {
+                    snapshot.price = ihDiscP.price;
+                    if (ihDiscP.currency) snapshot.currency = ihDiscP.currency;
+                  }
+                }
+              }
+            }
 
-          // Hepsiburada / Noon Current Prices
-          '[data-test-id="price-current-price"]',
-          '[data-test-id="price-discount-price"]',
-          '[data-qa="div-price-now"]',
-          '.priceNow',
-          '#offering-price',
-
-          // Generic E-Commerce / Shopify / WooCommerce Sale Prices
-          'ins .amount',
-          'ins [class*="price"]',
-          '.price-item--sale',
-          '.special-price',
-          '.sale-price',
-          '.discount-price',
-          '.discounted-price',
-          '[class*="discountPrice"]',
-          '[class*="discountedPrice"]',
-          '[class*="salePrice"]',
-          '.product-price-container',
-          '.product-price',
-          '.pdp-price',
-
-          // Life Pharmacy
-          '.dirham.text-lg',
-          '.dirham.font-bold:not(.line-through):not([class*="line-through"])',
-          'p.dirham:not(.line-through):not([class*="line-through"])',
-          'p[class*="dirham"]:not(.line-through):not([class*="line-through"])',
-          '[class*="dirham"]:not(.line-through):not([class*="line-through"])',
-          '[class*="special-price" i]',
-          '[class*="offer-price" i]',
-          '[class*="offerPrice" i]',
-          '[class*="regular-price" i]',
-          '[class*="product-price" i]',
-          '[data-testid*="price" i]',
-          '[data-cy*="price" i]'
-        ];
-
-        for (var s = 0; s < candidatePriceSelectors.length; s++) {
-          var elList = document.querySelectorAll(candidatePriceSelectors[s]);
-          for (var ei = 0; ei < elList.length; ei++) {
-            var currEl = elList[ei];
-            if (isStruckOrOldPriceElement(currEl)) continue;
-            var raw = getCleanElementPriceText(currEl);
-            if (raw && /[0-9]/.test(raw)) {
-              var parsed = parsePriceAndCurrency(raw);
-              if (parsed.price) {
-                snapshot.price = parsed.price;
-                snapshot.rawPriceText = raw;
-                if (parsed.currency && !snapshot.currency) snapshot.currency = parsed.currency;
-
-                // Inspect Shein data-price-size="other" or currency span directly inside currEl
-                if (!snapshot.currency && currEl.querySelector) {
-                  var curChildSnap = currEl.querySelector('[data-price-size="other"], [class*="price-symbol"], [class*="currency"]');
-                  if (curChildSnap) {
-                    var ctSnap = (curChildSnap.textContent || curChildSnap.innerText || '').trim().toUpperCase();
-                    var ctAria = (curChildSnap.getAttribute('aria-label') || curChildSnap.getAttribute('data-currency') || curChildSnap.getAttribute('title') || curChildSnap.className || '').toUpperCase();
-                    var ctCombined = ctSnap + ' ' + ctAria;
-                    if (ctCombined.indexOf('SR') > -1 || ctCombined.indexOf('SAR') > -1 || ctCombined.indexOf('RIYAL') > -1 || /[﷼\uFDFC\u20C1⃁]|ر\.?س|ريال/.test(ctSnap)) {
-                      snapshot.currency = 'SAR';
-                    } else if (ctCombined.indexOf('AED') > -1 || ctCombined.indexOf('DIRHAM') > -1 || /د\.?إ|د\.?ا|درهم|\u20C3/.test(ctSnap)) {
-                      snapshot.currency = 'AED';
-                    } else if (ctSnap === '$' || ctCombined.indexOf('USD') > -1) {
-                      snapshot.currency = 'USD';
+            // 1c. Client-side JS globals: window.PRODUCT_DETAILS or window.IHR_DL
+            if (!snapshot.price) {
+              try {
+                if (window.PRODUCT_DETAILS) {
+                  var pdVal = window.PRODUCT_DETAILS.discountPrice || window.PRODUCT_DETAILS.price || window.PRODUCT_DETAILS.listPrice;
+                  if (pdVal) {
+                    var pdP = parsePriceAndCurrency(String(pdVal));
+                    if (pdP.price) {
+                      snapshot.price = pdP.price;
+                      if (window.PRODUCT_DETAILS.currency) snapshot.currency = window.PRODUCT_DETAILS.currency;
                     }
                   }
                 }
-
-                // Inspect currEl's ancestors up to 4 levels for currency symbols (AED, SAR, TL, then USD)
-                if (!snapshot.currency && currEl) {
-                  var pNodeSnap = currEl;
-                  for (var psi = 0; psi < 4 && pNodeSnap; psi++) {
-                    var psText = pNodeSnap.textContent || '';
-                    if (/د\.?إ|د\.?ا|درهم|\u20C3/i.test(psText) || /(?:^|[^a-zA-Z])AED(?:[^a-zA-Z]|$)/i.test(psText)) { snapshot.currency = 'AED'; break; }
-                    if (/[﷼\uFDFC\u20C1⃁]|ر\.?س|ريال/i.test(psText) || /(?:^|[^a-zA-Z])(?:SAR|SR)(?:[^a-zA-Z]|$)/i.test(psText)) { snapshot.currency = 'SAR'; break; }
-                    if (/₺|\bTL\b|\bTRY\b/i.test(psText)) { snapshot.currency = 'TL'; break; }
-                    if (/\$|\bUSD\b/i.test(psText)) { snapshot.currency = 'USD'; break; }
-                    pNodeSnap = pNodeSnap.parentElement;
+                if (!snapshot.price && window.IHR_DL && window.IHR_DL.product) {
+                  var ihrP = window.IHR_DL.product;
+                  var ihrVal = ihrP.discount_price || ihrP.unit_price || ihrP.price;
+                  if (ihrVal) {
+                    var ihrParsed = parsePriceAndCurrency(String(ihrVal));
+                    if (ihrParsed.price) {
+                      snapshot.price = ihrParsed.price;
+                      if (ihrP.currency) snapshot.currency = ihrP.currency;
+                    }
                   }
                 }
-                break;
-              }
-            }
-          }
-          if (snapshot.price) break;
-        }
-
-        // 3a-life. Check Life Pharmacy DOM, JSON-LD, Nuxt 3 data & body text scanner
-        if (!snapshot.price && ((window.location && window.location.href && window.location.href.indexOf('lifepharmacy.com') > -1) || (document.title && document.title.toLowerCase().indexOf('life pharmacy') > -1))) {
-          try {
-            // 1. Direct DOM check for Life Pharmacy dirham price
-            var lpDirhamElsSnap = document.querySelectorAll('p[class*="dirham"]:not(.line-through):not([class*="line-through"]), [class*="dirham"]:not(.line-through):not([class*="line-through"])');
-            for (var lpdsi = 0; lpdsi < lpDirhamElsSnap.length; lpdsi++) {
-              var lpElSnap = lpDirhamElsSnap[lpdsi];
-              if (isStruckOrOldPriceElement(lpElSnap)) continue;
-              var lpCleanSnap = getCleanElementPriceText(lpElSnap);
-              var lpPSnap = parsePriceAndCurrency(lpCleanSnap);
-              if (lpPSnap.price) {
-                snapshot.price = lpPSnap.price;
-                snapshot.currency = 'AED';
-                break;
-              }
+              } catch(_ePd) {}
             }
 
-            // 2. JSON-LD Product offers check
+            // 1d. Next.js __NEXT_DATA__
             if (!snapshot.price) {
-              var lpLdScriptsSnap = document.querySelectorAll('script[type="application/ld+json"]');
-              for (var lpLdsi = 0; lpLdsi < lpLdScriptsSnap.length; lpLdsi++) {
+              try {
+                var ihNextDataEl = document.getElementById('__NEXT_DATA__');
+                if (ihNextDataEl && ihNextDataEl.textContent) {
+                  var ihNext = JSON.parse(ihNextDataEl.textContent);
+                  var ihProps = ihNext && ihNext.props && ihNext.props.pageProps;
+                  var ihProdData = ihProps && (ihProps.product || ihProps.initialData || ihProps.productData);
+                  if (ihProdData) {
+                    var ihNpVal = ihProdData.discountPrice || ihProdData.price || ihProdData.listPrice;
+                    if (ihNpVal) {
+                      var ihNpP = parsePriceAndCurrency(String(ihNpVal));
+                      if (ihNpP.price) {
+                        snapshot.price = ihNpP.price;
+                        if (ihProdData.currency || ihProdData.priceCurrency) snapshot.currency = ihProdData.currency || ihProdData.priceCurrency;
+                      }
+                    }
+                  }
+                }
+              } catch(_eNd) {}
+            }
+
+            // 1e. Last resort: OpenGraph / Meta price tags
+            if (!snapshot.price) {
+              var ihMeta = document.querySelector('meta[property="og:price:amount"], meta[property="product:price:amount"], meta[name="twitter:data1"], meta[itemprop="price"], [itemprop="price"]');
+              if (ihMeta) {
+                var ihMetaContent = ihMeta.getAttribute('content') || ihMeta.content || (ihMeta.innerText || '').trim();
+                if (ihMetaContent) {
+                  var ihMetaP = parsePriceAndCurrency(ihMetaContent);
+                  if (ihMetaP.price) {
+                    snapshot.price = ihMetaP.price;
+                  }
+                }
+              }
+            }
+
+            // 1f. Last resort: JSON-LD Product offers
+            if (!snapshot.price) {
+              var ihLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
+              for (var ihLdi = 0; ihLdi < ihLdScripts.length; ihLdi++) {
                 try {
-                  var lpLdDataSnap = JSON.parse(lpLdScriptsSnap[lpLdsi].textContent);
-                  var lpGraphSnap = lpLdDataSnap && (lpLdDataSnap['@graph'] || (Array.isArray(lpLdDataSnap) ? lpLdDataSnap : [lpLdDataSnap]));
-                  if (Array.isArray(lpGraphSnap)) {
-                    var lpProdSnap = lpGraphSnap.find(function(g) {
+                  var ihLdData = JSON.parse(ihLdScripts[ihLdi].textContent);
+                  var ihGraph = ihLdData && (ihLdData['@graph'] || (Array.isArray(ihLdData) ? ihLdData : [ihLdData]));
+                  if (Array.isArray(ihGraph)) {
+                    var ihProd = ihGraph.find(function(g) {
                       return g && (g['@type'] === 'Product' || (Array.isArray(g['@type']) && g['@type'].indexOf('Product') > -1));
                     });
-                    if (lpProdSnap && lpProdSnap.offers) {
-                      var lpOfferSnap = Array.isArray(lpProdSnap.offers) ? lpProdSnap.offers[0] : lpProdSnap.offers;
-                      var lpPriceValSnap = lpOfferSnap && (lpOfferSnap.price !== undefined ? lpOfferSnap.price : lpOfferSnap.lowPrice);
-                      if (lpPriceValSnap) {
-                        snapshot.price = String(lpPriceValSnap).trim();
+                    if (ihProd && ihProd.offers) {
+                      var ihOffer = Array.isArray(ihProd.offers) ? ihProd.offers[0] : ihProd.offers;
+                      if (ihOffer && ihOffer.offers && Array.isArray(ihOffer.offers)) {
+                        ihOffer = ihOffer.offers[0];
+                      }
+                      var ihPVal = ihOffer && (ihOffer.price !== undefined ? ihOffer.price : (ihOffer.lowPrice !== undefined ? ihOffer.lowPrice : ihOffer.highPrice));
+                      if (ihPVal) {
+                        snapshot.price = String(ihPVal).trim();
+                        if (ihOffer.priceCurrency) snapshot.currency = ihOffer.priceCurrency;
+                        break;
+                      }
+                    }
+                  }
+                } catch(_eIhLd) {}
+                if (snapshot.price) break;
+              }
+            }
+
+            // Currency detection for iHerb
+            if (snapshot.price && !snapshot.currency) {
+              if (host.indexOf('sa.iherb.com') > -1 || href.indexOf('sa.iherb.com') > -1) {
+                snapshot.currency = 'SAR';
+              } else if (host.indexOf('ae.iherb.com') > -1 || href.indexOf('ae.iherb.com') > -1) {
+                snapshot.currency = 'AED';
+              } else {
+                snapshot.currency = 'USD';
+              }
+            }
+          } catch(_eIh) {}
+        }
+
+        // 2. Dedicated Carrefour UAE extractor (Runs FIRST for Carrefour UAE to capture split decimal prices and [data-qa="product-price"])
+        if (isCarrefourSite && !snapshot.price) {
+          try {
+            // 1. Direct Carrefour DOM check
+            var cfPriceEls = document.querySelectorAll('[data-qa="product-price"], [class*="css-"][class*="price" i], [class*="css-"][data-testid*="price" i], [class*="product-price" i], .product-price');
+            for (var cfi = 0; cfi < cfPriceEls.length; cfi++) {
+              var cfEl = cfPriceEls[cfi];
+              if (isStruckOrOldPriceElement(cfEl)) continue;
+              var cfRaw = (cfEl.innerText || cfEl.textContent || '').trim();
+              if (cfRaw && /[0-9]/.test(cfRaw)) {
+                // Normalize split decimals e.g. "24 .50" or "24 ,50"
+                cfRaw = cfRaw.replace(/([0-9]+)\s*[.,]\s*([0-9]{2})\b/, '$1.$2');
+                var cfP = parsePriceAndCurrency(cfRaw);
+                if (cfP.price) {
+                  snapshot.price = cfP.price;
+                  snapshot.currency = 'AED';
+                  break;
+                }
+              }
+            }
+
+            // 2. Next.js __NEXT_DATA__
+            if (!snapshot.price) {
+              var cfNextEl = document.getElementById('__NEXT_DATA__');
+              if (cfNextEl && cfNextEl.textContent) {
+                var cfNextData = JSON.parse(cfNextEl.textContent);
+                var cfPProps = cfNextData && cfNextData.props && cfNextData.props.pageProps;
+                var cfProduct = cfPProps && (cfPProps.product || cfPProps.initialProduct || (cfPProps.initialState && cfPProps.initialState.product));
+                if (cfProduct) {
+                  var cfPriceVal = cfProduct.price !== undefined ? cfProduct.price : (cfProduct.finalPrice !== undefined ? cfProduct.finalPrice : cfProduct.salePrice);
+                  if (cfPriceVal !== undefined) {
+                    var cfParsed = parsePriceAndCurrency(String(cfPriceVal));
+                    if (cfParsed.price) {
+                      snapshot.price = cfParsed.price;
+                      snapshot.currency = 'AED';
+                    }
+                  }
+                }
+              }
+            }
+
+            // 3. JSON-LD Product offers
+            if (!snapshot.price) {
+              var cfLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
+              for (var cfLdi = 0; cfLdi < cfLdScripts.length; cfLdi++) {
+                try {
+                  var cfLdData = JSON.parse(cfLdScripts[cfLdi].textContent);
+                  var cfGraph = cfLdData && (cfLdData['@graph'] || (Array.isArray(cfLdData) ? cfLdData : [cfLdData]));
+                  if (Array.isArray(cfGraph)) {
+                    var cfProd = cfGraph.find(function(g) {
+                      return g && (g['@type'] === 'Product' || (Array.isArray(g['@type']) && g['@type'].indexOf('Product') > -1));
+                    });
+                    if (cfProd && cfProd.offers) {
+                      var cfOffer = Array.isArray(cfProd.offers) ? cfProd.offers[0] : cfProd.offers;
+                      var cfPVal = cfOffer && (cfOffer.price !== undefined ? cfOffer.price : cfOffer.lowPrice);
+                      if (cfPVal) {
+                        snapshot.price = String(cfPVal).trim();
                         snapshot.currency = 'AED';
                         break;
                       }
                     }
                   }
-                } catch(_eLpLdSnap) {}
+                } catch(_eCfLd) {}
+                if (snapshot.price) break;
+              }
+            }
+          } catch(_eCf) {}
+          if (snapshot.price && !snapshot.currency) snapshot.currency = 'AED';
+        }
+
+        // 3. Dedicated Life Pharmacy extractor
+        if (isLifePharmacySite && !snapshot.price) {
+          try {
+            var lpDirhamEls = document.querySelectorAll('p[class*="dirham"]:not(.line-through):not([class*="line-through"]), [class*="dirham"]:not(.line-through):not([class*="line-through"])');
+            for (var lpdi = 0; lpdi < lpDirhamEls.length; lpdi++) {
+              var lpEl = lpDirhamEls[lpdi];
+              if (isStruckOrOldPriceElement(lpEl)) continue;
+              var lpClean = getCleanElementPriceText(lpEl);
+              var lpP = parsePriceAndCurrency(lpClean);
+              if (lpP.price) {
+                snapshot.price = lpP.price;
+                snapshot.currency = 'AED';
+                break;
+              }
+            }
+
+            // JSON-LD Product offers check
+            if (!snapshot.price) {
+              var lpLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
+              for (var lpLdi = 0; lpLdi < lpLdScripts.length; lpLdi++) {
+                try {
+                  var lpLdData = JSON.parse(lpLdScripts[lpLdi].textContent);
+                  var lpGraph = lpLdData && (lpLdData['@graph'] || (Array.isArray(lpLdData) ? lpLdData : [lpLdData]));
+                  if (Array.isArray(lpGraph)) {
+                    var lpProd = lpGraph.find(function(g) {
+                      return g && (g['@type'] === 'Product' || (Array.isArray(g['@type']) && g['@type'].indexOf('Product') > -1));
+                    });
+                    if (lpProd && lpProd.offers) {
+                      var lpOffer = Array.isArray(lpProd.offers) ? lpProd.offers[0] : lpProd.offers;
+                      var lpPriceVal = lpOffer && (lpOffer.price !== undefined ? lpOffer.price : lpOffer.lowPrice);
+                      if (lpPriceVal) {
+                        snapshot.price = String(lpPriceVal).trim();
+                        snapshot.currency = 'AED';
+                        break;
+                      }
+                    }
+                  }
+                } catch(_eLpLd) {}
                 if (snapshot.price) break;
               }
             }
 
-            // 3. Nuxt 3 data scanner with pointer index resolution
+            // Nuxt 3 data resolver
             if (!snapshot.price) {
               var nuxtScriptSnap = document.getElementById('__NUXT_DATA__');
               if (nuxtScriptSnap && nuxtScriptSnap.textContent) {
@@ -2925,7 +2969,7 @@ export const getProductSnapshotBridge = page_url => {
               }
             }
 
-            // 4. Tabby installment promo URL check
+            // Tabby installment promo URL check
             if (!snapshot.price) {
               var tabbyElSnap = document.querySelector('a[href*="tabby.ai"][href*="price="], iframe[src*="tabby.ai"][src*="price="], [data-tabby-price]');
               if (tabbyElSnap) {
@@ -2938,7 +2982,7 @@ export const getProductSnapshotBridge = page_url => {
               }
             }
 
-            // 5. Body text fallback
+            // Body text fallback
             if (!snapshot.price && document.body) {
               var lpBodySnap = document.body.innerText || '';
               var aedMatchSnap = lpBodySnap.match(/(?:(?:^|\s)[DÐ]|AED|د\.?إ|د\.?ا|درهم|Dhs?\.?)\s*([0-9]+(?:[.,][0-9]{1,2})?)/i) ||
@@ -2952,39 +2996,227 @@ export const getProductSnapshotBridge = page_url => {
           if (snapshot.price && !snapshot.currency) snapshot.currency = 'AED';
         }
 
-        // 3b. Trendyol App State (fallback)
+        // ==========================================
+        // Generic Candidate Selectors (For Other Stores)
+        // ==========================================
         if (!snapshot.price) {
-          try {
-            if (window.__PRODUCT_DETAIL_APP_INITIAL_STATE__ && window.__PRODUCT_DETAIL_APP_INITIAL_STATE__.product) {
-              var tpP = window.__PRODUCT_DETAIL_APP_INITIAL_STATE__.product;
-              var selectedVarPrice = null;
-              if (Array.isArray(tpP.variants)) {
-                var selVar = tpP.variants.find(function(v) { return v && v.selected; });
-                if (selVar && selVar.price) {
-                  selectedVarPrice = selVar.price;
-                }
-              }
-              var tpPrice = selectedVarPrice || tpP.price;
-              if (tpPrice) {
-                var dP = tpPrice.discountedPrice;
-                var sP = tpPrice.sellingPrice;
-                if (dP) {
-                  var dVal = (typeof dP === 'object') ? (dP.value || dP.text || '') : dP;
-                  if (dVal && dVal !== '0' && dVal !== 0) {
-                    snapshot.price = String(dVal).trim();
+          var candidatePriceSelectors = [
+            '.bsc-main-price',
+            '[class*="bsc-main-price"]',
+            '.bsc-price__content',
+            '.floor-price',
+            '[class*="floor-price"]',
+            '[class*="floorPrice"]',
+            '.product-intro__head-price-text',
+            '.product-intro__head-price',
+            '.product-intro__price-new',
+            '.product-intro__price',
+            '[class*="product-intro__head-price"]',
+            '[class*="product-intro__price"]',
+            '.productPrice',
+            '[class*="productPrice__main"]',
+            '[class*="productPrice"]',
+            '[class*="product-price" i]',
+            '[class*="productprice" i]',
+            '[class*="productPriceContainer"]',
+            '[class*="selling-price" i]',
+            '[class*="sellingPrice" i]',
+            '[class*="real-price" i]',
+            '[class*="realPrice" i]',
+            '[class*="shein-price" i]',
+            '[class*="goods-price" i]',
+            '[class*="goodsPrice" i]',
+            '[class*="goods-detail-price" i]',
+            '[class*="goodsDetailPrice" i]',
+            '[data-price]',
+            '[data-sku-price]',
+            '[aria-label*="price" i]',
+            '[aria-label*="Price" i]',
+            '[itemprop="price"]',
+            'span[itemprop="price"]',
+
+            // Trendyol Discount / Campaign Prices
+            'span.prc-dsc',
+            '.prc-dsc',
+            '.prc-box-dsc',
+            '.product-price-container .prc-dsc',
+            '.basket-discount-price',
+            '.campaign-price',
+            '.badge-basket-discount',
+            '.discounted-price',
+
+            // Amazon PriceToPay / Deal / BuyBox / Non-struck Prices
+            '#corePriceDisplay_mobile_feature_div .priceToPay .a-offscreen',
+            '#corePrice_mobile_feature_div .priceToPay .a-offscreen',
+            '#apex_mobile_feature_div .priceToPay .a-offscreen',
+            '.priceToPay .a-offscreen',
+            '#corePriceDisplay_desktop_feature_div .priceToPay .a-offscreen',
+            '#corePrice_desktop .priceToPay .a-offscreen',
+            '.apexPriceToPay .a-offscreen',
+            '#priceblock_dealprice',
+            '#priceblock_saleprice',
+            '#price_inside_buybox',
+            '#corePriceDisplay_mobile_feature_div .a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
+            '#corePrice_mobile_feature_div .a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
+            '#apex_mobile_feature_div .a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
+            '.a-price:not([data-a-strike="true"]):not(.a-text-price) .a-offscreen',
+            '.reinventPricePriceToPayMargin .a-offscreen',
+
+            // Additional Shein / General Selectors
+            '[class*="from-price"]',
+            '[class*="goods-detail-price"]',
+            '[class*="discount-price"]',
+            '[class*="sale-price"]',
+            '[class*="current-price"]',
+            '[class*="currentPrice"]',
+            '[class*="now-price"]',
+            '[class*="priceNow"]',
+            '[class*="normal-price"]',
+            '.goods-detail-price .discount-price',
+            '.product-price-info .discount-price',
+            '.goods-detail-price .price',
+            '.goods-price',
+            '[data-test-id*="price"]',
+
+            // Hepsiburada / Noon Current Prices
+            '[data-test-id="price-current-price"]',
+            '[data-test-id="price-discount-price"]',
+            '[data-qa="div-price-now"]',
+            '.priceNow',
+            '#offering-price',
+
+            // Generic E-Commerce / Shopify / WooCommerce Sale Prices
+            'ins .amount',
+            'ins [class*="price"]',
+            '.price-item--sale',
+            '.special-price',
+            '.sale-price',
+            '.discount-price',
+            '.discounted-price',
+            '[class*="discountPrice"]',
+            '[class*="discountedPrice"]',
+            '[class*="salePrice"]',
+            '.product-price-container',
+            '.product-price',
+            '.pdp-price',
+
+            // AliExpress / iHerb / YesStyle price selectors
+            '[class*="currentPriceText"]',
+            '[class*="price--currentPriceText"]',
+            '[class*="price--current"]',
+            '[class*="product-price-current"]',
+            '[class*="product-price-value"]',
+            '.uniform-banner-box-price',
+            '[class*="uniform-banner-box-price"]',
+            '.price-current',
+            '.es--wrap-- [class*="price"]',
+            '[class*="snow-price"]',
+            'span[class*="price--"]',
+            'div[class*="price--"]',
+            '[data-pl="product-price"]',
+            '.product-price-value',
+            '#our-price',
+            '.our-price',
+            '.item-price',
+            '.price-tag',
+            '[class*="itemPrice"]',
+            '[class*="price-now"]',
+            '[class*="now-price"]',
+
+            // iHerb price selectors
+            '#product-price',
+            '.list-price',
+            '.original-price-wrapper.show .list-price',
+
+            // Carrefour UAE price selectors
+            '[data-qa="product-price"]',
+            '.product-price',
+            '[class*="css-"][class*="price" i]',
+            '[class*="css-"][data-testid*="price" i]',
+
+            // Life Pharmacy
+            '.dirham.text-lg',
+            '.dirham.font-bold:not(.line-through):not([class*="line-through"])',
+            'p.dirham:not(.line-through):not([class*="line-through"])',
+            'p[class*="dirham"]:not(.line-through):not([class*="line-through"])',
+            '[class*="dirham"]:not(.line-through):not([class*="line-through"])',
+            '[class*="special-price" i]',
+            '[class*="offer-price" i]',
+            '[class*="offerPrice" i]',
+            '[class*="regular-price" i]',
+            '[class*="product-price" i]',
+            '[data-testid*="price" i]',
+            '[data-cy*="price" i]'
+          ];
+
+          for (var s = 0; s < candidatePriceSelectors.length; s++) {
+            var elList = document.querySelectorAll(candidatePriceSelectors[s]);
+            for (var ei = 0; ei < elList.length; ei++) {
+              var currEl = elList[ei];
+              if (isStruckOrOldPriceElement(currEl)) continue;
+              var raw = getCleanElementPriceText(currEl);
+              if (raw && /[0-9]/.test(raw)) {
+                var parsed = parsePriceAndCurrency(raw);
+                if (parsed.price) {
+                  snapshot.price = parsed.price;
+                  if (parsed.currency && !snapshot.currency) snapshot.currency = parsed.currency;
+
+                  // Inspect Shein data-price-size="other" or currency span directly inside currEl
+                  if (!snapshot.currency && currEl.querySelector) {
+                    var curChild = currEl.querySelector('[data-price-size="other"], [class*="price-symbol"], [class*="currency"]');
+                    if (curChild) {
+                      var ct = (curChild.textContent || '').trim().toUpperCase();
+                      if (ct === 'SR' || ct === 'SAR' || ct.indexOf('SR') > -1 || ct.indexOf('SAR') > -1 || /[﷼\uFDFC\u20C1⃁]|ر\.?س|ريال/.test(ct)) {
+                        snapshot.currency = 'SAR';
+                      } else if (ct === 'AED' || ct.indexOf('AED') > -1 || /د\.?إ|د\.?ا|درهم|\u20C3/.test(ct)) {
+                        snapshot.currency = 'AED';
+                      } else if (ct === '$' || ct === 'USD') {
+                        snapshot.currency = 'USD';
+                      }
+                    }
                   }
+
+                  // Inspect currEl's ancestors up to 4 levels for currency symbols (AED, SAR, TL, then USD)
+                  if (!snapshot.currency && currEl) {
+                    var pNode = currEl;
+                    for (var pi = 0; pi < 4 && pNode; pi++) {
+                      var pText = pNode.textContent || '';
+                      if (/د\.?إ|د\.?ا|درهم|\u20C3/i.test(pText) || /(?:^|[^a-zA-Z])AED(?:[^a-zA-Z]|$)/i.test(pText)) { snapshot.currency = 'AED'; break; }
+                      if (/[﷼\uFDFC\u20C1⃁]|ر\.?س|ريال/i.test(pText) || /(?:^|[^a-zA-Z])(?:SAR|SR)(?:[^a-zA-Z]|$)/i.test(pText)) { snapshot.currency = 'SAR'; break; }
+                      if (/₺|\bTL\b|\bTRY\b/i.test(pText)) { snapshot.currency = 'TL'; break; }
+                      if (/\$|\bUSD\b/i.test(pText)) { snapshot.currency = 'USD'; break; }
+                      pNode = pNode.parentElement;
+                    }
+                  }
+
+                  // If currency not detected directly inside currEl, inspect parent / container and siblings
+                  if (!snapshot.currency && currEl) {
+                    var containerEl = (currEl.closest && currEl.closest(
+                      '[class*="head-price"], [class*="floor-price"], [class*="product-price"], [class*="productPrice"], [class*="goods-price"], [class*="selling-price"], [class*="goodsPrice"], .product-intro__head-price'
+                    )) || currEl.parentElement;
+                    if (containerEl) {
+                      var cText = containerEl.textContent || '';
+                      if (/د\.?إ|د\.?ا|درهم|\u20C3/i.test(cText) || /(?:^|[^a-zA-Z])AED(?:[^a-zA-Z]|$)/i.test(cText)) {
+                        snapshot.currency = 'AED';
+                      } else if (/[﷼\uFDFC\u20C1⃁]|ر\.?س|ريال/i.test(cText) || /(?:^|[^a-zA-Z])(?:SAR|SR)(?:[^a-zA-Z]|$)/i.test(cText)) {
+                        snapshot.currency = 'SAR';
+                      } else if (/₺|\bTL\b|\bTRY\b/i.test(cText)) {
+                        snapshot.currency = 'TL';
+                      } else if (/\$|\bUSD\b/i.test(cText)) {
+                        snapshot.currency = 'USD';
+                      }
+                    }
+                  }
+                  break;
                 }
-                if (!snapshot.price && sP) {
-                  var sVal = (typeof sP === 'object') ? (sP.value || sP.text || '') : sP;
-                  if (sVal) snapshot.price = String(sVal).trim();
-                }
-                if (tpPrice.currency && !snapshot.currency) snapshot.currency = String(tpPrice.currency).trim();
               }
             }
-          } catch(_eTp) {}
+            if (snapshot.price) break;
+          }
         }
-
-        var isSheinSnapshot = (window.location && window.location.hostname && window.location.hostname.indexOf('shein.') > -1);
+      
+      
+      var isSheinSnapshot = (window.location && window.location.hostname && window.location.hostname.indexOf('shein.') > -1);
 
         // For Shein: Check user cookie and localStorage FIRST before falling back to SEO tags
         if (isSheinSnapshot && !snapshot.currency) {
