@@ -27,16 +27,20 @@ const createInitialTabState = () => ({
   loadingMore: false,
 });
 
+// Read FILTER_TABS lazily: orderStatus is part of an import cycle with this
+// store (orderStatus -> storeHelper -> ... -> auth -> useOrderStore), so its
+// exports can still be undefined while this module is first evaluated.
+const createInitialTabs = () => {
+  const ids = Array.isArray(FILTER_TABS) ? FILTER_TABS.map(t => t.id) : ['all'];
+  return ids.reduce((acc, id) => {
+    acc[id] = createInitialTabState();
+    return acc;
+  }, {});
+};
+
 export const useOrderStore = create((set, get) => ({
-  // Per-tab cache mapping for: 'all', 'pending', 'confirmed', 'in_progress', 'delivered', 'cancelled'
-  tabs: {
-    all: createInitialTabState(),
-    pending: createInitialTabState(),
-    confirmed: createInitialTabState(),
-    in_progress: createInitialTabState(),
-    delivered: createInitialTabState(),
-    cancelled: createInitialTabState(),
-  },
+  // Per-tab cache, one entry per FILTER_TABS id (others are created on first fetch)
+  tabs: createInitialTabs(),
 
   // Active search query cache
   searchCache: {
@@ -56,14 +60,16 @@ export const useOrderStore = create((set, get) => ({
   invalidateOrders: () => {
     set(state => ({
       isDirty: true,
-      tabs: {
-        all: { ...state.tabs.all, lastFetched: null },
-        pending: { ...state.tabs.pending, lastFetched: null },
-        confirmed: { ...state.tabs.confirmed, lastFetched: null },
-        in_progress: { ...state.tabs.in_progress, lastFetched: null },
-        delivered: { ...state.tabs.delivered, lastFetched: null },
-        cancelled: { ...state.tabs.cancelled, lastFetched: null },
-      },
+      tabs: Object.keys({ ...createInitialTabs(), ...state.tabs }).reduce(
+        (acc, id) => {
+          acc[id] = {
+            ...(state.tabs[id] || createInitialTabState()),
+            lastFetched: null,
+          };
+          return acc;
+        },
+        {},
+      ),
     }));
   },
 
@@ -71,14 +77,7 @@ export const useOrderStore = create((set, get) => ({
   clearOrders: () => {
     set(() => ({
       isDirty: true,
-      tabs: {
-        all: createInitialTabState(),
-        pending: createInitialTabState(),
-        confirmed: createInitialTabState(),
-        in_progress: createInitialTabState(),
-        delivered: createInitialTabState(),
-        cancelled: createInitialTabState(),
-      },
+      tabs: createInitialTabs(),
       searchCache: {
         query: '',
         tabId: 'all',
@@ -197,7 +196,8 @@ export const useOrderStore = create((set, get) => ({
         const activeTabObj =
           FILTER_TABS.find(t => t.id === tabId) || FILTER_TABS[0];
 
-        // Optimized query parameters (5 orders per page for fast response)
+        // GET /orders?filter=<all|pending|confirmed|in_progress|dubai_warehouse|
+        //   delivery_warehouse|out_for_delivery|delivered|cancelled>
         const queryParams = {
           page: pageNum,
           per_page: ORDERS_PER_PAGE,
@@ -205,9 +205,6 @@ export const useOrderStore = create((set, get) => ({
           filter: activeTabObj.filter || tabId,
           tab: activeTabObj.filter || tabId,
         };
-        if (activeTabObj.durums && tabId !== 'all') {
-          queryParams.durum = activeTabObj.durums;
-        }
 
         if (isSearching) {
           queryParams.search = cleanSearch;

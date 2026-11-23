@@ -543,7 +543,7 @@ export const getMetaTagPriceAndCurrency = page_url => {
 
         var parsePriceAndCurrency = function(rawText) {
           if (!rawText || typeof rawText !== 'string') return { price: '', currency: '' };
-          var t = rawText.replace(/[ \t\r\n\u00A0]+/g, ' ').trim();
+          var t = rawText.replace(/[ \\t\\r\\n\\u00A0]+/g, ' ').trim();
           // Convert Arabic-Indic digits ٠-٩ to 0-9
           t = t.replace(/[٠-٩]/g, function(d) { return String.fromCharCode(d.charCodeAt(0) - 1632 + 48); });
           var detectedCurr = '';
@@ -559,7 +559,7 @@ export const getMetaTagPriceAndCurrency = page_url => {
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])GBP(?:$|[^a-zA-Z\u0600-\u06FF])|£/i.test(t)) detectedCurr = 'GBP';
 
           // Support Life Pharmacy "D 18.23" format and "dirham"
-          if (!detectedCurr && (/^D\s+[0-9]/i.test(t) || /\bdirham\b/i.test(t))) {
+          if (!detectedCurr && (/^D\\s+[0-9]/i.test(t) || /\\bdirham\\b/i.test(t))) {
             detectedCurr = 'AED';
           }
 
@@ -567,10 +567,10 @@ export const getMetaTagPriceAndCurrency = page_url => {
           t = t.replace(/[-–]?[ \t]*[0-9]+(?:\.[0-9]+)?[ \t]*%[ \t]*(?:off|indirim|discount|saving|savings)?/gi, '');
           t = t.replace(/%[ \t]*[0-9]+(?:\.[0-9]+)?/gi, '');
           t = t.replace(/(?:save|off|indirim)[ \t]+[0-9]+(?:\.[0-9]+)?%?/gi, '');
-          t = t.replace(/(?:save|tasarruf|indirim|saving|savings)\s*[$€£₺]?\s*[0-9]+(?:[.,][0-9]{1,2})?/gi, '');
+          t = t.replace(/(?:save|tasarruf|indirim|saving|savings)\\s*[$€£₺]?\\s*[0-9]+(?:[.,][0-9]{1,2})?/gi, '');
 
           // Normalize split decimals e.g. "24 .50" or "24 ,50"
-          t = t.replace(/([0-9]+)\s*[.,]\s*([0-9]{2})\b/, '$1.$2');
+          t = t.replace(/([0-9]+)\\s*[.,]\\s*([0-9]{2})\\b/, '$1.$2');
 
           // Match price numbers:
           var matches = t.match(/([0-9]{1,3}(?:[., ][0-9]{3})+(?:[.,][0-9]{1,2})(?![0-9])|[0-9]{1,3}(?:[., ][0-9]{3})+(?![0-9])|[0-9]+(?:[.,][0-9]{1,2})(?![0-9])|[0-9]+)/g);
@@ -747,7 +747,7 @@ export const getMetaTagPriceAndCurrency = page_url => {
               var cfRaw = (cfEl.innerText || cfEl.textContent || '').trim();
               if (cfRaw && /[0-9]/.test(cfRaw)) {
                 // Normalize split decimals e.g. "24 .50" or "24 ,50"
-                cfRaw = cfRaw.replace(/([0-9]+)\s*[.,]\s*([0-9]{2})\b/, '$1.$2');
+                cfRaw = cfRaw.replace(/([0-9]+)\\s*[.,]\\s*([0-9]{2})\\b/, '$1.$2');
                 var cfP = parsePriceAndCurrency(cfRaw);
                 if (cfP.price) {
                   price = cfP.price;
@@ -2639,7 +2639,7 @@ export const getProductSnapshotBridge = page_url => {
 
         var parsePriceAndCurrency = function(rawText) {
           if (!rawText || typeof rawText !== 'string') return { price: '', currency: '' };
-          var t = rawText.replace(/[ \t\r\n\u00A0]+/g, ' ').trim();
+          var t = rawText.replace(/[ \\t\\r\\n\\u00A0]+/g, ' ').trim();
           // Convert Arabic-Indic digits ٠-٩ to 0-9
           t = t.replace(/[٠-٩]/g, function(d) { return String.fromCharCode(d.charCodeAt(0) - 1632 + 48); });
           var detectedCurr = '';
@@ -2655,7 +2655,7 @@ export const getProductSnapshotBridge = page_url => {
           else if (/(?:^|[^a-zA-Z\u0600-\u06FF])GBP(?:$|[^a-zA-Z\u0600-\u06FF])|£/i.test(t)) detectedCurr = 'GBP';
 
           // Support Life Pharmacy "D 18.23" format and "dirham"
-          if (!detectedCurr && (/^D\s+[0-9]/i.test(t) || /\bdirham\b/i.test(t))) {
+          if (!detectedCurr && (/^D\\s+[0-9]/i.test(t) || /\\bdirham\\b/i.test(t))) {
             detectedCurr = 'AED';
           }
 
@@ -2663,10 +2663,10 @@ export const getProductSnapshotBridge = page_url => {
           t = t.replace(/[-–]?[ \t]*[0-9]+(?:\.[0-9]+)?[ \t]*%[ \t]*(?:off|indirim|discount|saving|savings)?/gi, '');
           t = t.replace(/%[ \t]*[0-9]+(?:\.[0-9]+)?/gi, '');
           t = t.replace(/(?:save|off|indirim)[ \t]+[0-9]+(?:\.[0-9]+)?%?/gi, '');
-          t = t.replace(/(?:save|tasarruf|indirim|saving|savings)\s*[$€£₺]?\s*[0-9]+(?:[.,][0-9]{1,2})?/gi, '');
+          t = t.replace(/(?:save|tasarruf|indirim|saving|savings)\\s*[$€£₺]?\\s*[0-9]+(?:[.,][0-9]{1,2})?/gi, '');
 
           // Normalize split decimals e.g. "24 .50" or "24 ,50"
-          t = t.replace(/([0-9]+)\s*[.,]\s*([0-9]{2})\b/, '$1.$2');
+          t = t.replace(/([0-9]+)\\s*[.,]\\s*([0-9]{2})\\b/, '$1.$2');
 
           // Match price numbers:
           var matches = t.match(/([0-9]{1,3}(?:[., ][0-9]{3})+(?:[.,][0-9]{1,2})(?![0-9])|[0-9]{1,3}(?:[., ][0-9]{3})+(?![0-9])|[0-9]+(?:[.,][0-9]{1,2})(?![0-9])|[0-9]+)/g);
@@ -2836,7 +2836,7 @@ export const getProductSnapshotBridge = page_url => {
               var cfRaw = (cfEl.innerText || cfEl.textContent || '').trim();
               if (cfRaw && /[0-9]/.test(cfRaw)) {
                 // Normalize split decimals e.g. "24 .50" or "24 ,50"
-                cfRaw = cfRaw.replace(/([0-9]+)\s*[.,]\s*([0-9]{2})\b/, '$1.$2');
+                cfRaw = cfRaw.replace(/([0-9]+)\\s*[.,]\\s*([0-9]{2})\\b/, '$1.$2');
                 var cfP = parsePriceAndCurrency(cfRaw);
                 if (cfP.price) {
                   snapshot.price = cfP.price;

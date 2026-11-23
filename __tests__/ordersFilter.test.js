@@ -62,8 +62,10 @@ describe('Order Status Categorization & Tab Filtering', () => {
     it('categorizes based on numeric durum when badges are absent', () => {
       expect(getOrderStatusCategory({ durum: 6 })).toBe('delivered');
       expect(getOrderStatusCategory({ durum: 2 })).toBe('in_progress');
-      expect(getOrderStatusCategory({ durum: 4 })).toBe('in_progress');
-      expect(getOrderStatusCategory({ durum: 11 })).toBe('in_progress');
+      expect(getOrderStatusCategory({ durum: 3 })).toBe('dubai_warehouse');
+      expect(getOrderStatusCategory({ durum: 4 })).toBe('dubai_warehouse');
+      expect(getOrderStatusCategory({ durum: 5 })).toBe('delivery_warehouse');
+      expect(getOrderStatusCategory({ durum: 11 })).toBe('out_for_delivery');
       expect(getOrderStatusCategory({ durum: 1 })).toBe('pending');
       expect(getOrderStatusCategory({ durum: 14 })).toBe('pending');
       expect(getOrderStatusCategory({ durum: 16 })).toBe('pending');
@@ -75,11 +77,86 @@ describe('Order Status Categorization & Tab Filtering', () => {
     it('categorizes based on Turkish durum_text', () => {
       expect(getOrderStatusCategory({ durum_text: 'Teslim Edildi' })).toBe('delivered');
       expect(getOrderStatusCategory({ durum_text: 'Sipariş Verildi' })).toBe('in_progress');
-      expect(getOrderStatusCategory({ durum_text: 'Dağıtımda' })).toBe('in_progress');
+      expect(getOrderStatusCategory({ durum_text: 'Dağıtımda' })).toBe('out_for_delivery');
+      expect(getOrderStatusCategory({ durum_text: 'Teslimat Deposunda' })).toBe('delivery_warehouse');
+      expect(getOrderStatusCategory({ durum_text: 'İst Depoda' })).toBe('dubai_warehouse');
       expect(getOrderStatusCategory({ durum_text: 'Beklemede' })).toBe('pending');
       expect(getOrderStatusCategory({ durum_text: 'Müşteri Onayladı' })).toBe('pending');
       expect(getOrderStatusCategory({ durum_text: 'Müşteri Ödedi' })).toBe('confirmed');
       expect(getOrderStatusCategory({ durum_text: 'İptal Edildi' })).toBe('cancelled');
+    });
+
+    it('categorizes new backend app_status values when durum is absent', () => {
+      expect(getOrderStatusCategory({ app_status: 'in_transit' })).toBe('dubai_warehouse');
+      expect(getOrderStatusCategory({ app_status: 'dubai_warehouse' })).toBe('dubai_warehouse');
+      expect(getOrderStatusCategory({ app_status: 'in_delivery_warehouse' })).toBe('delivery_warehouse');
+      expect(getOrderStatusCategory({ app_status: 'out_for_delivery' })).toBe('out_for_delivery');
+    });
+
+    it('does not treat "Out For Delivery" / "In Delivery Warehouse" text as Delivered', () => {
+      expect(getOrderStatusCategory({ app_status_text: 'Out For Delivery' })).toBe('out_for_delivery');
+      expect(getOrderStatusCategory({ app_status_text: 'In Delivery Warehouse' })).toBe('delivery_warehouse');
+      expect(getOrderStatusCategory({ app_status_text: 'In Transit' })).toBe('dubai_warehouse');
+    });
+  });
+
+  describe('dubai_warehouse filter response', () => {
+    // Shape returned by GET /orders?filter=dubai_warehouse
+    const response = [
+      {
+        card_type: 'single',
+        id: 169,
+        durum: 3,
+        durum_text: 'İst Depoda',
+        app_status: 'in_transit',
+        app_status_text: 'In Transit',
+        app_badge_color: 'blue',
+        total_usd: 37.84,
+      },
+      {
+        card_type: 'group',
+        is_group: true,
+        id: 42,
+        durum: 3,
+        durum_text: 'İst Depoda',
+        app_status: 'in_progress',
+        app_status_text: 'In Progress',
+        app_badge_color: 'blue',
+        orders: [{ id: 170, durum: 3 }, { id: 171, durum: 3 }],
+      },
+    ];
+
+    it('keeps every returned card on the Dubai Warehouse tab', () => {
+      const normalized = response.map(normalizeOrderRecord);
+      expect(filterOrdersByTabAndSearch(normalized, 'dubai_warehouse')).toHaveLength(2);
+      normalized.forEach(item => {
+        expect(item.app_status).toBe('dubai_warehouse');
+        expect(item.app_status_text).toBe('Dubai Warehouse');
+        expect(item.can_track).toBe(true);
+      });
+    });
+
+    it('labels delivery warehouse and out for delivery cards', () => {
+      const dw = normalizeOrderRecord({ durum: 5, app_status: 'in_delivery_warehouse' });
+      expect(dw.app_status).toBe('in_delivery_warehouse');
+      expect(dw.app_status_text).toBe('In Delivery Warehouse');
+      const ofd = normalizeOrderRecord({ durum: 11, app_status: 'out_for_delivery' });
+      expect(ofd.app_status).toBe('out_for_delivery');
+      expect(ofd.app_status_text).toBe('Out For Delivery');
+    });
+
+    it('exposes all requested filter tabs in order', () => {
+      expect(FILTER_TABS.map(t => t.filter)).toEqual([
+        'all',
+        'pending',
+        'confirmed',
+        'in_progress',
+        'dubai_warehouse',
+        'delivery_warehouse',
+        'out_for_delivery',
+        'delivered',
+        'cancelled',
+      ]);
     });
   });
 

@@ -7,14 +7,99 @@ import {
   cleanProductTitle,
 } from './storeHelper';
 
+/**
+ * Order filter tabs. `filter` is sent to GET /orders?filter=..., `durums` is the
+ * backend status codes that belong to the tab, `appStatuses` are the canonical
+ * `app_status` values the backend may return for the tab.
+ */
 export const FILTER_TABS = [
   { id: 'all', label: 'All', durums: 0, filter: 'all' },
-  { id: 'pending', label: 'Pending', durums: [1, 14, 15, 16, 19], filter: 'pending' },
-  { id: 'confirmed', label: 'Confirmed', durums: [18], filter: 'confirmed' },
-  { id: 'in_progress', label: 'In Progress', durums: [2, 3, 4, 5, 11], filter: 'in_progress' },
-  { id: 'delivered', label: 'Delivered', durums: [6], filter: 'delivered' },
-  { id: 'cancelled', label: 'Cancelled', durums: [7, 8, 9, 10, 12, 13, 17], filter: 'cancelled' },
+  {
+    id: 'pending',
+    label: 'Pending',
+    durums: [1, 14, 15, 16, 19],
+    filter: 'pending',
+    appStatuses: ['pending'],
+    statusText: 'Pending',
+    badgeColor: 'orange',
+    canTrack: true,
+  },
+  {
+    id: 'confirmed',
+    label: 'Confirmed',
+    durums: [18],
+    filter: 'confirmed',
+    appStatuses: ['confirmed'],
+    statusText: 'Confirmed',
+    badgeColor: 'orange',
+    canTrack: true,
+  },
+  {
+    id: 'in_progress',
+    label: 'In Progress',
+    durums: [2],
+    filter: 'in_progress',
+    appStatuses: ['in_progress', 'progress'],
+    statusText: 'In Progress',
+    badgeColor: 'blue',
+    canTrack: true,
+  },
+  {
+    id: 'dubai_warehouse',
+    label: 'Dubai Warehouse',
+    durums: [3, 4],
+    filter: 'dubai_warehouse',
+    appStatuses: ['dubai_warehouse', 'in_transit'],
+    statusText: 'Dubai Warehouse',
+    badgeColor: 'blue',
+    canTrack: true,
+  },
+  {
+    id: 'delivery_warehouse',
+    label: 'Delivery Warehouse',
+    durums: [5],
+    filter: 'delivery_warehouse',
+    appStatuses: ['in_delivery_warehouse', 'delivery_warehouse'],
+    statusText: 'In Delivery Warehouse',
+    badgeColor: 'blue',
+    canTrack: true,
+  },
+  {
+    id: 'out_for_delivery',
+    label: 'Out for Delivery',
+    durums: [11],
+    filter: 'out_for_delivery',
+    appStatuses: ['out_for_delivery'],
+    statusText: 'Out For Delivery',
+    badgeColor: 'blue',
+    canTrack: true,
+  },
+  {
+    id: 'delivered',
+    label: 'Delivered',
+    durums: [6],
+    filter: 'delivered',
+    appStatuses: ['delivered'],
+    statusText: 'Delivered',
+    badgeColor: 'green',
+    canTrack: false,
+  },
+  {
+    id: 'cancelled',
+    label: 'Cancelled',
+    durums: [7, 8, 9, 10, 12, 13, 17],
+    filter: 'cancelled',
+    appStatuses: ['cancelled', 'canceled'],
+    statusText: 'Canceled',
+    badgeColor: 'red',
+    canTrack: false,
+  },
 ];
+
+/** Tab IDs excluding 'all' (one per status category). */
+export const STATUS_TAB_IDS = FILTER_TABS.filter(t => t.id !== 'all').map(t => t.id);
+
+const getTabById = id => FILTER_TABS.find(t => t.id === id);
 
 /**
  * Normalize text for case-insensitive and locale-safe comparison (including Turkish chars)
@@ -30,15 +115,15 @@ export const normalizeText = (text) => {
 };
 
 /**
- * Categorize any order item or order group into one of the standard tab IDs:
- * 'pending' | 'confirmed' | 'in_progress' | 'delivered' | 'cancelled'
+ * Categorize any order item or order group into one of the FILTER_TABS ids:
+ * 'pending' | 'confirmed' | 'in_progress' | 'dubai_warehouse' |
+ * 'delivery_warehouse' | 'out_for_delivery' | 'delivered' | 'cancelled'
  *
  * Checks in priority order:
- * 1. Definitive status codes (durum 6 = delivered, durum 18 = confirmed) & explicit Turkish/English text
- * 2. Explicit numeric durum standard mapping
- * 3. Explicit canonical app_status (when no contradictory statusNum exists)
- * 4. Text keywords in app_status_text or durum_text (multilingual: TR/EN)
- * 5. Visual badge color app_badge_color
+ * 1. Numeric durum (definitive)
+ * 2. Canonical app_status
+ * 3. Text keywords in app_status_text or durum_text (multilingual: TR/EN)
+ * 4. Visual badge color app_badge_color
  */
 export const getOrderStatusCategory = (item) => {
   if (!item) return 'pending';
@@ -54,58 +139,67 @@ export const getOrderStatusCategory = (item) => {
     item.app_status_text || item.durum_text || firstOrder.durum_text || firstOrder.app_status_text
   );
 
-  // 1. Direct Delivered identification (durum 6, "Delivered", "Teslim Edildi")
-  if (
-    statusNum === 6 ||
-    statusText.includes('deliver') ||
-    statusText.includes('teslim')
-  ) {
-    return 'delivered';
+  // 1. Numeric durum is the source of truth (backend app_status can be stale,
+  //    e.g. a durum 3 group still reported as app_status "in_progress").
+  if (statusNum !== null && !isNaN(statusNum)) {
+    const byDurum = FILTER_TABS.find(
+      t => Array.isArray(t.durums) && t.durums.includes(statusNum),
+    );
+    if (byDurum) return byDurum.id;
   }
 
-  // 2. Direct Confirmed identification (durum 18, "Confirmed", "Müşteri Ödedi", "odendi")
-  if (
-    statusNum === 18 ||
-    statusText.includes('confirm') ||
-    statusText.includes('ödedi') ||
-    statusText.includes('odedi')
-  ) {
-    return 'confirmed';
-  }
-
-  // 3. Direct Cancelled identification (durum in cancelled set, "Cancelled", "İptal Edildi", "İade")
-  if (
-    (statusNum !== null && [7, 8, 9, 10, 12, 13, 17].includes(statusNum)) ||
-    statusText.includes('cancel') ||
-    statusText.includes('iptal') ||
-    statusText.includes('iade')
-  ) {
-    return 'cancelled';
-  }
-
-  // 4. Numeric durum standard mapping (when explicit durum exists)
-  if (statusNum !== null) {
-    if ([1, 14, 15, 16, 19].includes(statusNum)) return 'pending';
-    if ([2, 3, 4, 5, 11].includes(statusNum)) return 'in_progress';
-  }
-
-  // 5. Explicit canonical app_status if supplied (when no contradictory statusNum)
+  // 2. Canonical app_status from the backend
   if (item.app_status) {
     const s = normalizeText(item.app_status);
-    if (s === 'delivered') return 'delivered';
-    if (s === 'in_progress' || s === 'progress') return 'in_progress';
-    if (s === 'cancelled' || s === 'canceled') return 'cancelled';
-    if (s === 'confirmed') return 'confirmed';
-    if (s === 'pending') return 'pending';
+    const byAppStatus = FILTER_TABS.find(
+      t => Array.isArray(t.appStatuses) && t.appStatuses.includes(s),
+    );
+    if (byAppStatus) return byAppStatus.id;
   }
 
-  // 6. Status text inspection (multilingual: English & Turkish)
+  // 3. Status text inspection (multilingual: English & Turkish).
+  //    Specific phrases are checked before generic ones ("Out For Delivery" and
+  //    "In Delivery Warehouse" both contain "deliver").
   if (statusText) {
+    if (statusText.includes('out for deliver') || statusText.includes('dağıtımda')) {
+      return 'out_for_delivery';
+    }
+    if (
+      statusText.includes('delivery warehouse') ||
+      statusText.includes('local warehouse') ||
+      statusText.includes('teslimat depo')
+    ) {
+      return 'delivery_warehouse';
+    }
+    if (
+      statusText.includes('dubai') ||
+      statusText.includes('warehouse') ||
+      statusText.includes('depoda') ||
+      statusText.includes('transit') ||
+      statusText.includes('taşıma') ||
+      statusText.includes('kargoya')
+    ) {
+      return 'dubai_warehouse';
+    }
+    if (statusText.includes('deliver') || statusText.includes('teslim edildi')) {
+      return 'delivered';
+    }
+    if (
+      statusText.includes('cancel') ||
+      statusText.includes('iptal') ||
+      statusText.includes('iade')
+    ) {
+      return 'cancelled';
+    }
+    if (
+      statusText.includes('confirm') ||
+      statusText.includes('ödedi') ||
+      statusText.includes('odedi')
+    ) {
+      return 'confirmed';
+    }
     if (
       statusText.includes('progress') ||
-      statusText.includes('dağıtım') ||
-      statusText.includes('taşıma') ||
-      statusText.includes('transit') ||
       statusText.includes('verildi') ||
       statusText.includes('hazırlanıyor') ||
       statusText.includes('kargo')
@@ -149,43 +243,13 @@ export const normalizeOrderRecord = (rawItem) => {
     : null;
   const firstSub = subOrders ? subOrders[0] : null;
 
-  // 1. Resolve numeric durum
-  const statusNum = item.durum !== undefined && item.durum !== null
-    ? parseInt(item.durum, 10)
-    : (firstSub && firstSub.durum !== undefined && firstSub.durum !== null
-        ? parseInt(firstSub.durum, 10)
-        : null);
-
-  // 2. Resolve true category using getOrderStatusCategory
+  // 1-3. Resolve the category and normalise canonical status fields from it
   const category = getOrderStatusCategory(item);
-
-  // 3. Normalise canonical status fields based on category & statusNum
-  if (category === 'delivered' || statusNum === 6) {
-    item.app_status = 'delivered';
-    item.app_status_text = 'Delivered';
-    item.app_badge_color = 'green';
-    item.can_track = false;
-  } else if (category === 'confirmed' || statusNum === 18) {
-    item.app_status = 'confirmed';
-    item.app_status_text = 'Confirmed';
-    item.app_badge_color = 'orange';
-    item.can_track = true;
-  } else if (category === 'cancelled' || (statusNum !== null && [7, 8, 9, 10, 12, 13, 17].includes(statusNum))) {
-    item.app_status = 'cancelled';
-    item.app_status_text = 'Canceled';
-    item.app_badge_color = 'red';
-    item.can_track = false;
-  } else if (category === 'in_progress' || (statusNum !== null && [2, 3, 4, 5, 11].includes(statusNum))) {
-    item.app_status = 'in_progress';
-    item.app_status_text = 'In Progress';
-    item.app_badge_color = 'blue';
-    item.can_track = true;
-  } else {
-    item.app_status = 'pending';
-    item.app_status_text = 'Pending';
-    item.app_badge_color = 'orange';
-    item.can_track = true;
-  }
+  const tab = getTabById(category) || getTabById('pending');
+  item.app_status = tab.appStatuses[0];
+  item.app_status_text = tab.statusText;
+  item.app_badge_color = tab.badgeColor;
+  item.can_track = tab.canTrack;
 
   // 4. Floating point and currency formatting normalization
   if (item.urun_tutar_usd != null) {

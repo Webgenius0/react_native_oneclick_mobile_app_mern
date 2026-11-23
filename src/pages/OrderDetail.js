@@ -45,11 +45,9 @@ export default function OrderDetail({ route, navigation }) {
         try {
           const storeState = useOrderStore.getState();
           const allOrders = [
-            ...(storeState.tabs?.all?.orders || []),
-            ...(storeState.tabs?.pending?.orders || []),
-            ...(storeState.tabs?.in_progress?.orders || []),
-            ...(storeState.tabs?.delivered?.orders || []),
-            ...(storeState.tabs?.cancelled?.orders || []),
+            ...Object.values(storeState.tabs || {}).flatMap(
+              tab => tab?.orders || [],
+            ),
             ...(storeState.searchCache?.orders || []),
           ];
           rawItem =
