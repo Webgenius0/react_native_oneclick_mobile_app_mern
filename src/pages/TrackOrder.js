@@ -19,16 +19,18 @@ import { EmContext } from '../contexts/EmContext';
 import ai from '../helpers/ai';
 import { supportPhone } from '../../config';
 import WhatsAppIcon from '../assets/svg/whatsapp.svg';
+import {
+  buildFallbackTimeline,
+  getOrderStatusCategory,
+  normalizeOrderRecord,
+} from '../helpers/orderStatus';
 
-const DEFAULT_TIMELINE_STEPS = [
-  { step: 1, key: 'order_received', title: 'Order Received', state: 'completed', is_completed: true, is_current: false, date: null },
-  { step: 2, key: 'order_placed', title: 'Order Placed', state: 'completed', is_completed: true, is_current: false, date: null },
-  { step: 3, key: 'in_transit', title: 'In Transit', state: 'completed', is_completed: true, is_current: false, date: null },
-  { step: 4, key: 'shipped', title: 'Shipped', state: 'current', is_completed: false, is_current: true, date: null },
-  { step: 5, key: 'in_delivery_warehouse', title: 'In Delivery Warehouse', state: 'pending', is_completed: false, is_current: false, date: null },
-  { step: 6, key: 'out_for_delivery', title: 'Out For Delivery', state: 'pending', is_completed: false, is_current: false, date: null },
-  { step: 7, key: 'delivered', title: 'Delivered', state: 'pending', is_completed: false, is_current: false, date: null },
-];
+const FALLBACK_SUBTITLES = {
+  pending: 'Your order is awaiting confirmation and payment.',
+  confirmed: 'Payment received. Your order will be placed soon.',
+  cancelled: 'This order has been cancelled.',
+  delivered: 'Your order has been delivered.',
+};
 
 export default function TrackOrder({ route, navigation }) {
   const insets = useSafeAreaInsets();
@@ -36,7 +38,14 @@ export default function TrackOrder({ route, navigation }) {
 
   const orderParam = route.params?.s || {};
   const orderId = route.params?.id || orderParam.id || '1CLK-582941';
-  const grupId = route.params?.grupID || orderParam.grupID || orderParam.id;
+  // Only send grupID for group cards. Single orders come back with grupID 0;
+  // falling back to the order id there sent e.g. grupID=391 for order #391.
+  const isGroupCard =
+    orderParam.is_group === true || orderParam.card_type === 'group';
+  const grupId =
+    route.params?.grupID ||
+    (Number(orderParam.grupID) > 0 ? orderParam.grupID : 0) ||
+    (isGroupCard ? orderParam.id : 0);
 
   const [loading, setLoading] = useState(!route.params?.customerTracking);
   const [refreshing, setRefreshing] = useState(false);
@@ -47,7 +56,6 @@ export default function TrackOrder({ route, navigation }) {
   // Fallback defaults if API call fails or while loading
   const rawDate = orderParam.tarih || new Date();
   const initialFormattedDate = route.params?.formattedDate || moment(rawDate).format('MMM DD, YYYY');
-  const initialExpectedDate = moment(rawDate).add(3, 'days').format('MMM DD, YYYY');
 
   const fetchTracking = useCallback(async (isRefresh = false) => {
     if (!isRefresh && !customerTracking) {
@@ -67,7 +75,11 @@ export default function TrackOrder({ route, navigation }) {
           setCustomerTracking(res.data.customer_tracking);
         } else if (res.data.tracking) {
           setCustomerTracking(res.data.tracking);
+        } else {
+          console.log('order-tracking: no customer_tracking in response', res.data);
         }
+      } else {
+        console.log('order-tracking error response:', res?.data);
       }
     } catch (e) {
       console.log('fetchTracking API note:', e?.message || e);
@@ -89,9 +101,27 @@ export default function TrackOrder({ route, navigation }) {
   // Derive display values from customer_tracking or fallback to params
   const orderNumber = customerTracking?.order_number || `Order #${orderId}`;
   const orderDate = customerTracking?.order_date || initialFormattedDate;
-  const statusTitle = customerTracking?.status_title || route.params?.statusText || 'In Progress';
-  const statusDesc = customerTracking?.status_subtitle || `Your order is on the way. Expected delivery on ${initialExpectedDate}`;
-  const rawBadgeColor = customerTracking?.status_badge_color || customerTracking?.status_badge || 'blue';
+  // Fallbacks come from the order's real status, never assumed progress
+  const fallbackOrder = normalizeOrderRecord(orderParam) || {};
+  const fallbackCategory = getOrderStatusCategory(orderParam);
+  const fallbackExpected = orderParam.expected_delivery_date
+    ? ` Expected delivery on ${orderParam.expected_delivery_date}`
+    : '';
+  const fallbackDesc =
+    FALLBACK_SUBTITLES[fallbackCategory] ||
+    `Your order is on the way.${fallbackExpected}`;
+
+  const statusTitle =
+    customerTracking?.status_title ||
+    route.params?.statusText ||
+    fallbackOrder.app_status_text ||
+    'Pending';
+  const statusDesc = customerTracking?.status_subtitle || fallbackDesc;
+  const rawBadgeColor =
+    customerTracking?.status_badge_color ||
+    (customerTracking ? customerTracking.status_badge : null) ||
+    fallbackOrder.app_badge_color ||
+    'orange';
   const badgeColor =
     rawBadgeColor === 'green'
       ? 'green'
@@ -103,7 +133,7 @@ export default function TrackOrder({ route, navigation }) {
 
   const steps = (customerTracking?.steps && Array.isArray(customerTracking.steps) && customerTracking.steps.length > 0)
     ? customerTracking.steps
-    : DEFAULT_TIMELINE_STEPS;
+    : buildFallbackTimeline(orderParam);
 
   const isDark = ctx?.isDark;
   const pageBg = isDark ? '#111827' : '#F8FAFC';
@@ -296,7 +326,7 @@ export default function TrackOrder({ route, navigation }) {
                           <Text style={[styles.stepTimestamp, { color: subTextColor }]}>
                             {stepItem.date}
                           </Text>
-                        ) : isCompleted || isCurrent ? (
+                        ) : idx === 0 && (isCompleted || isCurrent) ? (
                           <Text style={[styles.stepTimestamp, { color: subTextColor }]}>
                             {orderDate}
                           </Text>

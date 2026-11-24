@@ -313,6 +313,68 @@ export const normalizeOrderRecord = (rawItem) => {
   return item;
 };
 
+const TIMELINE_STEP_DEFS = [
+  { key: 'order_received', title: 'Order Received' },
+  { key: 'order_placed', title: 'Order Placed' },
+  { key: 'dubai_warehouse', title: 'Dubai Warehouse' },
+  { key: 'shipped', title: 'Shipped' },
+  { key: 'in_delivery_warehouse', title: 'In Delivery Warehouse' },
+  { key: 'out_for_delivery', title: 'Out For Delivery' },
+  { key: 'delivered', title: 'Delivered' },
+];
+
+/**
+ * Index of the current timeline step for an order. -1 means nothing is
+ * completed or current (cancelled); length means everything is completed.
+ */
+const getActiveStepIndex = (category, statusNum) => {
+  switch (category) {
+    case 'in_progress':
+      return 1;
+    case 'dubai_warehouse':
+      return statusNum === 4 ? 3 : 2;
+    case 'delivery_warehouse':
+      return 4;
+    case 'out_for_delivery':
+      return 5;
+    case 'delivered':
+      return TIMELINE_STEP_DEFS.length;
+    case 'cancelled':
+      return -1;
+    case 'pending':
+    case 'confirmed':
+    default:
+      return 0;
+  }
+};
+
+/**
+ * Build a tracking timeline from the order's own status. Used only when the
+ * order-tracking API returns nothing, so it never shows progress the order
+ * hasn't actually reached.
+ */
+export const buildFallbackTimeline = order => {
+  const category = getOrderStatusCategory(order || {});
+  const rawDurum =
+    order?.durum ?? (Array.isArray(order?.orders) ? order.orders[0]?.durum : undefined);
+  const statusNum = rawDurum != null ? parseInt(rawDurum, 10) : null;
+  const active = getActiveStepIndex(category, statusNum);
+  return TIMELINE_STEP_DEFS.map((def, idx) => {
+    let state = 'pending';
+    if (active >= 0 && idx < active) state = 'completed';
+    else if (idx === active) state = 'current';
+    return {
+      step: idx + 1,
+      key: def.key,
+      title: def.title,
+      state,
+      is_completed: state === 'completed',
+      is_current: state === 'current',
+      date: null,
+    };
+  });
+};
+
 /**
  * Filter an order by search query (order ID, item title, store name, etc.)
  */

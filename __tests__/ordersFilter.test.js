@@ -310,3 +310,29 @@ describe('Order Status Categorization & Tab Filtering', () => {
     });
   });
 });
+
+describe('buildFallbackTimeline (Track Order without API data)', () => {
+  const { buildFallbackTimeline } = require('../src/helpers/orderStatus');
+  const states = order => buildFallbackTimeline(order).map(s => s.state);
+
+  it('shows no completed steps for a pending (unpaid) order', () => {
+    expect(states({ durum: 1, app_status_text: 'Pending' })).toEqual([
+      'current', 'pending', 'pending', 'pending', 'pending', 'pending', 'pending',
+    ]);
+  });
+
+  it('marks progress up to Dubai Warehouse for durum 3', () => {
+    expect(states({ durum: 3 })).toEqual([
+      'completed', 'completed', 'current', 'pending', 'pending', 'pending', 'pending',
+    ]);
+  });
+
+  it('marks everything completed for delivered and nothing for cancelled', () => {
+    expect(states({ durum: 6 }).every(s => s === 'completed')).toBe(true);
+    expect(states({ durum: 7 }).every(s => s === 'pending')).toBe(true);
+  });
+
+  it('reads durum from group sub-orders', () => {
+    expect(states({ orders: [{ durum: 11 }] })[5]).toBe('current');
+  });
+});
