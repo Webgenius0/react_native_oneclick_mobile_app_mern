@@ -9,6 +9,7 @@ import {
 import FastImage from 'react-native-fast-image';
 import { tr } from '../../translate/i18n';
 import moment from 'moment';
+import { getOrderGroupId } from '../../helpers/orderStatus';
 
 const GroupItem = React.memo(function GroupItem({
   s,
@@ -109,17 +110,21 @@ const GroupItem = React.memo(function GroupItem({
     ? s.images
     : orders.map(o => o.resim || o.img || o.image).filter(Boolean);
 
+  // 0 for standalone orders, so they are looked up by id instead
+  const grupId = getOrderGroupId(s);
+
   const handleViewDetails = () => {
     navigation.navigate('OrderDetail', {
       id: orderId,
       s: s,
-      grupID: s.id,
+      grupID: grupId,
     });
   };
 
   const handleTrackOrder = () => {
     navigation.navigate('TrackOrder', {
       id: orderId,
+      grupID: grupId,
       s: s,
       statusText: statusText,
       formattedDate: formattedDate,

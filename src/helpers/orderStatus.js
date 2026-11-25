@@ -228,6 +228,25 @@ export const getOrderStatusCategory = (item) => {
 };
 
 /**
+ * Returns the order's group id, or 0 when it is a standalone order.
+ * Single orders come back with grupID 0; group cards carry grupID === id.
+ */
+export const getOrderGroupId = record => {
+  if (!record || typeof record !== 'object') return 0;
+  const grupID = Number(record.grupID);
+  if (grupID > 0) return grupID;
+  const isGroupCard = record.is_group === true || record.card_type === 'group';
+  return isGroupCard && Number(record.id) > 0 ? Number(record.id) : 0;
+};
+
+/**
+ * Query params for GET /api/order-tracking. The backend checks `id` first and
+ * treats it strictly as an order id, so a group must be sent as grupID only.
+ */
+export const buildTrackingParams = (orderId, grupId) =>
+  Number(grupId) > 0 ? { grupID: grupId } : { id: orderId };
+
+/**
  * Robustly normalizes an order card or order group from the server:
  * - Fixes status and badge color mismatches (e.g. durum 6 Delivered with blue badge)
  * - Rounds floating-point prices (e.g. 20.839999999999996 -> 20.84)

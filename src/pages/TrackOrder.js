@@ -21,6 +21,8 @@ import { supportPhone } from '../../config';
 import WhatsAppIcon from '../assets/svg/whatsapp.svg';
 import {
   buildFallbackTimeline,
+  buildTrackingParams,
+  getOrderGroupId,
   getOrderStatusCategory,
   normalizeOrderRecord,
 } from '../helpers/orderStatus';
@@ -38,14 +40,10 @@ export default function TrackOrder({ route, navigation }) {
 
   const orderParam = route.params?.s || {};
   const orderId = route.params?.id || orderParam.id || '1CLK-582941';
-  // Only send grupID for group cards. Single orders come back with grupID 0;
-  // falling back to the order id there sent e.g. grupID=391 for order #391.
-  const isGroupCard =
-    orderParam.is_group === true || orderParam.card_type === 'group';
-  const grupId =
-    route.params?.grupID ||
-    (Number(orderParam.grupID) > 0 ? orderParam.grupID : 0) ||
-    (isGroupCard ? orderParam.id : 0);
+  // Only group cards have a grupID; single orders come back with grupID 0.
+  const grupId = Number(route.params?.grupID) > 0
+    ? route.params.grupID
+    : getOrderGroupId(orderParam);
 
   const [loading, setLoading] = useState(!route.params?.customerTracking);
   const [refreshing, setRefreshing] = useState(false);
@@ -62,12 +60,9 @@ export default function TrackOrder({ route, navigation }) {
       setLoading(true);
     }
     try {
-      // Primary endpoint: GET /api/order-tracking?id={orderId}
+      // GET /api/order-tracking?grupID={grupId} for groups, ?id={orderId} otherwise
       const res = await ai.get('order-tracking', {
-        params: {
-          id: orderId,
-          ...(grupId ? { grupID: grupId } : {}),
-        },
+        params: buildTrackingParams(orderId, grupId),
       });
 
       if (res?.data && res.data.error === false) {

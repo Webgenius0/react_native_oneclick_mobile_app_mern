@@ -22,7 +22,11 @@ import { cleanProductTitle, getStoreName } from '../helpers/storeHelper';
 import { supportPhone } from '../../config';
 import WhatsAppIcon from '../assets/svg/whatsapp.svg';
 import { useOrderStore } from '../store/useOrderStore';
-import { normalizeOrderRecord } from '../helpers/orderStatus';
+import {
+  buildTrackingParams,
+  getOrderGroupId,
+  normalizeOrderRecord,
+} from '../helpers/orderStatus';
 
 const parsePrice = val => {
   if (val == null) return 0;
@@ -73,7 +77,11 @@ export default function OrderDetail({ route, navigation }) {
     async (isRefresh = false) => {
       const orderId =
         route.params?.id || order?.id || route.params?.grupID || route.params?.s?.id;
-      const grupId = route.params?.grupID || order?.grupID || order?.id || orderId;
+      // 0 for standalone orders; never fall back to the order id here
+      const grupId =
+        Number(route.params?.grupID) > 0
+          ? route.params.grupID
+          : getOrderGroupId(order);
       if (!orderId) return;
 
       // Only show full loading spinner if we literally have no data in memory
@@ -97,7 +105,7 @@ export default function OrderDetail({ route, navigation }) {
           } catch (_) {}
           return ai.post(
             'order-detail',
-            { id: orderId, grupID: grupId },
+            { id: orderId, ...(grupId ? { grupID: grupId } : {}) },
             timeoutConfig,
           );
         };
@@ -105,7 +113,7 @@ export default function OrderDetail({ route, navigation }) {
         const [detailRes, trackingRes] = await Promise.allSettled([
           fetchDetail(),
           ai.get('order-tracking', {
-            params: { id: orderId, ...(grupId ? { grupID: grupId } : {}) },
+            params: buildTrackingParams(orderId, grupId),
             ...timeoutConfig,
           }),
         ]);
@@ -530,6 +538,10 @@ export default function OrderDetail({ route, navigation }) {
                 onPress={() => {
                   navigation.navigate('TrackOrder', {
                     id: orderId,
+                    grupID:
+                      Number(route.params?.grupID) > 0
+                        ? route.params.grupID
+                        : getOrderGroupId(order),
                     s: order,
                     customerTracking: customerTracking || order?.customer_tracking,
                     statusText: displayStatusTitle,
