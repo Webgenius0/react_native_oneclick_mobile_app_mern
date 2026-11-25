@@ -181,7 +181,9 @@ function AuthAfterTabNavigator() {
 
 export default function AppNavigator() {
   const { ctx, ctxDil, setCtxDil } = useContext(EmContext);
-  const { addItem } = useCartStore();
+  // Selector: subscribing to the whole cart store re-rendered the entire
+  // navigator on every cart change.
+  const addItem = useCartStore(state => state.addItem);
 
   const [state, setState] = useState({
     token: null,

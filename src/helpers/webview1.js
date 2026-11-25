@@ -19,6 +19,80 @@ export const isTrendyol = page_url => {
   if (!page_url || typeof page_url !== 'string') return false;
   return page_url.indexOf('trendyol.') > -1 || page_url.indexOf('trendyol.com') > -1;
 };
+
+// Install/teardown preamble embedded at the top of each injected bridge.
+//
+// The app re-injects the whole script several times per page (and on every
+// SPA route change). Bridges used to start fresh intervals, observers and
+// listeners on each injection without stopping the previous ones, so they
+// piled up for as long as the document lived (badly on SPAs like Carrefour).
+// Now each bridge registers itself on window[name]; a new injection first
+// tears down the previous instance, so only one copy of each bridge runs.
+//
+// Inside the bridge, use __rnInterval / __rnTimeout / __rnListen / __rnObserve
+// instead of the raw APIs so they are cleaned up on teardown. Timeouts are not
+// tracked; they are skipped once the bridge instance is torn down.
+// Self-contained on purpose: tests run single bridges with a mock window.
+export const bridgeLifecycle = name => `
+    var __rnPrev = window['${name}'];
+    if (__rnPrev && typeof __rnPrev.teardown === 'function') {
+      try { __rnPrev.teardown(); } catch (_e) {}
+    }
+    var __rnSetI = typeof window.setInterval === 'function' ? window.setInterval : setInterval;
+    var __rnClearI = typeof window.clearInterval === 'function' ? window.clearInterval : clearInterval;
+    var __rnSetT = typeof window.setTimeout === 'function' ? window.setTimeout : setTimeout;
+    var __rnBridge = {
+      dead: false,
+      intervals: [],
+      listeners: [],
+      observers: [],
+      teardown: function() {
+        this.dead = true;
+        var i;
+        for (i = 0; i < this.intervals.length; i++) {
+          try { __rnClearI(this.intervals[i]); } catch (_e) {}
+        }
+        for (i = 0; i < this.listeners.length; i++) {
+          var l = this.listeners[i];
+          try { l[0].removeEventListener(l[1], l[2], l[3]); } catch (_e) {}
+        }
+        for (i = 0; i < this.observers.length; i++) {
+          try { this.observers[i].disconnect(); } catch (_e) {}
+        }
+        this.intervals = [];
+        this.listeners = [];
+        this.observers = [];
+      }
+    };
+    window['${name}'] = __rnBridge;
+    var __rnInterval = function(fn, ms) {
+      var id = __rnSetI(function() {
+        if (!__rnBridge.dead) fn();
+      }, ms);
+      __rnBridge.intervals.push(id);
+      return id;
+    };
+    var __rnTimeout = function(fn, ms) {
+      return __rnSetT(function() {
+        if (!__rnBridge.dead) fn();
+      }, ms);
+    };
+    var __rnListen = function(target, type, fn, capture) {
+      if (!target || typeof target.addEventListener !== 'function') return;
+      target.addEventListener(type, fn, capture);
+      __rnBridge.listeners.push([target, type, fn, capture]);
+    };
+    var __rnObserve = function(target, options, callback) {
+      if (!target || !window.MutationObserver) return null;
+      var observer = new window.MutationObserver(function() {
+        if (!__rnBridge.dead) callback();
+      });
+      observer.observe(target, options);
+      __rnBridge.observers.push(observer);
+      return observer;
+    };
+`;
+
 export const injectedJavascript = params => {
   var page_url = params?.page_url || '';
   var str = '';
@@ -91,6 +165,7 @@ export const getTrendyolImage = () => {
 export const getMetaTagImage = page_url => {
   return `
   (function() {
+    ${bridgeLifecycle('__RN_IMAGE_BRIDGE__')}
     var attempts = 0;
     var maxAttempts = 30;
 
@@ -282,7 +357,7 @@ export const getMetaTagImage = page_url => {
       } catch(err) {}
     };
 
-    var imgInterval = setInterval(checkImage, 500);
+    var imgInterval = __rnInterval(checkImage, 500);
     checkImage();
   })();
   `;
@@ -291,6 +366,7 @@ export const getMetaTagImage = page_url => {
 export const getMetaTagTitle = page_url => {
   return `
   (function() {
+    ${bridgeLifecycle('__RN_TITLE_BRIDGE__')}
     var attempts = 0;
     var maxAttempts = 30;
 
@@ -455,7 +531,7 @@ export const getMetaTagTitle = page_url => {
       } catch(e) {}
     };
 
-    var titleInterval = setInterval(checkTitle, 500);
+    var titleInterval = __rnInterval(checkTitle, 500);
     checkTitle();
   })();
 `;
@@ -464,6 +540,7 @@ export const getMetaTagTitle = page_url => {
 export const getMetaTagPriceAndCurrency = page_url => {
   return `
   (function() {
+    ${bridgeLifecycle('__RN_PRICE_BRIDGE__')}
     var attempts = 0;
     var maxAttempts = 30;
 
@@ -1160,9 +1237,12 @@ export const getMetaTagPriceAndCurrency = page_url => {
           }
         }
 
+        // Stop polling after the fast window (~18s). It used to fall back to
+        // polling every 2s forever; later variant/price changes are picked
+        // up by the tap listener below and the options bridge's observer.
         if (attempts >= maxAttempts && priceInterval) {
           clearInterval(priceInterval);
-          priceInterval = setInterval(function() { checkPrice(false); }, 2000);
+          priceInterval = null;
         }
       } catch(err) {}
     };
@@ -1172,12 +1252,12 @@ export const getMetaTagPriceAndCurrency = page_url => {
     };
 
     // Listen for variant clicks/taps to re-check price immediately
-    document.addEventListener('click', function() {
-      setTimeout(function() { checkPrice(true); }, 300);
-      setTimeout(function() { checkPrice(true); }, 900);
+    __rnListen(document, 'click', function() {
+      __rnTimeout(function() { checkPrice(true); }, 300);
+      __rnTimeout(function() { checkPrice(true); }, 900);
     }, true);
 
-    var priceInterval = setInterval(function() { checkPrice(false); }, 600);
+    var priceInterval = __rnInterval(function() { checkPrice(false); }, 600);
     checkPrice(true);
   })();
 `;
@@ -1186,6 +1266,7 @@ export const getMetaTagPriceAndCurrency = page_url => {
 export const getProductOptionsBridge = page_url => {
   return `
   (function() {
+    ${bridgeLifecycle('__RN_OPTIONS_BRIDGE__')}
     var attempts = 0;
     var maxFastAttempts = 20;
     var lastSentKey = '';
@@ -1802,9 +1883,12 @@ export const getProductOptionsBridge = page_url => {
           }
         }
 
+        // Stop polling after the fast window; it used to poll every 2s
+        // forever. Later changes come from the tap/change listeners and the
+        // debounced observer below.
         if (attempts >= maxFastAttempts && optInterval) {
           clearInterval(optInterval);
-          optInterval = setInterval(function() { extractOptions(false); }, 2000);
+          optInterval = null;
         }
       } catch(e) {}
     };
@@ -1813,7 +1897,7 @@ export const getProductOptionsBridge = page_url => {
       extractOptions(Boolean(force));
     };
 
-    var optInterval = setInterval(function() { extractOptions(false); }, 600);
+    var optInterval = __rnInterval(function() { extractOptions(false); }, 600);
     extractOptions(false);
 
     var notifyChange = function() {
@@ -1824,28 +1908,27 @@ export const getProductOptionsBridge = page_url => {
     };
 
     try {
-      document.addEventListener('click', function() {
-        setTimeout(notifyChange, 200);
-        setTimeout(notifyChange, 650);
+      __rnListen(document, 'click', function() {
+        __rnTimeout(notifyChange, 200);
+        __rnTimeout(notifyChange, 650);
       }, true);
-      document.addEventListener('change', function() {
-        setTimeout(notifyChange, 150);
-        setTimeout(notifyChange, 500);
+      __rnListen(document, 'change', function() {
+        __rnTimeout(notifyChange, 150);
+        __rnTimeout(notifyChange, 500);
       }, true);
-      document.addEventListener('touchend', function() {
-        setTimeout(notifyChange, 250);
-        setTimeout(notifyChange, 700);
+      __rnListen(document, 'touchend', function() {
+        __rnTimeout(notifyChange, 250);
+        __rnTimeout(notifyChange, 700);
       }, true);
     } catch(e) {}
 
     try {
-      if (window.MutationObserver) {
-        var optObserver = new MutationObserver(function() {
-          clearTimeout(window.__optDebounceTimer);
-          window.__optDebounceTimer = setTimeout(notifyChange, 350);
-        });
-        optObserver.observe(document.body || document.documentElement, { childList: true, subtree: true });
-      }
+      // Single debounced observer (one per page now, not one per injection).
+      var optDebounceTimer = null;
+      __rnObserve(document.body || document.documentElement, { childList: true, subtree: true }, function() {
+        clearTimeout(optDebounceTimer);
+        optDebounceTimer = __rnTimeout(notifyChange, 350);
+      });
     } catch(e) {}
   })();
   `;
@@ -1965,8 +2048,8 @@ export const hideTrendyolBanners = () => {
   return `
     // #onetrust-accept-btn-handler is visible click it
     (function(){
-   
-    var popupCleanerInterval = setInterval(function(){
+    ${bridgeLifecycle('__RN_TRENDYOL_POPUP_BRIDGE__')}
+    var popupCleanerInterval = __rnInterval(function(){
         // console.log('popupCleanerInterval', +new Date());
         var acceptBtn = document.querySelector('#onetrust-accept-btn-handler');
         if(acceptBtn && acceptBtn.offsetParent !== null){
@@ -3610,9 +3693,12 @@ export const checkProductPageBridge = page_url => {
       } catch(e) {}
       window.__RN_PRODUCT_MUTATION_OBSERVER__ = null;
     }
+    ${bridgeLifecycle('__RN_PRODUCT_CHECK_BRIDGE__')}
 
     var attempts = 0;
     var maxAttempts = 25;
+    var watchingDone = false;
+    var finishWatching;
     var lastPostedState = null;
 
     var postStatus = function(isProduct, isSoldOut, currentHref) {
@@ -3981,6 +4067,10 @@ export const checkProductPageBridge = page_url => {
           postStatus(isProduct, isSoldOut, currentHref);
         }
 
+        if (isProduct || isSoldOut) {
+          finishWatching();
+        }
+
         if (isProduct || isSoldOut || attempts >= maxAttempts) {
           if (window.__RN_PRODUCT_CHECK_TIMER__) {
             try {
@@ -3996,17 +4086,44 @@ export const checkProductPageBridge = page_url => {
       } catch(err) {}
     };
 
+    // Once the page is confirmed as a product (or sold out), stop watching
+    // every DOM change. A variant tap can still flip it between in-stock and
+    // sold out, so re-check shortly after taps instead.
+    var tapCheckTimer = null;
+    var scheduleTapCheck = function() {
+      clearTimeout(tapCheckTimer);
+      tapCheckTimer = __rnTimeout(check, 600);
+    };
+    finishWatching = function() {
+      if (watchingDone) return;
+      watchingDone = true;
+      if (window.__RN_PRODUCT_MUTATION_OBSERVER__) {
+        try {
+          window.__RN_PRODUCT_MUTATION_OBSERVER__.disconnect();
+        } catch(e) {}
+        window.__RN_PRODUCT_MUTATION_OBSERVER__ = null;
+      }
+      __rnListen(document, 'click', scheduleTapCheck, true);
+      __rnListen(document, 'touchend', scheduleTapCheck, true);
+    };
+
     var setTimerFn = typeof window.setInterval === 'function' ? window.setInterval : setInterval;
     window.__RN_PRODUCT_CHECK_TIMER__ = setTimerFn(check, 500);
     check();
 
-    if (window.MutationObserver && document.body) {
+    // Debounced: this used to run the full check synchronously on every DOM
+    // mutation, hundreds of times while scrolling Amazon/Carrefour pages.
+    if (!watchingDone && window.MutationObserver && document.body) {
       try {
-        var observer = new MutationObserver(function() {
-          check();
-        });
-        observer.observe(document.body, { childList: true, subtree: true });
-        window.__RN_PRODUCT_MUTATION_OBSERVER__ = observer;
+        var mutationTimer = null;
+        window.__RN_PRODUCT_MUTATION_OBSERVER__ = __rnObserve(
+          document.body,
+          { childList: true, subtree: true },
+          function() {
+            clearTimeout(mutationTimer);
+            mutationTimer = __rnTimeout(check, 300);
+          }
+        );
       } catch(e) {}
     }
   })();

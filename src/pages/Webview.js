@@ -918,7 +918,7 @@ const ROUTE_CHANGE_BRIDGE = `
 `;
 
 export default function Webview({ route, navigation }) {
-  const { addItem } = useCartStore();
+  const addItem = useCartStore(state => state.addItem);
   const cartItems = useCartStore(state => state.items);
   const cartCount = useMemo(() => {
     return (cartItems || []).reduce((sum, item) => sum + (item.count || 1), 0);
@@ -1063,6 +1063,10 @@ export default function Webview({ route, navigation }) {
   const webViewRef = useRef(null);
   const injectTimersRef = useRef([]);
   const injectWaveIdRef = useRef(0);
+  // URL the current injection wave was scheduled for. onNavigationStateChange,
+  // onLoadEnd and the in-page route bridge all fire for the same navigation;
+  // only the first one schedules. Cleared when a new document starts loading.
+  const scheduledUrlRef = useRef('');
   const currentUrlRef = useRef(sourceUrl);
   const lastInjectedKeyRef = useRef('');
   const canGoBackRef = useRef(false);
@@ -1240,6 +1244,7 @@ export default function Webview({ route, navigation }) {
       }
 
       currentUrlRef.current = nextUrl;
+      scheduledUrlRef.current = nextUrl;
       setTranslateUrl(nextUrl);
 
       clearInjectTimers();
@@ -3756,6 +3761,11 @@ export default function Webview({ route, navigation }) {
             if (!nextUrl) {
               return;
             }
+            // Sites call history.replaceState without changing the URL (often
+            // while scrolling). Each of those used to trigger a full re-inject.
+            if (nextUrl === scheduledUrlRef.current) {
+              return;
+            }
 
             if (isDifferentProduct(currentUrlRef.current, nextUrl)) {
               titleRef.current = '';
@@ -3963,13 +3973,17 @@ export default function Webview({ route, navigation }) {
 
   const onLoadStart = useCallback(() => {
     loadingRef.current = true;
+    // A new document needs a fresh injection, even for the same URL (reload).
+    scheduledUrlRef.current = '';
     setStatus(injectScript ? 'pending' : 'waiting');
   }, [injectScript, setStatus]);
 
   const onLoadEnd = useCallback(() => {
     loadingRef.current = false;
     injectTrendyolCookies(currentUrlRef.current);
-    scheduleInject(currentUrlRef.current);
+    if (scheduledUrlRef.current !== currentUrlRef.current) {
+      scheduleInject(currentUrlRef.current);
+    }
     if (isProductUrl(currentUrlRef.current)) {
       if (!isSoldOutRef.current) {
         setIsProductPage(true);
@@ -4003,7 +4017,7 @@ export default function Webview({ route, navigation }) {
         setIsProductPage(false);
       }
 
-      if (!navState.loading) {
+      if (!navState.loading && scheduledUrlRef.current !== currentUrlRef.current) {
         scheduleInject(currentUrlRef.current);
       }
     },
@@ -4094,6 +4108,7 @@ export default function Webview({ route, navigation }) {
     currencyRef.current = '';
     resetOptionsRef();
     clearInjectTimers();
+    scheduledUrlRef.current = '';
     setTranslateUrl(sourceUrl);
     setStatus(sourceUrl === BLANK_SOURCE_URL ? 'idle' : 'pending');
   }, [clearInjectTimers, resetOptionsRef, setStatus, setTranslateUrl, sourceUrl]);

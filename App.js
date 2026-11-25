@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, BackHandler, Linking, Platform } from 'react-native';
 import ReceiveSharingIntent from 'react-native-receive-sharing-intent';
 import { EmContext } from './src/contexts/EmContext';
@@ -36,29 +36,33 @@ const App = () => {
     // cart: __DEV__ ? [] : [],
   });
 
-  const { setInjectScript } = useScriptServiceStore();
+  const setInjectScript = useScriptServiceStore(state => state.setInjectScript);
   const [ctxDil, setCtxDil] = useState('en'); // i18n.locale default is 'en'
   const [methods, setMethods] = useState({});
   const [direction, setDirection] = useState('ltr');
 
-  const appendMethods = newMethods => {
-    setMethods({
-      ...methods,
+  const appendMethods = useCallback(newMethods => {
+    setMethods(prev => ({
+      ...prev,
       ...newMethods,
-    });
-  };
+    }));
+  }, []);
 
-  const contextData = {
-    // isDark: useColorScheme() === "dark",
-    ctxDil,
-    setCtxDil,
-    methods,
-    appendMethods,
-    direction,
-    setDirection,
-    ctx,
-    setCtx,
-  };
+  // Memoized so the ~50 useContext(EmContext) consumers only re-render when a
+  // value actually changes, not every time App renders.
+  const contextData = useMemo(
+    () => ({
+      ctxDil,
+      setCtxDil,
+      methods,
+      appendMethods,
+      direction,
+      setDirection,
+      ctx,
+      setCtx,
+    }),
+    [ctxDil, methods, appendMethods, direction, ctx],
+  );
 
   const checkVersion = async () => {
     try {

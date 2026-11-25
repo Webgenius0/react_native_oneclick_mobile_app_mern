@@ -41,12 +41,16 @@ export const loadTheme = async (ctx, setCtx) => {
 
     const { bgColor, color, isDark, isLight } = themeParams(theme);
 
-    setCtx({...ctx,
-      theme,
-      bgColor,
-      color,
-      isDark,
-      isLight
+    // Functional update: `ctx` may be stale by the time storage resolves.
+    setCtx(prev => {
+      if (
+        prev.theme === theme &&
+        prev.bgColor === bgColor &&
+        prev.color === color
+      ) {
+        return prev;
+      }
+      return { ...prev, theme, bgColor, color, isDark, isLight };
     });
 
 }

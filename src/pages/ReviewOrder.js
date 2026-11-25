@@ -34,7 +34,7 @@ const CITIES = ['Borama', 'Hargeisa', 'Mogadishu', 'Berbera', 'Garowe', 'Kismayo
 export default function ReviewOrder({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const { ctx } = useContext(EmContext);
-  const { removeItem } = useCartStore();
+  const removeItem = useCartStore(state => state.removeItem);
 
   const items = route.params?.items || [];
   const initialTotalUsd = route.params?.totalUsdPrice || 0;
@@ -46,7 +46,8 @@ export default function ReviewOrder({ navigation, route }) {
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { rates, inverseRates } = useExchangeRateStore();
+  const rates = useExchangeRateStore(state => state.rates);
+  const inverseRates = useExchangeRateStore(state => state.inverseRates);
   const marketplaces = useSheinPriceStore(state => state.marketplaces) || [];
   const fetchMarketplacePrices = useSheinPriceStore(
     state => state.fetchMarketplacePrices || state.fetchSheinPrice,

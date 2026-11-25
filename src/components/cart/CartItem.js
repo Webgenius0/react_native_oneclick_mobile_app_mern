@@ -23,7 +23,7 @@ import {
 import { cleanProductTitle, getStoreName, calculateMarketplacePrice } from '../../helpers/storeHelper';
 import { isAgeOrMeasurement } from '../../helpers/variantUtils';
 
-export default function CartItem({
+function CartItem({
   item,
   onRemove,
   onIncrease,
@@ -35,7 +35,8 @@ export default function CartItem({
   isDark = false,
 }) {
   const targetId = item.id || item.url;
-  const { rates, inverseRates } = useExchangeRateStore();
+  const rates = useExchangeRateStore(state => state.rates);
+  const inverseRates = useExchangeRateStore(state => state.inverseRates);
   const marketplaces = useSheinPriceStore(state => state.marketplaces) || [];
 
   const { code: itemCurrency, display: receivedDisplay, isUsd } =
@@ -596,3 +597,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 });
+
+// Memoized: props are stable store actions, so typing in one item no longer
+// re-renders every other item in the cart.
+export default React.memo(CartItem);

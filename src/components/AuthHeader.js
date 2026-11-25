@@ -1,9 +1,7 @@
-import React, { useContext, useEffect } from "react";
+import React, { useContext } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions } from "react-native";
 import NotificationButton from "./NotificationButton";
 import { EmContext } from "../contexts/EmContext";
-import { fetchAllNotifications } from "../helpers/notificationV2";
-import { IS_DEV } from "../helpers/common";
 import { resolveAvatarUrl } from "../helpers/auth";
 import ProfileIcon from "../assets/svg/profile1.svg";
 
@@ -25,24 +23,11 @@ export default function AuthHeader(props) {
     logoChanged = false;
   }
 
-  const { ctx, setCtx } = useContext(EmContext);
+  const { ctx } = useContext(EmContext);
   const [avatarError, setAvatarError] = React.useState(false);
   const userAvatarUri = resolveAvatarUrl(ctx?.user);
-  const notifInterval = true;
-  const notifTimeout = IS_DEV ? 1000 * 10 * 60 : 1000 * 60 * 3;
-
-  useEffect(() => {
-    if (notifInterval) {
-      const intervalId = setInterval(async () => {
-        await fetchAllNotifications(ctx, setCtx);
-      }, notifTimeout);
-
-      return () => {
-        clearInterval(intervalId);
-      };
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Notifications are polled once, app-wide, in App.js. Each header used to
+  // start its own 3-minute poll on top of that.
 
   const logoMaxHeight = 36;
   const logoMaxWidth = width - 130;

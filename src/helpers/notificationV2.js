@@ -192,14 +192,24 @@ export const fetchAllNotifications = async (ctx, setCtx, markAsRead) => {
         */
   }
 
-  if(JSON.stringify(ctx.notifications) !== JSON.stringify(merged.notifications)) {
-    setCtx({
-      ...ctx,
+  // Functional update: callers run this from long-lived timers whose `ctx` is
+  // the mount-time snapshot. Spreading that stale copy re-rendered the whole
+  // app every poll and reverted newer ctx fields (user, theme).
+  const mergedJson = JSON.stringify(merged.notifications);
+  setCtx(prev => {
+    if (
+      prev.notificationCount === merged.unread &&
+      JSON.stringify(prev.notifications) === mergedJson
+    ) {
+      return prev;
+    }
+    return {
+      ...prev,
       notifications: merged.notifications,
       notificationCount: merged.unread,
-      nextFetchNotifications: Date.now() + 1000 * 60 * 5
-    });
-  }
+      nextFetchNotifications: Date.now() + 1000 * 60 * 5,
+    };
+  });
   if(logNotif) console.log("Fetch Notifications End \n\n\n\n");
 
   // return merged;
