@@ -111,8 +111,17 @@ ai.interceptors.response.use(
       console.log('error status ======> ', JSON.stringify(error));
     }
 
+    // Timeouts and cancellations are deliberate: retrying them with fetch
+    // added up to 15s on top of the caller's own timeout (e.g. a 4s timeout
+    // in OrderDetail could take ~19s to fail).
+    const isTimeoutOrCancel =
+      error?.code === 'ECONNABORTED' ||
+      error?.code === 'ETIMEDOUT' ||
+      error?.code === 'ERR_CANCELED' ||
+      axios.isCancel?.(error);
+
     // React Native network error (Axios XHR failure)
-    if (!error?.response && error?.config) {
+    if (!error?.response && error?.config && !isTimeoutOrCancel) {
       const cfg = error.config;
       const method = (cfg.method || 'get').toUpperCase();
       const base = (cfg.baseURL || API_URL || '').replace(/\/+$/, '');

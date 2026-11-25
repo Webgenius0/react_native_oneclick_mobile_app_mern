@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState, useCallback } from 'react';
+import React, { useContext, useState, useCallback, useRef } from 'react';
 import {
   Image,
   RefreshControl,
@@ -18,7 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { availableLanguages, i18n, tr } from '../translate/i18n';
 import { storageDelete, storageGet, storageSet } from '../helpers/storage';
-import { getFcmToken, fcmUpdate } from '../helpers/notification';
+import { getFcmToken } from '../helpers/notification';
 import * as RootNavigation from '../services/RootNavigation';
 import { logoutUser, setUser, resolveAvatarUrl } from '../helpers/auth';
 
@@ -69,8 +69,16 @@ export default function Account({ navigation }) {
     }, 120);
   };
 
+  // Read ctx through a ref so fetchData is not recreated when ctx.user
+  // changes. It used to depend on ctx.user while also setting a fresh user
+  // object, which re-triggered the effects below: an endless profile-fetch /
+  // whole-app re-render loop that kept running after leaving this tab.
+  const ctxRef = useRef(ctx);
+  ctxRef.current = ctx;
+
   const fetchData = useCallback(
     async (isRefresh = false) => {
+      const ctx = ctxRef.current;
       try {
         if (isRefresh) {
           setRefreshing(true);
@@ -144,7 +152,12 @@ export default function Account({ navigation }) {
                 isGuest: false,
               });
               await setUser(freshUser);
-              if (setCtx) {
+              const prevUser = ctxRef.current?.user;
+              const unchanged =
+                prevUser &&
+                ctxRef.current?.token === storedToken &&
+                JSON.stringify(prevUser) === JSON.stringify(freshUser);
+              if (setCtx && !unchanged) {
                 setCtx(prev => ({
                   ...prev,
                   user: freshUser,
@@ -163,13 +176,10 @@ export default function Account({ navigation }) {
         setState(prev => ({ ...prev, loading: false }));
       }
     },
-    [ctx?.user, ctx?.token, setCtx],
+    [setCtx],
   );
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
+  // Runs on first focus (mount) and every later focus.
   useFocusEffect(
     useCallback(() => {
       fetchData();
@@ -216,15 +226,13 @@ export default function Account({ navigation }) {
 
   const handleDilUpdate = async dil => {
     setLangModalVisible(false);
-    await storageSet('language', dil);
     i18n.locale = dil;
-    try {
-      const fcmToken = await getFcmToken();
-      if (fcmToken) {
-        await fcmUpdate(fcmToken, true);
-      }
-    } catch (e) {}
+    // Update the UI first; it used to wait on two FCM network calls.
     setCtxDil(dil);
+    await storageSet('language', dil);
+    // getFcmToken() already sends the token (with the new locale) to the
+    // server, so the extra fcmUpdate() call was a duplicate request.
+    getFcmToken().catch(() => {});
   };
 
   const isDark = ctx?.isDark;

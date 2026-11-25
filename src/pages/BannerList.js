@@ -23,7 +23,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import FastImage from "react-native-fast-image";
 import Svg, { Defs, LinearGradient as SvgGradient, Stop, Rect } from "react-native-svg";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import AuthHeader from "../components/AuthHeader";
 import CustomSlider from "../components/CustomSlider";
 import UlkeBar from "../components/UlkeBar";
@@ -362,9 +362,11 @@ export default function BannerList({ route, navigation }) {
     return slides;
   }, [state.sliders, ctxDil]);
 
-  // Auto-slide effect for top carousel
+  // Auto-slide effect for top carousel. Paused while Home is not focused:
+  // tab screens stay mounted, and each tick re-renders this whole screen.
+  const isFocused = useIsFocused();
   useEffect(() => {
-    if (!carouselSlides || carouselSlides.length <= 1) return;
+    if (!isFocused || !carouselSlides || carouselSlides.length <= 1) return;
 
     const timer = setInterval(() => {
       setActiveSlideIndex(prev => {
@@ -379,7 +381,7 @@ export default function BannerList({ route, navigation }) {
 
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [carouselSlides.length, activeWidth]);
+  }, [carouselSlides.length, activeWidth, isFocused]);
 
   const handleCarouselScroll = event => {
     const offsetX = event.nativeEvent.contentOffset.x;

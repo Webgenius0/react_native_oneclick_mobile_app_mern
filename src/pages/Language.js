@@ -13,7 +13,7 @@ import {
 import { EmContext } from '../contexts/EmContext';
 import { availableLanguages, i18n, tr } from '../translate/i18n';
 import { storageSet } from '../helpers/storage';
-import { getFcmToken, fcmUpdate } from '../helpers/notification';
+import { getFcmToken } from '../helpers/notification';
 import AppHeader from '../components/common/AppHeader';
 
 import GlobeIcon from '../assets/svg/menu_globe.svg';
@@ -40,14 +40,12 @@ export default function Language({ navigation }) {
     setSelectedLang(langId);
     setSaving(true);
     try {
-      await storageSet('language', langId);
       i18n.locale = langId;
       setCtxDil(langId);
-
-      const fcmToken = await getFcmToken();
-      if (fcmToken) {
-        await fcmUpdate(fcmToken, true);
-      }
+      await storageSet('language', langId);
+      // getFcmToken() already sends the token (with the new locale) to the
+      // server; don't block on it or send it twice.
+      getFcmToken().catch(() => {});
     } catch (e) {
       // safe fallback
     } finally {
