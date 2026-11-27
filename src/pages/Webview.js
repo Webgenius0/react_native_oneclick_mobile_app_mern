@@ -1429,18 +1429,18 @@ export default function Webview({ route, navigation }) {
               str = str.replace(/\\s*\\d+(?:\\.\\d+)?\\s*(?:out of 5 stars|stars|yıldız).*$/gi, '');
               str = str.replace(/\\s*\\(\\s*\\d+(?:,\\d+)*\\s*(?:ratings?|reviews?|değerlendirme|yorum)\\s*\\).*$/gi, '');
               str = str.replace(/^[\\s:|–—•·\"'\\-]+|[\\s:|–—•·\"'\\-]+$/g, '').trim();
-              if (/^ref[=_\s-]/i.test(str) || str.toLowerCase().indexOf('ref=') === 0 || /product summary|key product information/i.test(str)) return '';
+              if (/^ref[=_\\s-]/i.test(str) || str.toLowerCase().indexOf('ref=') === 0 || /product summary|key product information/i.test(str)) return '';
               return str.replace(/\\s+/g, ' ').trim();
             };
 
             var cleanOptionValue = function(text) {
               if (!text || typeof text !== 'string') return '';
-              var clean = text.replace(/\s+/g, ' ').trim();
-              clean = clean.replace(/\s*[\(\[]\s*[+\-]?\s*[$€£₺]?\s*\d+(?:[.,]\d+)?\s*(?:tl|₺|\$|€|usd|eur|aed|sar|try)?\s*[\)\]]/gi, '');
-              clean = clean.replace(/\s*[-–]\s*[$€£₺]?\s*\d+(?:[.,]\d+)?\s*(?:tl|₺|\$|€|usd|eur|aed|sar|try)?$/gi, '');
-              clean = clean.replace(/\s+\d+(?:[.,]\d+)?\s*(?:tl|₺|\$|€|usd|eur|aed|sar|try)\b.*$/gi, '');
-              clean = clean.replace(/\s*[-:]?\s*\b(tl|₺|\$|€|usd|eur|aed|sar|try)\b.*$/gi, '');
-              clean = clean.replace(/^[:\-\s]+|[:\-\s]+$/g, '').trim();
+              var clean = text.replace(/\\s+/g, ' ').trim();
+              clean = clean.replace(/\\s*[\\(\\[]\\s*[+\\-]?\\s*[$€£₺]?\\s*\\d+(?:[.,]\\d+)?\\s*(?:tl|₺|\\$|€|usd|eur|aed|sar|try)?\\s*[\\)\\]]/gi, '');
+              clean = clean.replace(/\\s*[-–]\\s*[$€£₺]?\\s*\\d+(?:[.,]\\d+)?\\s*(?:tl|₺|\\$|€|usd|eur|aed|sar|try)?$/gi, '');
+              clean = clean.replace(/\\s+\\d+(?:[.,]\\d+)?\\s*(?:tl|₺|\\$|€|usd|eur|aed|sar|try)\\b.*$/gi, '');
+              clean = clean.replace(/\\s*[-:]?\\s*\\b(tl|₺|\\$|€|usd|eur|aed|sar|try)\\b.*$/gi, '');
+              clean = clean.replace(/^[:\\-\\s]+|[:\\-\\s]+$/g, '').trim();
               if (clean.length === 0 || clean.length > 35) return '';
               var lower = clean.toLowerCase();
               var exactJunk = ['select', 'seçiniz', 'seç', 'choose', 'lütfen', 'beden tablosu', 'size guide', 'size chart', 'out of stock', 'tükendi', 'stokta yok', 'sepete ekle', 'add to cart', 'buy now', 'hemen al'];
@@ -1448,9 +1448,9 @@ export default function Webview({ route, navigation }) {
                 if (lower === exactJunk[j] || (lower.indexOf(exactJunk[j]) === 0 && exactJunk[j].indexOf(' ') > -1)) return '';
               }
               // Reject timestamps and delivery time slots (e.g. "30 PM", "5:30 PM", "11:00 AM", "Express Delivery")
-              if (/\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/i.test(clean) || /^\d{1,2}\s*(?:am|pm)$/i.test(clean) || /^(?:am|pm)$/i.test(clean)) return '';
-              if (/\b(?:today|tomorrow|delivery|express|standard|slot|order within|min(?:utes)?|hrs?|hours?)\b/i.test(lower)) return '';
-              if (/^\d{8,}$/.test(clean)) return '';
+              if (/\\b\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)\\b/i.test(clean) || /^\\d{1,2}\\s*(?:am|pm)$/i.test(clean) || /^(?:am|pm)$/i.test(clean)) return '';
+              if (/\\b(?:today|tomorrow|delivery|express|standard|slot|order within|min(?:utes)?|hrs?|hours?)\\b/i.test(lower)) return '';
+              if (/^\\d{8,}$/.test(clean)) return '';
               return clean;
             };
 
@@ -1489,7 +1489,7 @@ export default function Webview({ route, navigation }) {
               ) return true;
               var cls = String(el.className || '');
               if (
-                /(^|[\s.;-])(selected|active|is-selected|is-active|current|swatchSelect|a-button-selected|chosen|sp-itm-selected)($|[\s.;-])/i.test(cls) ||
+                /(^|[\\s.;-])(selected|active|is-selected|is-active|current|swatchSelect|a-button-selected|chosen|sp-itm-selected)($|[\\s.;-])/i.test(cls) ||
                 cls.indexOf('--active') > -1 ||
                 cls.indexOf('--selected') > -1
               ) return true;
@@ -1599,7 +1599,7 @@ export default function Webview({ route, navigation }) {
                 var el = document.querySelector(prioritySelectors[p]);
                 if (el) {
                   var elClass = String(el.className || '');
-                  if (/(^|[\s.;-])(a-offscreen|a-screen-reader|sr-only)($|[\s.;-])/i.test(elClass) ||
+                  if (/(^|[\\s.;-])(a-offscreen|a-screen-reader|sr-only)($|[\\s.;-])/i.test(elClass) ||
                       (el.offsetParent === null && window.getComputedStyle && window.getComputedStyle(el).position !== 'fixed')) {
                     continue;
                   }
@@ -1793,7 +1793,7 @@ export default function Webview({ route, navigation }) {
               try {
                 if (el.closest && (el.closest('.original-price-wrapper.show') || el.closest('#product-price') || (el.classList && el.classList.contains('list-price')) || el.closest('#price') || el.closest('.price-inner'))) {
                   var directCls = String(el.className || '');
-                  if (!/(^|[\s.;-])(bsc-strikethrough-price|line-through|crossed|del-price)($|[\s.;-])/i.test(directCls) &&
+                  if (!/(^|[\\s.;-])(bsc-strikethrough-price|line-through|crossed|del-price)($|[\\s.;-])/i.test(directCls) &&
                       el.tagName !== 'DEL' && el.tagName !== 'S' && el.tagName !== 'STRIKE' &&
                       (!el.getAttribute || el.getAttribute('data-a-strike') !== 'true')) {
                     return false;
@@ -1802,8 +1802,8 @@ export default function Webview({ route, navigation }) {
                 if (el.tagName === 'DEL' || el.tagName === 'S' || el.tagName === 'STRIKE') return true;
                 if (el.getAttribute && el.getAttribute('data-a-strike') === 'true') return true;
                 var cls = String(el.className || '');
-                if (/(^|[\s.;-])(bsc-strikethrough-price|prc-org|prc-box-org|prc-slg|a-text-price|basisPrice|line-through|crossed)($|[\s.;-])/i.test(cls)) return true;
-                if (/(^|[\s.;-])(original-price|originalPrice|orig-price|old-price|oldPrice|oldprice|was-price|wasPrice|price-was|del-price|head-price-del|market-price|retail-price|productPrice__del|product-price__del)($|[\s.;-])/i.test(cls)) return true;
+                if (/(^|[\\s.;-])(bsc-strikethrough-price|prc-org|prc-box-org|prc-slg|a-text-price|basisPrice|line-through|crossed)($|[\\s.;-])/i.test(cls)) return true;
+                if (/(^|[\\s.;-])(original-price|originalPrice|orig-price|old-price|oldPrice|oldprice|was-price|wasPrice|price-was|del-price|head-price-del|market-price|retail-price|productPrice__del|product-price__del)($|[\\s.;-])/i.test(cls)) return true;
                 if (el.closest && el.closest('del, s, strike, [data-a-strike="true"], .bsc-strikethrough-price, .a-text-price, .basisPrice, .prc-org, .prc-box-org, [class*="original-price"], [class*="old-price"], [class*="was-price"], [class*="head-price-del"], [class*="strikethrough"], [class*="del-price"], [class*="productPrice__del"], [class*="product-price__del"]')) {
                   return true;
                 }
@@ -1852,14 +1852,14 @@ export default function Webview({ route, navigation }) {
               // Convert Arabic-Indic digits ٠-٩ to 0-9
               t = t.replace(/[٠-٩]/g, function(d) { return String.fromCharCode(d.charCodeAt(0) - 1632 + 48); });
               var detectedCurr = '';
-              if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:AED|د\.?إ|د\.?ا|درهم)(?:$|[^a-zA-Z\u0600-\u06FF])|\u20C3|[Ð\u00D0]/i.test(t)) detectedCurr = 'AED';
-              else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:SAR|SR|ر\.?س|ريال)(?:$|[^a-zA-Z\u0600-\u06FF])|[﷼\uFDFC\u20C1⃁]/i.test(t)) detectedCurr = 'SAR';
-              else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:KWD|د\.?ك)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'KWD';
-              else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:QAR|ر\.?ق)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'QAR';
-              else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:BHD|د\.?ب)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'BHD';
-              else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:OMR|ر\.?ع)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'OMR';
+              if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:AED|د\\.?إ|د\\.?ا|درهم)(?:$|[^a-zA-Z\u0600-\u06FF])|\u20C3|[Ð\u00D0]/i.test(t)) detectedCurr = 'AED';
+              else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:SAR|SR|ر\\.?س|ريال)(?:$|[^a-zA-Z\u0600-\u06FF])|[﷼\uFDFC\u20C1⃁]/i.test(t)) detectedCurr = 'SAR';
+              else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:KWD|د\\.?ك)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'KWD';
+              else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:QAR|ر\\.?ق)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'QAR';
+              else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:BHD|د\\.?ب)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'BHD';
+              else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:OMR|ر\\.?ع)(?:$|[^a-zA-Z\u0600-\u06FF])/i.test(t)) detectedCurr = 'OMR';
               else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:TL|TRY)(?:$|[^a-zA-Z\u0600-\u06FF])|₺/i.test(t)) detectedCurr = 'TL';
-              else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:USD|US\$)(?:$|[^a-zA-Z\u0600-\u06FF])|\$/i.test(t)) detectedCurr = 'USD';
+              else if (/(?:^|[^a-zA-Z\u0600-\u06FF])(?:USD|US\\$)(?:$|[^a-zA-Z\u0600-\u06FF])|\\$/i.test(t)) detectedCurr = 'USD';
               else if (/(?:^|[^a-zA-Z\u0600-\u06FF])EUR(?:$|[^a-zA-Z\u0600-\u06FF])|€/i.test(t)) detectedCurr = 'EUR';
               else if (/(?:^|[^a-zA-Z\u0600-\u06FF])GBP(?:$|[^a-zA-Z\u0600-\u06FF])|£/i.test(t)) detectedCurr = 'GBP';
 
@@ -1869,9 +1869,9 @@ export default function Webview({ route, navigation }) {
               }
 
               // Strip discount percentages e.g. '-30%', '%25', '30% off', 'Save 20%'
-              t = t.replace(/[-–]?[ \t]*[0-9]+(?:\.[0-9]+)?[ \t]*%[ \t]*(?:off|indirim|discount|saving|savings)?/gi, '');
-              t = t.replace(/%[ \t]*[0-9]+(?:\.[0-9]+)?/gi, '');
-              t = t.replace(/(?:save|off|indirim)[ \t]+[0-9]+(?:\.[0-9]+)?%?/gi, '');
+              t = t.replace(/[-–]?[ \t]*[0-9]+(?:\\.[0-9]+)?[ \t]*%[ \t]*(?:off|indirim|discount|saving|savings)?/gi, '');
+              t = t.replace(/%[ \t]*[0-9]+(?:\\.[0-9]+)?/gi, '');
+              t = t.replace(/(?:save|off|indirim)[ \t]+[0-9]+(?:\\.[0-9]+)?%?/gi, '');
               t = t.replace(/(?:save|tasarruf|indirim|saving|savings)\\s*[$€£₺]?\\s*[0-9]+(?:[.,][0-9]{1,2})?/gi, '');
 
               // Normalize split decimals e.g. "24 .50" or "24 ,50"
@@ -2204,7 +2204,7 @@ export default function Webview({ route, navigation }) {
                   var tabbyEl = document.querySelector('a[href*="tabby.ai"][href*="price="], iframe[src*="tabby.ai"][src*="price="], [data-tabby-price]');
                   if (tabbyEl) {
                     var tbSrc = (tabbyEl.getAttribute('href') || tabbyEl.getAttribute('src') || tabbyEl.getAttribute('data-tabby-price') || '');
-                    var tbM = tbSrc.match(/[?&]price=([0-9]+(?:\.[0-9]+)?)/i) || tbSrc.match(/([0-9]+(?:\.[0-9]+)?)/);
+                    var tbM = tbSrc.match(/[?&]price=([0-9]+(?:\\.[0-9]+)?)/i) || tbSrc.match(/([0-9]+(?:\\.[0-9]+)?)/);
                     if (tbM && tbM[1]) {
                       price = tbM[1].trim();
                       rawPriceText = tbM[1].trim();
@@ -2216,8 +2216,8 @@ export default function Webview({ route, navigation }) {
                 // Body text regex with D, Ð, or AED
                 if (!price && document.body) {
                   var lpBodyAdd = document.body.innerText || '';
-                  var aedMatchAdd = lpBodyAdd.match(/(?:(?:^|\s)[DÐ]|AED|د\.?إ|د\.?ا|درهم|Dhs?\.?)\s*([0-9]+(?:[.,][0-9]{1,2})?)/i) ||
-                                    lpBodyAdd.match(/([0-9]+(?:[.,][0-9]{1,2})?)\s*(?:AED|د\.?إ|د\.?ا|درهم|Dhs?\.?)/i);
+                  var aedMatchAdd = lpBodyAdd.match(/(?:(?:^|\\s)[DÐ]|AED|د\\.?إ|د\\.?ا|درهم|Dhs?\\.?)\\s*([0-9]+(?:[.,][0-9]{1,2})?)/i) ||
+                                    lpBodyAdd.match(/([0-9]+(?:[.,][0-9]{1,2})?)\\s*(?:AED|د\\.?إ|د\\.?ا|درهم|Dhs?\\.?)/i);
                   if (aedMatchAdd && aedMatchAdd[1]) {
                     price = aedMatchAdd[1].trim();
                     rawPriceText = aedMatchAdd[1].trim();
@@ -2400,9 +2400,9 @@ export default function Webview({ route, navigation }) {
                         var curChild = currEl.querySelector('[data-price-size="other"], [class*="price-symbol"], [class*="currency"]');
                         if (curChild) {
                           var ct = (curChild.textContent || '').trim().toUpperCase();
-                          if (ct === 'SR' || ct === 'SAR' || ct.indexOf('SR') > -1 || ct.indexOf('SAR') > -1 || /[﷼\uFDFC\u20C1⃁]|ر\.?س|ريال/.test(ct)) {
+                          if (ct === 'SR' || ct === 'SAR' || ct.indexOf('SR') > -1 || ct.indexOf('SAR') > -1 || /[﷼\uFDFC\u20C1⃁]|ر\\.?س|ريال/.test(ct)) {
                             currency = 'SAR';
-                          } else if (ct === 'AED' || ct.indexOf('AED') > -1 || /د\.?إ|د\.?ا|درهم|\u20C3/.test(ct)) {
+                          } else if (ct === 'AED' || ct.indexOf('AED') > -1 || /د\\.?إ|د\\.?ا|درهم|\u20C3/.test(ct)) {
                             currency = 'AED';
                           } else if (ct === '$' || ct === 'USD') {
                             currency = 'USD';
@@ -2415,10 +2415,10 @@ export default function Webview({ route, navigation }) {
                         var pNode = currEl;
                         for (var pi = 0; pi < 4 && pNode; pi++) {
                           var pText = pNode.textContent || '';
-                          if (/د\.?إ|د\.?ا|درهم|\u20C3/i.test(pText) || /(?:^|[^a-zA-Z])AED(?:[^a-zA-Z]|$)/i.test(pText)) { currency = 'AED'; break; }
-                          if (/[﷼\uFDFC\u20C1⃁]|ر\.?س|ريال/i.test(pText) || /(?:^|[^a-zA-Z])(?:SAR|SR)(?:[^a-zA-Z]|$)/i.test(pText)) { currency = 'SAR'; break; }
-                          if (/₺|\bTL\b|\bTRY\b/i.test(pText)) { currency = 'TL'; break; }
-                          if (/\$|\bUSD\b/i.test(pText)) { currency = 'USD'; break; }
+                          if (/د\\.?إ|د\\.?ا|درهم|\u20C3/i.test(pText) || /(?:^|[^a-zA-Z])AED(?:[^a-zA-Z]|$)/i.test(pText)) { currency = 'AED'; break; }
+                          if (/[﷼\uFDFC\u20C1⃁]|ر\\.?س|ريال/i.test(pText) || /(?:^|[^a-zA-Z])(?:SAR|SR)(?:[^a-zA-Z]|$)/i.test(pText)) { currency = 'SAR'; break; }
+                          if (/₺|\\bTL\\b|\\bTRY\\b/i.test(pText)) { currency = 'TL'; break; }
+                          if (/\\$|\\bUSD\\b/i.test(pText)) { currency = 'USD'; break; }
                           pNode = pNode.parentElement;
                         }
                       }
@@ -2430,13 +2430,13 @@ export default function Webview({ route, navigation }) {
                         )) || currEl.parentElement;
                         if (containerEl) {
                           var cText = containerEl.textContent || '';
-                          if (/د\.?إ|د\.?ا|درهم|\u20C3/i.test(cText) || /(?:^|[^a-zA-Z])AED(?:[^a-zA-Z]|$)/i.test(cText)) {
+                          if (/د\\.?إ|د\\.?ا|درهم|\u20C3/i.test(cText) || /(?:^|[^a-zA-Z])AED(?:[^a-zA-Z]|$)/i.test(cText)) {
                             currency = 'AED';
-                          } else if (/[﷼\uFDFC\u20C1⃁]|ر\.?س|ريال/i.test(cText) || /(?:^|[^a-zA-Z])(?:SAR|SR)(?:[^a-zA-Z]|$)/i.test(cText)) {
+                          } else if (/[﷼\uFDFC\u20C1⃁]|ر\\.?س|ريال/i.test(cText) || /(?:^|[^a-zA-Z])(?:SAR|SR)(?:[^a-zA-Z]|$)/i.test(cText)) {
                             currency = 'SAR';
-                          } else if (/₺|\bTL\b|\bTRY\b/i.test(cText)) {
+                          } else if (/₺|\\bTL\\b|\\bTRY\\b/i.test(cText)) {
                             currency = 'TL';
-                          } else if (/\$|\bUSD\b/i.test(cText)) {
+                          } else if (/\\$|\\bUSD\\b/i.test(cText)) {
                             currency = 'USD';
                           }
                         }
@@ -2454,13 +2454,13 @@ export default function Webview({ route, navigation }) {
             if (isSheinSite && !currency) {
               try {
                 if (document.cookie) {
-                  var nativeCookie = document.cookie.match(/(?:^|;\s*)currency=([A-Za-z]{3})(?:;|$)/i);
+                  var nativeCookie = document.cookie.match(/(?:^|;\\s*)currency=([A-Za-z]{3})(?:;|$)/i);
                   if (nativeCookie && nativeCookie[1]) {
                     var nCur = nativeCookie[1].toUpperCase();
                     if (['USD', 'SAR', 'AED', 'TRY', 'EUR', 'GBP'].indexOf(nCur) > -1) currency = nCur;
                   }
                   if (!currency) {
-                    var cookieMatch = document.cookie.match(/(?:^|;\s*)(?:currency|shein_currency|sitecurrency|local_currency|user_currency)=([A-Za-z]{3})/i);
+                    var cookieMatch = document.cookie.match(/(?:^|;\\s*)(?:currency|shein_currency|sitecurrency|local_currency|user_currency)=([A-Za-z]{3})/i);
                     if (cookieMatch && cookieMatch[1]) {
                       var cVal = cookieMatch[1].toUpperCase();
                       if (['USD', 'SAR', 'AED', 'TRY', 'EUR', 'GBP'].indexOf(cVal) > -1) currency = cVal;
@@ -2485,7 +2485,7 @@ export default function Webview({ route, navigation }) {
             if (!currency && price) {
               try {
                 var bodySnippet = document.body ? document.body.innerText.slice(0, 4000) : '';
-                if (new RegExp(price.replace('.', '\\.') + '\\s*(?:AED|د\\.?إ|د\\.?ا|درهم|\\u20C3)').test(bodySnippet) || /د\.?إ|د\.?ا|درهم|\u20C3/i.test(bodySnippet.slice(0, 1500)) || /(?:^|[^a-zA-Z])AED(?:[^a-zA-Z]|$)/i.test(bodySnippet.slice(0, 1500))) {
+                if (new RegExp(price.replace('.', '\\.') + '\\s*(?:AED|د\\.?إ|د\\.?ا|درهم|\\u20C3)').test(bodySnippet) || /د\\.?إ|د\\.?ا|درهم|\u20C3/i.test(bodySnippet.slice(0, 1500)) || /(?:^|[^a-zA-Z])AED(?:[^a-zA-Z]|$)/i.test(bodySnippet.slice(0, 1500))) {
                   currency = 'AED';
                 } else if (new RegExp(price.replace('.', '\\.') + '\\s*(?:SAR|SR|ر\\.?س|ريাল|[﷼\\uFDFC\\u20C1⃁])').test(bodySnippet) || /[﷼\\uFDFC\\u20C1⃁]|ر\\.?س|ريال/i.test(bodySnippet.slice(0, 1500)) || /(?:^|[^a-zA-Z])(?:SAR|SR)(?:[^a-zA-Z]|$)/i.test(bodySnippet.slice(0, 1500))) {
                   currency = 'SAR';
@@ -2499,7 +2499,7 @@ export default function Webview({ route, navigation }) {
             if (!currency) {
               try {
                 if (document.cookie) {
-                  var genCookie = document.cookie.match(/(?:^|;\s*)currency=([A-Za-z]{3})(?:;|$)/i);
+                  var genCookie = document.cookie.match(/(?:^|;\\s*)currency=([A-Za-z]{3})(?:;|$)/i);
                   if (genCookie && genCookie[1]) {
                     var gcVal = genCookie[1].toUpperCase();
                     if (/^[A-Z]{3}$/.test(gcVal)) currency = gcVal;
@@ -2743,7 +2743,7 @@ export default function Webview({ route, navigation }) {
               var strVal = String(val).trim();
 
               // If a value contains embedded "/ Size: ...", separate them
-              var sizeEmbedMatch = strVal.match(/^(.*?)\s*[\/,|]\s*(?:size|beden|numara)\s*:\s*([^,\/|]+)/i);
+              var sizeEmbedMatch = strVal.match(/^(.*?)\\s*[\\/,|]\\s*(?:size|beden|numara)\\s*:\\s*([^,\\/|]+)/i);
               if (sizeEmbedMatch) {
                 strVal = sizeEmbedMatch[1].trim();
                 var extractedSize = cleanOptionValue(sizeEmbedMatch[2]);
@@ -2751,7 +2751,7 @@ export default function Webview({ route, navigation }) {
                   setOptionSelected('Size', extractedSize);
                 }
               }
-              var colorEmbedMatch = strVal.match(/^(.*?)\s*[\/,|]\s*(?:color|renk)\s*:\s*([^,\/|]+)/i);
+              var colorEmbedMatch = strVal.match(/^(.*?)\\s*[\\/,|]\\s*(?:color|renk)\\s*:\\s*([^,\\/|]+)/i);
               if (colorEmbedMatch) {
                 strVal = colorEmbedMatch[1].trim();
                 var extractedColor = cleanOptionValue(colorEmbedMatch[2]);
@@ -2763,20 +2763,20 @@ export default function Webview({ route, navigation }) {
               var isAgeOrMeasurement = function(s) {
                 if (!s || typeof s !== 'string') return false;
                 var str = s.trim();
-                if (/\b\d+\s*[-–/]\s*\d+\s*(?:y|m|yr|yrs|mo|mos|ya[sş]|years?|months?|t|cm|mm|in|inch)(?![a-zA-Z0-9])/i.test(str)) return true;
-                if (/[\(\[]\s*\d+\s*[-–/]\s*\d+\s*(?:y|m|yr|yrs|mo|mos|ya[sş]|years?|months?|t)?\s*[\)\]]/i.test(str)) return true;
-                if (/^\d+\s*[-–/]\s*\d+$/i.test(str)) return true;
-                if (/^\d+[yYtTmM]$/i.test(str)) return true;
+                if (/\\b\\d+\\s*[-–/]\\s*\\d+\\s*(?:y|m|yr|yrs|mo|mos|ya[sş]|years?|months?|t|cm|mm|in|inch)(?![a-zA-Z0-9])/i.test(str)) return true;
+                if (/[\\(\\[]\\s*\\d+\\s*[-–/]\\s*\\d+\\s*(?:y|m|yr|yrs|mo|mos|ya[sş]|years?|months?|t)?\\s*[\\)\\]]/i.test(str)) return true;
+                if (/^\\d+\\s*[-–/]\\s*\\d+$/i.test(str)) return true;
+                if (/^\\d+[yYtTmM]$/i.test(str)) return true;
                 return false;
               };
 
               var optPrice = explicitPrice ? String(explicitPrice).trim() : '';
               if (!optPrice && strVal && !isAgeOrMeasurement(strVal)) {
                 var pMatch = strVal.match(
-                  /[\(\[]\s*([+\-]?\s*(?:[$€£₺]|(?:usd|eur|tl|try|aed|sar|kwd|qar|bhd|omr)\b)\s*[0-9]+(?:[.,][0-9]{1,2})?|[+\-]?\s*[0-9]+(?:[.,][0-9]{1,2})?\s*(?:[$€£₺]|(?:usd|eur|tl|try|aed|sar|kwd|qar|bhd|omr)\b)|[+\-]\s*[0-9]+(?:[.,][0-9]{1,2})?)\s*[\)\]]|[-–]\s*([$€£₺]|(?:usd|eur|tl|try|aed|sar|kwd|qar|bhd|omr)\b)?\s*([0-9]+(?:[.,][0-9]{1,2})?)\s*([$€£₺]|(?:usd|eur|tl|try|aed|sar|kwd|qar|bhd|omr)\b)?/i
+                  /[\\(\\[]\\s*([+\\-]?\\s*(?:[$€£₺]|(?:usd|eur|tl|try|aed|sar|kwd|qar|bhd|omr)\\b)\\s*[0-9]+(?:[.,][0-9]{1,2})?|[+\\-]?\\s*[0-9]+(?:[.,][0-9]{1,2})?\\s*(?:[$€£₺]|(?:usd|eur|tl|try|aed|sar|kwd|qar|bhd|omr)\\b)|[+\\-]\\s*[0-9]+(?:[.,][0-9]{1,2})?)\\s*[\\)\\]]|[-–]\\s*([$€£₺]|(?:usd|eur|tl|try|aed|sar|kwd|qar|bhd|omr)\\b)?\\s*([0-9]+(?:[.,][0-9]{1,2})?)\\s*([$€£₺]|(?:usd|eur|tl|try|aed|sar|kwd|qar|bhd|omr)\\b)?/i
                 );
                 if (pMatch) {
-                  var hasCurrencyOrSign = /[$€£₺]|(?:usd|eur|tl|try|aed|sar|kwd|qar|bhd|omr)/i.test(pMatch[0]) || /^[+\-]/.test(pMatch[0].trim());
+                  var hasCurrencyOrSign = /[$€£₺]|(?:usd|eur|tl|try|aed|sar|kwd|qar|bhd|omr)/i.test(pMatch[0]) || /^[+\\-]/.test(pMatch[0].trim());
                   if (hasCurrencyOrSign) {
                     var numMatch = pMatch[0].match(/([0-9]{1,3}(?:[., ][0-9]{3})+(?:[.,][0-9]{1,2})|[0-9]+(?:[.,][0-9]{1,2})|[0-9]+)/);
                     if (numMatch) {
@@ -2790,8 +2790,8 @@ export default function Webview({ route, navigation }) {
               if (!cleanVal) return;
 
               // Pure measurements in cm (e.g. "83 cm") must NOT overwrite or be added as Size when clothing sizes exist
-              if (normName === 'Size' && /^\d+(?:\.\d+)?\s*(?:cm|inch|in|mm)$/i.test(cleanVal)) {
-                if (optionsMap['Size'] && optionsMap['Size'].values.some(function(v) { return !/^\d+(?:\.\d+)?\s*(?:cm|inch|in|mm)$/i.test(v); })) {
+              if (normName === 'Size' && /^\\d+(?:\\.\\d+)?\\s*(?:cm|inch|in|mm)$/i.test(cleanVal)) {
+                if (optionsMap['Size'] && optionsMap['Size'].values.some(function(v) { return !/^\\d+(?:\\.\\d+)?\\s*(?:cm|inch|in|mm)$/i.test(v); })) {
                   return;
                 }
               }
@@ -2819,7 +2819,7 @@ export default function Webview({ route, navigation }) {
               var normName = normalizeDimName(dimName);
               if (!normName) return;
               var strSel = String(selVal).trim();
-              var sizeMatch = strSel.match(/^(.*?)\s*[\/,|]\s*(?:size|beden|numara)\s*:\s*([^,\/|]+)/i);
+              var sizeMatch = strSel.match(/^(.*?)\\s*[\\/,|]\\s*(?:size|beden|numara)\\s*:\\s*([^,\\/|]+)/i);
               if (sizeMatch) {
                 strSel = sizeMatch[1].trim();
                 var embSize = cleanOptionValue(sizeMatch[2]);
@@ -2828,8 +2828,8 @@ export default function Webview({ route, navigation }) {
               var cleanVal = cleanOptionValue(strSel);
               if (!cleanVal) return;
 
-              if (normName === 'Size' && /^\d+(?:\.\d+)?\s*(?:cm|inch|in|mm)$/i.test(cleanVal)) {
-                if (optionsMap['Size'] && optionsMap['Size'].values.some(function(v) { return !/^\d+(?:\.\d+)?\s*(?:cm|inch|in|mm)$/i.test(v); })) {
+              if (normName === 'Size' && /^\\d+(?:\\.\\d+)?\\s*(?:cm|inch|in|mm)$/i.test(cleanVal)) {
+                if (optionsMap['Size'] && optionsMap['Size'].values.some(function(v) { return !/^\\d+(?:\\.\\d+)?\\s*(?:cm|inch|in|mm)$/i.test(v); })) {
                   return;
                 }
               }
@@ -2856,7 +2856,7 @@ export default function Webview({ route, navigation }) {
               for (var hi = 0; hi < headerEls.length; hi++) {
                 var hText = cleanText(headerEls[hi].textContent || '');
                 if (hText && hText.length < 80 && hText.indexOf(':') > -1) {
-                  var parts = hText.split(/\s*[\/,|]\s*/);
+                  var parts = hText.split(/\\s*[\\/,|]\\s*/);
                   for (var pi = 0; pi < parts.length; pi++) {
                     var pSub = parts[pi].trim();
                     var cIdx = pSub.indexOf(':');
@@ -2973,7 +2973,7 @@ export default function Webview({ route, navigation }) {
               if (!sciVal) continue;
               var isSciSel = (sciEl.getAttribute('aria-checked') === 'true') ||
                              (sciEl.getAttribute('aria-selected') === 'true') ||
-                             /\b(active|selected|color-active)\b/i.test(sciEl.className || '') ||
+                             /\\b(active|selected|color-active)\\b/i.test(sciEl.className || '') ||
                              isElementActive(sciEl) ||
                              isElementActive(sciEl.parentElement);
               addOptionValue('Color', sciVal, isSciSel);
@@ -2983,13 +2983,13 @@ export default function Webview({ route, navigation }) {
               if (!el) return false;
               if (el.getAttribute('aria-selected') === 'true' || el.getAttribute('aria-checked') === 'true') return true;
               var cls = String(el.className || '');
-              if (/\b(size-active|selected|active|is-selected|is-active)\b/i.test(cls)) return true;
+              if (/\\b(size-active|selected|active|is-selected|is-active)\\b/i.test(cls)) return true;
               if (isElementActive(el)) return true;
               var input = el.querySelector('input[type="radio"], input[type="checkbox"]');
               if (input && input.checked) return true;
               var parent = el.parentElement;
               if (parent && (parent.getAttribute('aria-selected') === 'true' || parent.getAttribute('aria-checked') === 'true')) return true;
-              if (parent && !/\b(list|container|wrap|choose|group|items|row|box|content)\b/i.test(parent.className || '')) {
+              if (parent && !/\\b(list|container|wrap|choose|group|items|row|box|content)\\b/i.test(parent.className || '')) {
                 if (isElementActive(parent)) return true;
               }
               return false;
@@ -3264,9 +3264,9 @@ export default function Webview({ route, navigation }) {
               return false;
             })();
 
-            var isDollarInBody = !!(document.body && (document.body.innerText.indexOf('$') > -1 || /\bUSD\b/i.test(document.body.innerText.slice(0, 3000))));
-            var isSarInBody = !!(document.body && (/[﷼\uFDFC\u20C1⃁]|ر\.?س|ريال|\bSAR\b/i.test(document.body.innerText.slice(0, 3000))));
-            var isAedInBody = !!(document.body && (/د\.?إ|درهم|\bAED\b/i.test(document.body.innerText.slice(0, 3000))));
+            var isDollarInBody = !!(document.body && (document.body.innerText.indexOf('$') > -1 || /\\bUSD\\b/i.test(document.body.innerText.slice(0, 3000))));
+            var isSarInBody = !!(document.body && (/[﷼\uFDFC\u20C1⃁]|ر\\.?س|ريال|\\bSAR\\b/i.test(document.body.innerText.slice(0, 3000))));
+            var isAedInBody = !!(document.body && (/د\\.?إ|درهم|\\bAED\\b/i.test(document.body.innerText.slice(0, 3000))));
 
             var isSoldOut = false;
             try {
